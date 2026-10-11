@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `c8662720d6805f09` · changed 2026-10-11T08:22Z
+> **BEGIN Shared Area** · sha256 `8747535e984a49b5` · changed 2026-10-11T08:32Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -109,10 +109,10 @@ and the UTC time that text last changed; change it in the channel first, never i
   An agent never sets Accepted, Rejected, Estimated, Backlog, Rework or Finished; it proposes in the channel. A
   size or plan that grows clearly while building is said before building on.
 - **`issues/README.md` is the index, grouped by state** in this order: Review, Rework, Implementing,
-  Backlog, Analyzed, Accepted, Idea, Estimated, then Finished and Rejected last; each group a table of number,
-  size, blocked by, what it covers and the number of open questions (the group's heading says the state; a note on
-  how far it is goes into what it covers), ordered by what to do next; it changes in
-  the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
+  Backlog, Analyzed, Accepted, Idea, Estimated, then Finished and Rejected last; each group a table of
+  number, size, blocked by and what it covers, and in *Analyzed* also the number of open questions
+  (the group's heading says the state; a note on how far it is goes into what it covers), ordered by
+  what to do next; it changes in the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
 - **A rejected issue's file is deleted**; its number, title and one sentence why stay as a row under
   *Rejected* in the index, so the same idea is not brought twice.
 - **From Analyzed on, an issue has a size and a plan, read in the code, not guessed.** XS is under an hour (one
@@ -123,8 +123,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   test that goes red first; a size or a plan that turns out wrong while building is corrected in the
   issue in the same commit.
 - **An open question is one only the operator can answer** - a choice of product, scope, account,
-  money or risk - and sits under *Open questions*, which the index counts: that column is what waits
-  on the operator. What the agent can find out itself, by reading, measuring or asking another agent,
+  money or risk - and sits under *Open questions*, which the index counts in *Analyzed*: that column
+  is what waits on the operator. From Estimated on an issue has none; one that comes up while building
+  is said in the channel, and the issue waits until it is answered. What the agent can find out itself, by reading, measuring or asking another agent,
   sits under *To be checked* and is not counted. An answered question is deleted once its answer is
   in the criteria, the design or a decision.
 - **A finished issue's file is deleted when the operator sets Finished, with every mention of its
@@ -303,7 +304,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `c8662720d6805f09`
+> **END Shared Area** · sha256 `8747535e984a49b5`
 
 ## What this repository is
 
