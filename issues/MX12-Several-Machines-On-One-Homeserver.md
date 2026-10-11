@@ -65,7 +65,10 @@ on another machine's accounts.
   `conversation`; if not, `"admitted": false` and no `conversation`. The relay is
   `@sokar-relay-<project>.<machine>`, invited by the machine's account.
 - **`enroll`, central**: registers `@<task>.<machine>`, invites it with the machine's account, and prints
-  its password in `secrets` beside its token, so the task's own account can be deactivated later.
+  its password in `secrets` beside its token, so the task's own account can be deactivated later. Sokar keeps
+  `enroll`'s `secrets` in the vault per task and hands them back to `retire` as environment variables,
+  forgetting them only once `retire` succeeds; a task with no kept secrets gets no `retire` call, so a
+  central `enroll` always prints them.
 - **`retire`, central**: as the task's own account, `POST /_matrix/client/v3/account/deactivate` with the
   password under user-interactive auth (`MatrixClient`); no `AdminRoom`. Enrolled again, the task's
   password changes through `/account/password`, also as itself.
@@ -102,5 +105,3 @@ on another machine's accounts.
   password user-interactive auth, as the plan's `retire` needs. Measured against the pinned image; mine.
 - Whether a member given the power to invite, not an administrator, is enough to invite the relay and the
   tasks into a room a person made. Measured against Tuwunel; mine.
-- Whether Sokar keeps a task's password from `enroll`'s `secrets` and passes it back to `retire` and to a
-  second `enroll`, as it does the token; read in `sokar` and asked of Agent Core.
