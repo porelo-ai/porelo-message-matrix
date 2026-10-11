@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `08221374be35ad68` · changed 2026-10-11T08:18Z
+> **BEGIN Shared Area** · sha256 `c8662720d6805f09` · changed 2026-10-11T08:22Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -83,14 +83,19 @@ and the UTC time that text last changed; change it in the channel first, never i
 
       - How it is judged done: what is measured, and what must be seen to fail.
 
+      ## Open questions
+
+      - What the operator must decide; deleted once answered.
+
       ## To be checked
 
-      - Open questions, each saying whose decision it is; deleted once answered.
+      - What the agent must still measure, read or confirm itself; deleted once done.
 - **An issue moves through these states, and only the operator, as product owner, sets six of them**:
   - **Idea** - anyone brings it: a title and *What must be true*.
   - **Accepted** or **Rejected** - the operator only; a rejection says why.
   - **Analyzed** - the agent owning the repository: the *Plan* (a base design of a page at most, read
-    in the code), the *Size*, and the open questions under *To be checked*, each with whose it is.
+    in the code), the *Size*, the operator's decisions under *Open questions*, and what it must still find out
+    itself under *To be checked*.
   - **Estimated** - the operator only, after reading the design and settling its questions with the
     agent, who adjusts the plan and the size.
   - **Backlog** - the operator only: it is built in the next round; the order in the index is the
@@ -105,7 +110,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   size or plan that grows clearly while building is said before building on.
 - **`issues/README.md` is the index, grouped by state** in this order: Review, Rework, Implementing,
   Backlog, Analyzed, Accepted, Idea, Estimated, then Finished and Rejected last; each group a table of number,
-  size, blocked by, what it covers and open questions (the group's heading says the state; a note on
+  size, blocked by, what it covers and the number of open questions (the group's heading says the state; a note on
   how far it is goes into what it covers), ordered by what to do next; it changes in
   the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
 - **A rejected issue's file is deleted**; its number, title and one sentence why stay as a row under
@@ -117,8 +122,11 @@ and the UTC time that text last changed; change it in the channel first, never i
   splits into issues of L or smaller. *Plan* names the files and classes it touches, the steps and the
   test that goes red first; a size or a plan that turns out wrong while building is corrected in the
   issue in the same commit.
-- **An issue's unanswered questions sit under *To be checked*, and the index counts them.** An
-  answered question is deleted once its answer is in the criteria, the design or a decision.
+- **An open question is one only the operator can answer** - a choice of product, scope, account,
+  money or risk - and sits under *Open questions*, which the index counts: that column is what waits
+  on the operator. What the agent can find out itself, by reading, measuring or asking another agent,
+  sits under *To be checked* and is not counted. An answered question is deleted once its answer is
+  in the criteria, the design or a decision.
 - **A finished issue's file is deleted when the operator sets Finished, with every mention of its
   number, in one commit**; its number, title and one sentence of what was built stay as a row under
   *Finished* in the index, so what was built can be seen. What outlives it
@@ -295,7 +303,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `08221374be35ad68`
+> **END Shared Area** · sha256 `c8662720d6805f09`
 
 ## What this repository is
 

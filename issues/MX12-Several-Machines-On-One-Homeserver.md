@@ -75,14 +75,14 @@ on another machine's accounts.
   `settings.homeserver() != null`.
 - **Tests:** `LifecycleIT` against one Tuwunel named as `homeserver`, two `--machine` names standing for
   two machines: each refusal of the acceptance seen red first there. Then the two-machine acceptance on
-  the VM and `silentmaxx-ms`.
+  the VM and the operator's second machine.
 - **Docs:** `doc/transport.md` (the verbs' central mode, `--machine`, `room`), `doc/homeserver.md` (running
   the central homeserver, a person's steps), `doc/decisions.md` (no administrator on a central homeserver).
 
 ## Acceptance
 
-- Across two machines, the Ubuntu VM and `silentmaxx-ms`, tasks on both in one project message each other,
-  and a person in the room sees all of them.
+- Across two machines, the Ubuntu VM and the operator's second machine, tasks on both in one project
+  message each other, and a person in the room sees all of them.
 - A task retired on one machine is gone, and the other machine's tasks and accounts are untouched.
 - Seen to fail:
   - one machine acting on another machine's account (`retire`, or enrolling its task again) is refused;
@@ -91,6 +91,11 @@ on another machine's accounts.
   - `join` on a central homeserver answers 77;
   - a machine not yet invited starts no task.
 
+## Open questions
+
+- Where the second machine for the acceptance comes from, with Sokar installed per account, and the
+  central homeserver both machines reach.
+
 ## To be checked
 
 - Whether Tuwunel lets an account deactivate itself and change its own password over the client API with
@@ -98,6 +103,4 @@ on another machine's accounts.
 - Whether a member given the power to invite, not an administrator, is enough to invite the relay and the
   tasks into a room a person made. Measured against Tuwunel; mine.
 - Whether Sokar keeps a task's password from `enroll`'s `secrets` and passes it back to `retire` and to a
-  second `enroll`, as it does the token; read in `sokar`, Agent Core's to confirm.
-- Where the second machine for the acceptance comes from: `silentmaxx-ms` with Sokar installed per
-  account, and a central homeserver both reach; the operator's to provide.
+  second `enroll`, as it does the token; read in `sokar` and asked of Agent Core.
