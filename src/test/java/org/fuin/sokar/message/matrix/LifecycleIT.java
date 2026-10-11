@@ -111,14 +111,14 @@ class LifecycleIT {
         final Map<String, String> kept = with(firstRun(), setup.path("account"), setup.path("secrets"));
         kept.put("XDG_STATE_HOME", dir.resolve("state").toString());
         final JsonNode alice = run(kept, "enroll", "--project", PROJECT, "--task", "sokar-demo-alice");
-        run(kept, "join", "--project", PROJECT, "--person", "michi");
+        run(kept, "join", "--project", PROJECT, "--person", "carol");
         final String server = AdminRoom.server(alice.path("address").asText());
 
         final JsonNode cleared = run(kept, "clear", "--project", PROJECT);
 
         assertThat(cleared.path("removed")).extracting(JsonNode::asText).containsExactlyInAnyOrder(
                 "the account @sokar-relay-demo:" + server, "the account @sokar-demo-alice:" + server,
-                "the account @michi:" + server, "the room #sokar-demo:" + server);
+                "the account @carol:" + server, "the room #sokar-demo:" + server);
         assertThat(cleared.path("kept")).isEmpty();
         assertThat(status(tuwunel.url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText())).isEqualTo(401);
         assertThat(status(tuwunel.url(), setup.path("account").path(Config.ADMIN_TOKEN).asText())).isEqualTo(200);
@@ -180,9 +180,9 @@ class LifecycleIT {
     void resetPasswordIsNotKept() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept = with(firstRun(), setup.path("account"), setup.path("secrets"));
-        run(kept, "join", "--project", PROJECT, "--person", "michi");
+        run(kept, "join", "--project", PROJECT, "--person", "carol");
 
-        final String password = run(kept, "join", "--project", PROJECT, "--person", "michi", "--reset")
+        final String password = run(kept, "join", "--project", PROJECT, "--person", "carol", "--reset")
                 .path("login").path("password").asText();
         final String adminToken = setup.path("account").path(Config.ADMIN_TOKEN).asText();
 
@@ -234,7 +234,7 @@ class LifecycleIT {
 
         for (final String[] args : new String[][] {{"setup", "--project", PROJECT},
                 {"enroll", "--project", PROJECT, "--task", "sokar-demo-alice"},
-                {"join", "--project", PROJECT, "--person", "michi"}}) {
+                {"join", "--project", PROJECT, "--person", "carol"}}) {
             final Transport.Result result = attempt(kept, args);
             assertThat(result.exit()).as(args[0]).isEqualTo(Exit.CONFIG);
             assertThat(result.err()).as(args[0]).contains("was reset");
@@ -376,16 +376,16 @@ class LifecycleIT {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> lifecycle = with(firstRun(), setup.path("account"), setup.path("secrets"));
 
-        final JsonNode login = run(lifecycle, "join", "--project", PROJECT, "--person", "michi").path("login");
-        assertThat(login.path("user").asText()).isEqualTo("@michi:" + Tuwunel.SERVER_NAME);
+        final JsonNode login = run(lifecycle, "join", "--project", PROJECT, "--person", "carol").path("login");
+        assertThat(login.path("user").asText()).isEqualTo("@carol:" + Tuwunel.SERVER_NAME);
         assertThat(login.path("room").asText()).isEqualTo("#sokar-demo:" + Tuwunel.SERVER_NAME);
         assertThat(login.path("password").asText()).isNotEmpty();
 
-        final Transport.Result again = attempt(lifecycle, "join", "--project", PROJECT, "--person", "michi");
+        final Transport.Result again = attempt(lifecycle, "join", "--project", PROJECT, "--person", "carol");
         assertThat(again.exit()).isEqualTo(Exit.NOT_PERMITTED);
         assertThat(again.err()).contains("--reset");
 
-        final JsonNode reset = run(lifecycle, "join", "--project", PROJECT, "--person", "michi", "--reset").path("login");
+        final JsonNode reset = run(lifecycle, "join", "--project", PROJECT, "--person", "carol", "--reset").path("login");
         assertThat(reset.path("password").asText()).isNotEqualTo(login.path("password").asText());
     }
 

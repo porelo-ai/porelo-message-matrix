@@ -39,7 +39,7 @@ class DirectIT {
     private Tuwunel.Account task;
 
     /** A person in the project's room. */
-    private Tuwunel.Account michi;
+    private Tuwunel.Account alice;
 
     private String project;
 
@@ -51,8 +51,8 @@ class DirectIT {
     void setUp() throws IOException, InterruptedException {
         tuwunel = Tuwunel.start();
         task = tuwunel.register("task");
-        michi = tuwunel.register("michi");
-        project = tuwunel.createRoom(task, michi);
+        alice = tuwunel.register("alice");
+        project = tuwunel.createRoom(task, alice);
         inbound = Files.createDirectories(dir.resolve("inbound"));
     }
 
@@ -94,19 +94,19 @@ class DirectIT {
     @Test
     @DisplayName("A chat a person of the project opens is joined, and what they say there is handed over as direct, for the task alone")
     void personOpensAChat() throws IOException, InterruptedException {
-        final String chat = tuwunel.openDirect(michi, task);
-        tuwunel.sayContent(michi, project, text("said in the project's room"));
+        final String chat = tuwunel.openDirect(alice, task);
+        tuwunel.sayContent(alice, project, text("said in the project's room"));
 
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
-        assertThat(tuwunel.membership(michi, chat, task.userId())).isEqualTo("join");
+        assertThat(tuwunel.membership(alice, chat, task.userId())).isEqualTo("join");
 
         final ObjectNode words = text("writer, a word for you alone");
         words.putObject("m.mentions").putArray("user_ids").add("@someone:else");
-        tuwunel.sayContent(michi, chat, words);
+        tuwunel.sayContent(alice, chat, words);
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
 
         assertThat(persons()).singleElement().satisfies(p -> {
-            assertThat(p.path("sender").asText()).isEqualTo(michi.userId());
+            assertThat(p.path("sender").asText()).isEqualTo(alice.userId());
             assertThat(p.path("direct").asBoolean(false)).isTrue();
             assertThat(p.path("to")).extracting(JsonNode::asText).containsExactly(task.userId());
             assertThat(p.path("body").asText()).isEqualTo("writer, a word for you alone");
@@ -129,26 +129,26 @@ class DirectIT {
     @Test
     @DisplayName("An encrypted chat, which a task cannot read, is declined with a reason the person sees, and said so")
     void encryptedChatIsDeclined() throws IOException, InterruptedException {
-        final String chat = tuwunel.openDirect(michi, task, true);
+        final String chat = tuwunel.openDirect(alice, task, true);
 
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(tuwunel.membership(michi, chat, task.userId())).isEqualTo("leave");
-        assertThat(stderr()).contains("an encrypted chat from " + michi.userId(), Direct.ENCRYPTED);
+        assertThat(tuwunel.membership(alice, chat, task.userId())).isEqualTo("leave");
+        assertThat(stderr()).contains("an encrypted chat from " + alice.userId(), Direct.ENCRYPTED);
         assertThat(persons()).isEmpty();
     }
 
     @Test
     @DisplayName("An encrypted message, which nobody here can read, is named on stderr and not handed over")
     void encryptedMessageIsNamed() throws IOException, InterruptedException {
-        final String chat = tuwunel.openDirect(michi, task);
+        final String chat = tuwunel.openDirect(alice, task);
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
-        tuwunel.sendEvent(michi, chat, "m.room.encrypted", MatrixClient.JSON.createObjectNode()
+        tuwunel.sendEvent(alice, chat, "m.room.encrypted", MatrixClient.JSON.createObjectNode()
                 .put("algorithm", "m.megolm.v1.aes-sha2").put("ciphertext", "AwgAEnAC").put("session_id", "s"));
 
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(stderr()).contains("an encrypted message, which Sokar cannot read", "from " + michi.userId());
+        assertThat(stderr()).contains("an encrypted message, which Sokar cannot read", "from " + alice.userId());
         assertThat(persons()).isEmpty();
     }
 
@@ -162,11 +162,11 @@ class DirectIT {
     @Test
     @DisplayName("send --to a person writes into the chat they opened, and opens one where there is none")
     void taskWritesToAPerson() throws IOException, InterruptedException, Failure {
-        final String chat = tuwunel.openDirect(michi, task);
+        final String chat = tuwunel.openDirect(alice, task);
         assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(sendTo(michi.userId(), "{\"answer\":1}")).as(this::stderr).isEqualTo(Exit.OK);
-        assertThat(tuwunel.messages(michi, chat)).anySatisfy(e -> {
+        assertThat(sendTo(alice.userId(), "{\"answer\":1}")).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(tuwunel.messages(alice, chat)).anySatisfy(e -> {
             assertThat(e.path("content").path(Send.MESSAGE_FIELD).asText()).isEqualTo("{\"answer\":1}");
             assertThat(e.path("content").has("m.mentions")).as("a direct chat is the two of them: nobody to mention")
                     .isFalse();

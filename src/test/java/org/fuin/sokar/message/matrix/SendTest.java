@@ -94,8 +94,8 @@ class SendTest {
         @DisplayName("a line that fits is carried as it is")
         void lineThatFits() {
             final ObjectNode content = content(MESSAGE);
-            Send.fit(content, "foo to michi: hello");
-            assertThat(content.path("body").asText()).isEqualTo("foo to michi: hello");
+            Send.fit(content, "foo to alice: hello");
+            assertThat(content.path("body").asText()).isEqualTo("foo to alice: hello");
         }
 
         @Test
@@ -165,34 +165,34 @@ class SendTest {
         @DisplayName("the body a client shows is the line --shown names, never the message")
         void bodyIsTheLine() throws IOException {
             homeserver.answer(200, "{\"event_id\":\"$abc\"}");
-            final Path line = Files.writeString(dir.resolve("line"), "foo to michi: Grüße ✓", StandardCharsets.UTF_8);
+            final Path line = Files.writeString(dir.resolve("line"), "foo to alice: Grüße ✓", StandardCharsets.UTF_8);
 
             assertThat(send(message.toString(), signature.toString(), "--shown", line.toString(), "--to", ROOM))
                     .as(SendTest.this::stderr).isEqualTo(Exit.OK);
 
             final JsonNode content = MatrixClient.JSON.readTree(homeserver.requests().getFirst().body());
-            assertThat(content.path("body").asText()).isEqualTo("foo to michi: Grüße ✓");
+            assertThat(content.path("body").asText()).isEqualTo("foo to alice: Grüße ✓");
             assertThat(content.path(Send.MESSAGE_FIELD).asText()).isEqualTo(MESSAGE);
         }
 
         @Test
         @DisplayName("--mention names the person in m.mentions and as a pill before the line, so their client highlights it")
         void mentionIsAPill() throws IOException {
-            homeserver.answer(200, "{\"displayname\":\"Michi <M>\"}").answer(200, "{\"event_id\":\"$abc\"}");
+            homeserver.answer(200, "{\"displayname\":\"Alice <M>\"}").answer(200, "{\"event_id\":\"$abc\"}");
             final Path line = Files.writeString(dir.resolve("line"), "a <b> & \"c\"\nnext", StandardCharsets.UTF_8);
 
             assertThat(send(message.toString(), signature.toString(), "--to", ROOM, "--shown", line.toString(),
-                    "--mention", "@michi:localhost")).as(SendTest.this::stderr).isEqualTo(Exit.OK);
+                    "--mention", "@alice:localhost")).as(SendTest.this::stderr).isEqualTo(Exit.OK);
 
             assertThat(homeserver.requests().getFirst().rawPath()).as("the name the person's client shows is asked")
-                    .endsWith("/profile/%40michi%3Alocalhost/displayname");
+                    .endsWith("/profile/%40alice%3Alocalhost/displayname");
             final JsonNode content = MatrixClient.JSON.readTree(homeserver.requests().get(1).body());
             assertThat(content.path("m.mentions").path("user_ids")).extracting(JsonNode::asText)
-                    .containsExactly("@michi:localhost");
-            assertThat(content.path("body").asText()).isEqualTo("Michi <M>: a <b> & \"c\"\nnext");
+                    .containsExactly("@alice:localhost");
+            assertThat(content.path("body").asText()).isEqualTo("Alice <M>: a <b> & \"c\"\nnext");
             assertThat(content.path("format").asText()).isEqualTo("org.matrix.custom.html");
-            assertThat(content.path("formatted_body").asText()).isEqualTo("<a href=\"https://matrix.to/#/@michi:localhost\">"
-                    + "Michi &lt;M&gt;</a>: a &lt;b&gt; &amp; &quot;c&quot;<br>next");
+            assertThat(content.path("formatted_body").asText()).isEqualTo("<a href=\"https://matrix.to/#/@alice:localhost\">"
+                    + "Alice &lt;M&gt;</a>: a &lt;b&gt; &amp; &quot;c&quot;<br>next");
             assertThat(content.path(Send.MESSAGE_FIELD).asText()).isEqualTo(MESSAGE);
         }
 
@@ -212,7 +212,7 @@ class SendTest {
         @Test
         @DisplayName("a --mention that is no user id, or a lone one, is 64, and nothing reaches the homeserver")
         void wrongMention() {
-            assertThat(send(message.toString(), signature.toString(), "--to", ROOM, "--mention", "michi"))
+            assertThat(send(message.toString(), signature.toString(), "--to", ROOM, "--mention", "alice"))
                     .isEqualTo(Exit.USAGE);
             assertThat(send(message.toString(), signature.toString(), "--to", ROOM, "--mention")).isEqualTo(Exit.USAGE);
             assertThat(homeserver.requests()).isEmpty();
