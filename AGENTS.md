@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `845398696eac94da` · changed 2026-10-11T08:11Z
+> **BEGIN Shared Area** · sha256 `08221374be35ad68` · changed 2026-10-11T08:18Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -129,8 +129,12 @@ and the UTC time that text last changed; change it in the channel first, never i
   change the answer.
 - **A requirement not yet placed waits in `sokar-project`** until it is clear which repository builds
   it, then moves there as an issue.
-- **Link to a requirement by its number and the index, never to its file**, which is deleted when the
-  requirement is finished. A repository that can test this, does.
+- **Every row of an index opens with an anchor named after its number**, `<a id="<number>"></a>`,
+  the number lower case; a *Finished* or *Rejected* row keeps it.
+- **An issue number in `issues/` is a link to its row in the index, never to its file**, which is
+  deleted when the issue is finished: `[<NUMBER>](README.md#<number>)` in the same repository, the
+  other repository's index on GitHub for another's. The row outlives the file, so the link does not
+  break. The shared tools check that every number is such a link and that its anchor exists.
 - **Code, comments, test names and anything that ships never cite an issue number**; they state the
   constraint itself, since the issue is deleted once it is finished.
 
@@ -291,7 +295,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `845398696eac94da`
+> **END Shared Area** · sha256 `08221374be35ad68`
 
 ## What this repository is
 
