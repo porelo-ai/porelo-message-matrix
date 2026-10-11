@@ -5,6 +5,6 @@ sequence.
 
 ## Analyzed
 
-| # | Status | Size | Blocked by | What it covers | Open questions |
-|---|---|---|---|---|---|
-| [MX12](MX12-Several-Machines-On-One-Homeserver.md) | Analyzed | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation | 4 |
+| # | Size | Blocked by | What it covers | Open questions |
+|---|---|---|---|---|
+| [MX12](MX12-Several-Machines-On-One-Homeserver.md) | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation | 4 |

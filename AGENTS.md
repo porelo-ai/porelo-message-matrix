@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `099f4cc885bf5ab9` · changed 2026-10-11T08:03Z
+> **BEGIN Shared Area** · sha256 `845398696eac94da` · changed 2026-10-11T08:11Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -104,8 +104,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   An agent never sets Accepted, Rejected, Estimated, Backlog, Rework or Finished; it proposes in the channel. A
   size or plan that grows clearly while building is said before building on.
 - **`issues/README.md` is the index, grouped by state** in this order: Review, Rework, Implementing,
-  Backlog, Analyzed, Accepted, Idea, Estimated, and Rejected last; each group a table of number,
-  status, size, blocked by, what it covers and open questions, ordered by what to do next; it changes in
+  Backlog, Analyzed, Accepted, Idea, Estimated, then Finished and Rejected last; each group a table of number,
+  size, blocked by, what it covers and open questions (the group's heading says the state; a note on
+  how far it is goes into what it covers), ordered by what to do next; it changes in
   the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
 - **A rejected issue's file is deleted**; its number, title and one sentence why stay as a row under
   *Rejected* in the index, so the same idea is not brought twice.
@@ -118,8 +119,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   issue in the same commit.
 - **An issue's unanswered questions sit under *To be checked*, and the index counts them.** An
   answered question is deleted once its answer is in the criteria, the design or a decision.
-- **A finished issue is deleted when the operator sets Finished, with its row and every mention of
-  its number, in one commit.** What outlives it
+- **A finished issue's file is deleted when the operator sets Finished, with every mention of its
+  number, in one commit**; its number, title and one sentence of what was built stay as a row under
+  *Finished* in the index, so what was built can be seen. What outlives it
   moves first: to `doc/` if a user needs it, to `doc/decisions.md` if it is a decision, to
   `AGENTS.md` if it is a rule, to `.AGENTS.md` if it is true only on one machine.
 - **`doc/decisions.md` opens with an index** - subject, one line of what holds, link - and a row is
@@ -289,7 +291,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `099f4cc885bf5ab9`
+> **END Shared Area** · sha256 `845398696eac94da`
 
 ## What this repository is
 
