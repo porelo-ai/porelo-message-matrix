@@ -330,8 +330,9 @@ over a Matrix homeserver. Sokar's side of it - the peer table, a task's account,
 - **Issue prefix: `MX`.**
 - **The tests tagged `documents` run alone with `./mvnw -B -s settings.xml -Pdocuments test`**;
   `DocumentTestsTaggedTest` fails when a test reads a document without the tag. None reads one today: the
-  `shared-rules` workflow checks them with `sokar-release`'s `check-citations`, `check-doc-site` and
-  `check-readmes`, on every change; the build skips a change to documents alone.
+  documents are checked with `sokar-release`'s `check-citations`, `check-doc-site` and `check-readmes` on the
+  host before every hand-over, and by the `shared-rules` workflow once a day; the build skips a change to
+  documents alone.
 - **The homeserver image's pin is moved by review.** Dependabot proposes a new digest for the `FROM` line of
   `homeserver/Dockerfile`; `ghcr.io` gives it no publication date, so the reviewer reads the image's
   `org.opencontainers.image.created` and takes nothing younger than three days.
