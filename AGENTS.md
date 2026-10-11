@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `07ac9925c20b6fd9` · changed 2026-10-08T06:49Z
+> **BEGIN Shared Area** · sha256 `5f6217b026c4daf0` · changed 2026-10-11T07:22Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -69,8 +69,13 @@ and the UTC time that text last changed; change it in the channel first, never i
       # <PREFIX><nn> — <Short Title>
 
       **Status:** now | soon | later; blocked by <repository> <number>, if so.
+      **Size:** XS | S | M | L | XL - one line why.
 
       **What must be true.** One or two sentences, from the point of view of whoever uses it.
+
+      ## Plan
+
+      - How it is built, read in today's code: what it touches, the steps, the test that goes red first.
 
       ## Acceptance
 
@@ -80,8 +85,15 @@ and the UTC time that text last changed; change it in the channel first, never i
 
       - Open questions, if any; deleted once answered.
 - **`issues/README.md` is the index, grouped into Now, Soon and Later**, each a table of number,
-  status, blocked by, what it covers and open questions, ordered by what to do next; it changes in
+  status, size, blocked by, what it covers and open questions, ordered by what to do next; it changes in
   the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
+- **Every open issue has a size and a plan, read in the code, not guessed.** XS is under an hour (one
+  file, no contract); S a few hours (one module and its tests, no contract other repositories read);
+  M about a day (several modules, or one contract change, docs, an acceptance step); L several days
+  (crosses repositories, or a design to decide first); XL is too big to build as one and says how it
+  splits into issues of L or smaller. *Plan* names the files and classes it touches, the steps and the
+  test that goes red first; a size or a plan that turns out wrong while building is corrected in the
+  issue in the same commit.
 - **An issue's unanswered questions sit under *To be checked*, and the index counts them.** An
   answered question is deleted once its answer is in the criteria, the design or a decision.
 - **A finished issue is deleted, with its row and every mention of its number.** What outlives it
@@ -254,7 +266,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `07ac9925c20b6fd9`
+> **END Shared Area** · sha256 `5f6217b026c4daf0`
 
 ## What this repository is
 

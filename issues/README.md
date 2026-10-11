@@ -15,6 +15,6 @@ None open.
 
 ## Later
 
-| # | Status | Blocked by | What it covers | Open questions |
-|---|---|---|---|---|
-| [MX12](MX12-Several-Machines-On-One-Homeserver.md) | open | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation | 0 |
+| # | Status | Size | Blocked by | What it covers | Open questions |
+|---|---|---|---|---|---|
+| [MX12](MX12-Several-Machines-On-One-Homeserver.md) | open | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation | 4 |

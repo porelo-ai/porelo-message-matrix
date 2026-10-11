@@ -1,6 +1,8 @@
 # MX12 — Several Machines On One Homeserver
 
 **Status:** later.
+**Size:** L - every lifecycle verb gets a second, central mode, `describe` and the settings change a contract
+Sokar reads, and its acceptance needs two machines on one homeserver.
 
 **What must be true.** A project whose tasks run on several machines has one conversation, in one room on
 one central homeserver, where a task on one machine messages a task on another and a person sees all of
@@ -49,6 +51,34 @@ on another machine's accounts.
 - **`doc/homeserver.md` says how to run the central homeserver**: where, TLS, the registration token, and
   the person's steps - make the room, invite each machine.
 
+## Plan
+
+- **Settings and its check** (`Settings`, `SettingsCheck`): a `room` key, an alias or a room id. On a
+  central homeserver (`homeserver` set) it is required. Red first in `SettingsTest`: `setup` without
+  `room` on a central homeserver exits 78.
+- **The option** (`Lifecycle.Options`): `--machine <name>` on every verb, sanitized to the localpart
+  alphabet; `describe` (`Describe.run`) adds `"takes": ["machine"]`, which wakes Sokar's dormant side.
+  Red first in `DescribeTest` and `LifecycleTest` (usage).
+- **`setup`, central** (`Lifecycle.setup`): no `admin(...)`, no `AdminRoom`, no `room(...)`. It registers
+  `@sokar.<machine>` with the registration token (`Accounts.register`); a name another machine holds is
+  78. If that account is invited to `room`, it joins and prints `"admitted": true` and the room as
+  `conversation`; if not, `"admitted": false` and no `conversation`. The relay is
+  `@sokar-relay-<project>.<machine>`, invited by the machine's account.
+- **`enroll`, central**: registers `@<task>.<machine>`, invites it with the machine's account, and prints
+  its password in `secrets` beside its token, so the task's own account can be deactivated later.
+- **`retire`, central**: as the task's own account, `POST /_matrix/client/v3/account/deactivate` with the
+  password under user-interactive auth (`MatrixClient`); no `AdminRoom`. Enrolled again, the task's
+  password changes through `/account/password`, also as itself.
+- **`join`, central**: 77, "people are managed at the homeserver itself". **`clear`, central**: deactivates
+  this machine's accounts only and leaves the room and other machines' accounts alone.
+- **The loopback homeserver** keeps today's paths byte for byte; every central branch is chosen by
+  `settings.homeserver() != null`.
+- **Tests:** `LifecycleIT` against one Tuwunel named as `homeserver`, two `--machine` names standing for
+  two machines: each refusal of the acceptance seen red first there. Then the two-machine acceptance on
+  the VM and `silentmaxx-ms`.
+- **Docs:** `doc/transport.md` (the verbs' central mode, `--machine`, `room`), `doc/homeserver.md` (running
+  the central homeserver, a person's steps), `doc/decisions.md` (no administrator on a central homeserver).
+
 ## Acceptance
 
 - Across two machines, the Ubuntu VM and `silentmaxx-ms`, tasks on both in one project message each other,
@@ -60,3 +90,14 @@ on another machine's accounts.
   - a `--machine` name another machine holds is refused with 78;
   - `join` on a central homeserver answers 77;
   - a machine not yet invited starts no task.
+
+## To be checked
+
+- Whether Tuwunel lets an account deactivate itself and change its own password over the client API with
+  password user-interactive auth, as the plan's `retire` needs. Measured against the pinned image; mine.
+- Whether a member given the power to invite, not an administrator, is enough to invite the relay and the
+  tasks into a room a person made. Measured against Tuwunel; mine.
+- Whether Sokar keeps a task's password from `enroll`'s `secrets` and passes it back to `retire` and to a
+  second `enroll`, as it does the token; read in `sokar`, Agent Core's to confirm.
+- Where the second machine for the acceptance comes from: `silentmaxx-ms` with Sokar installed per
+  account, and a central homeserver both reach; the operator's to provide.
