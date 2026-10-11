@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `5f6217b026c4daf0` · changed 2026-10-11T07:22Z
+> **BEGIN Shared Area** · sha256 `099f4cc885bf5ab9` · changed 2026-10-11T08:03Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -68,14 +68,16 @@ and the UTC time that text last changed; change it in the channel first, never i
 
       # <PREFIX><nn> — <Short Title>
 
-      **Status:** now | soon | later; blocked by <repository> <number>, if so.
-      **Size:** XS | S | M | L | XL - one line why.
+      **Status:** Idea | Accepted | Analyzed | Estimated | Backlog | Implementing | Review | Rework;
+      blocked by <repository> <number>, if so.
+      **Size:** XS | S | M | L | XL - one line why (from Analyzed on).
 
       **What must be true.** One or two sentences, from the point of view of whoever uses it.
 
       ## Plan
 
-      - How it is built, read in today's code: what it touches, the steps, the test that goes red first.
+      - The base design, a page at most, read in today's code: what it touches, the steps, the test
+        that goes red first (from Analyzed on).
 
       ## Acceptance
 
@@ -83,11 +85,31 @@ and the UTC time that text last changed; change it in the channel first, never i
 
       ## To be checked
 
-      - Open questions, if any; deleted once answered.
-- **`issues/README.md` is the index, grouped into Now, Soon and Later**, each a table of number,
+      - Open questions, each saying whose decision it is; deleted once answered.
+- **An issue moves through these states, and only the operator, as product owner, sets six of them**:
+  - **Idea** - anyone brings it: a title and *What must be true*.
+  - **Accepted** or **Rejected** - the operator only; a rejection says why.
+  - **Analyzed** - the agent owning the repository: the *Plan* (a base design of a page at most, read
+    in the code), the *Size*, and the open questions under *To be checked*, each with whose it is.
+  - **Estimated** - the operator only, after reading the design and settling its questions with the
+    agent, who adjusts the plan and the size.
+  - **Backlog** - the operator only: it is built in the next round; the order in the index is the
+    priority.
+  - **Implementing** - the agent: **Rework** before Backlog; built locally, its whole workflow green on
+    the VM, then pushed by the coordinator.
+  - **Review** - the agent, once it is pushed and published as a snapshot; the operator tests what is
+    published.
+  - **Rework** or **Finished** - the operator only, after the test; a rework says what was found.
+
+  An agent never sets Accepted, Rejected, Estimated, Backlog, Rework or Finished; it proposes in the channel. A
+  size or plan that grows clearly while building is said before building on.
+- **`issues/README.md` is the index, grouped by state** in this order: Review, Rework, Implementing,
+  Backlog, Analyzed, Accepted, Idea, Estimated, and Rejected last; each group a table of number,
   status, size, blocked by, what it covers and open questions, ordered by what to do next; it changes in
   the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
-- **Every open issue has a size and a plan, read in the code, not guessed.** XS is under an hour (one
+- **A rejected issue's file is deleted**; its number, title and one sentence why stay as a row under
+  *Rejected* in the index, so the same idea is not brought twice.
+- **From Analyzed on, an issue has a size and a plan, read in the code, not guessed.** XS is under an hour (one
   file, no contract); S a few hours (one module and its tests, no contract other repositories read);
   M about a day (several modules, or one contract change, docs, an acceptance step); L several days
   (crosses repositories, or a design to decide first); XL is too big to build as one and says how it
@@ -96,7 +118,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   issue in the same commit.
 - **An issue's unanswered questions sit under *To be checked*, and the index counts them.** An
   answered question is deleted once its answer is in the criteria, the design or a decision.
-- **A finished issue is deleted, with its row and every mention of its number.** What outlives it
+- **A finished issue is deleted when the operator sets Finished, with its row and every mention of
+  its number, in one commit.** What outlives it
   moves first: to `doc/` if a user needs it, to `doc/decisions.md` if it is a decision, to
   `AGENTS.md` if it is a rule, to `.AGENTS.md` if it is true only on one machine.
 - **`doc/decisions.md` opens with an index** - subject, one line of what holds, link - and a row is
@@ -266,7 +289,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `5f6217b026c4daf0`
+> **END Shared Area** · sha256 `099f4cc885bf5ab9`
 
 ## What this repository is
 

@@ -1,6 +1,6 @@
 # MX12 — Several Machines On One Homeserver
 
-**Status:** later.
+**Status:** Analyzed.
 **Size:** L - every lifecycle verb gets a second, central mode, `describe` and the settings change a contract
 Sokar reads, and its acceptance needs two machines on one homeserver.
 
