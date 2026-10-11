@@ -4,10 +4,13 @@ run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.he
 # What every change needs, documents alone included, which the build skips: the shared rules block, the
 # citations of issues in any file, the documentation chapter, and the tests that read a document. On a
 # runner of GitHub's own, and on every path, since a citation can land in any file.
+# Once a day, not on a push: every hand-over runs the same checks locally on its exact commit first, and a run per
+# push spent build minutes on what was already known. 03:17 UTC lies outside the hours the repositories are worked in.
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

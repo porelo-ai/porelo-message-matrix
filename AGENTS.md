@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `8747535e984a49b5` · changed 2026-10-11T08:32Z
+> **BEGIN Shared Area** · sha256 `e551903cf21a633a` · changed 2026-10-11T11:54Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -153,6 +153,10 @@ and the UTC time that text last changed; change it in the channel first, never i
   when the operator says so, and in the GitHub build on every push.** Which machines a setup has is
   defined in the optional `.AGENTS.md` or fed into every agent's context; machines are rented only
   through the shared tooling, and nothing else names a provider.
+- **The documents' checks run locally before every hand-over, and on GitHub once a day.** Every change is handed
+  over with `check-shared`, `check-citations`, `check-readmes`, `check-doc-site`, `check-actions` and the tests
+  that read documents green on the host, on the exact commit; the *Shared rules check* workflow runs on a daily
+  schedule, on a pull request and by hand, never on a push.
 - **How agents exchange files for a test on a local VM is defined in `.AGENTS.md`.** Where it says
   nothing, a test uses only the agent's own artifacts.
 - **A local VM is restarted only when agreed in the channel or asked of the operator.** A rented
@@ -304,7 +308,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `8747535e984a49b5`
+> **END Shared Area** · sha256 `e551903cf21a633a`
 
 ## What this repository is
 
