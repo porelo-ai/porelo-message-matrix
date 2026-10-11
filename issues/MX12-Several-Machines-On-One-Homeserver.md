@@ -1,6 +1,6 @@
 # MX12 — Several Machines On One Homeserver
 
-**Status:** Analyzed.
+**Status:** Estimated.
 **Size:** L - every lifecycle verb gets a second, central mode, `describe` and the settings change a contract
 Sokar reads, and its acceptance needs two machines on one homeserver.
 
@@ -78,13 +78,14 @@ on another machine's accounts.
   `settings.homeserver() != null`.
 - **Tests:** `LifecycleIT` against one Tuwunel named as `homeserver`, two `--machine` names standing for
   two machines: each refusal of the acceptance seen red first there. Then the two-machine acceptance on
-  the VM and the operator's second machine.
+  two local VMs, the test VM and a second one beside it, with the central homeserver on one of the two;
+  nothing runs on the operator's own machines.
 - **Docs:** `doc/transport.md` (the verbs' central mode, `--machine`, `room`), `doc/homeserver.md` (running
   the central homeserver, a person's steps), `doc/decisions.md` (no administrator on a central homeserver).
 
 ## Acceptance
 
-- Across two machines, the Ubuntu VM and the operator's second machine, tasks on both in one project
+- Across two machines, the Ubuntu test VM and a second local VM, tasks on both in one project
   message each other, and a person in the room sees all of them.
 - A task retired on one machine is gone, and the other machine's tasks and accounts are untouched.
 - Seen to fail:
@@ -93,11 +94,6 @@ on another machine's accounts.
   - a `--machine` name another machine holds is refused with 78;
   - `join` on a central homeserver answers 77;
   - a machine not yet invited starts no task.
-
-## Open questions
-
-- Where the second machine for the acceptance comes from, with Sokar installed per account, and the
-  central homeserver both machines reach.
 
 ## To be checked
 
