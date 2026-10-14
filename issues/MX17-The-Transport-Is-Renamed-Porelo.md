@@ -21,7 +21,9 @@ is read or kept.
     which `sokar`'s `TransportDirectory` finds and `sokar-frontend`'s setup installs; the settings
     `SOKAR_MATRIX_HOMESERVER`, `_ACCESS_TOKEN`, `_ADMIN_TOKEN`, `_REGISTRATION_TOKEN`, `_CA_FILE`, `_TLS_VERIFY`,
     `_PORT`, which `sokar`'s `HelperEnvironment` passes and `sokar-frontend` writes; the user unit
-    `sokar-matrix-homeserver.service` and its container.
+    `sokar-matrix-homeserver.service` and its container. Both other sides take the plain replacement in the same
+    window, nothing kept under the old name: `sokar` passes `PORELO_MATRIX_*` and finds
+    `/usr/libexec/porelo/transports`, `sokar-frontend` writes the same variables and installs the renamed packages.
   - **On the wire and in the homeserver:** the event content keys `org.fuin.sokar.message` and
     `org.fuin.sokar.signature`; the administrator `@sokar`, the relay `@sokar-relay-<project>`, and the
     transaction ids `sokar-admin-…`, `sokar-redact-…`.
@@ -65,6 +67,3 @@ is read or kept.
 ## To be checked
 
 - Whether this repository's version moves to `0.5.0-SNAPSHOT` with Porelo and the tools, or keeps its own line.
-- Whether `sokar` renames the settings and the executable's path in the same window, so it and this transport
-  agree; they are contracts, not migrated. `sokar-frontend` does: its rename replaces the `SOKAR_*` variables and the
-  transports' package names it installs.
