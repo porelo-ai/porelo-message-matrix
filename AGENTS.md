@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `e551903cf21a633a` · changed 2026-10-11T11:54Z
+> **BEGIN Shared Area** · sha256 `93ecd5e8699c1f32` · changed 2026-10-13T19:20Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -49,8 +49,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Amend, squash or rebase only commits that are not pushed**, checked with
   `git ls-remote origin refs/heads/main`, never with a cached `origin/main`. A pushed commit is
   repaired by a new commit on the remote's tip, never by a force push.
-- **A commit message is one brief line saying in words what changed**, never by a requirement number;
-  the reasoning goes into an issue or a decision.
+- **A commit message is one line of at most 72 characters saying in words what changed**, never by a
+  requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
+  what they share, not each of them.
 - **No commit message, changelog entry, issue or document says who asked for a change or who made it**
   - no "as the operator chose", no agent's name; it says what changed and why.
 - **A change to what ships or builds gets its changelog entry in the same commit**, under
@@ -308,7 +309,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `e551903cf21a633a`
+> **END Shared Area** · sha256 `93ecd5e8699c1f32`
 
 ## What this repository is
 
