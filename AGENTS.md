@@ -2,7 +2,7 @@
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `93ecd5e8699c1f32` · changed 2026-10-13T19:20Z
+> **BEGIN Shared Area** · sha256 `32234366c7b349ec` · changed 2026-10-14T17:28Z
 
 Identical in every repository `project.yml` names but `sokar-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -156,8 +156,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   through the shared tooling, and nothing else names a provider.
 - **The documents' checks run locally before every hand-over, and on GitHub once a day.** Every change is handed
   over with `check-shared`, `check-citations`, `check-readmes`, `check-doc-site`, `check-actions` and the tests
-  that read documents green on the host, on the exact commit; the *Shared rules check* workflow runs on a daily
-  schedule, on a pull request and by hand, never on a push.
+  that read documents green on the host, on the exact commit, and the code it changed read against the
+  repository's skills; the *Shared rules check* workflow runs on a daily schedule, on a pull request and by hand,
+  never on a push.
 - **How agents exchange files for a test on a local VM is defined in `.AGENTS.md`.** Where it says
   nothing, a test uses only the agent's own artifacts.
 - **A local VM is restarted only when agreed in the channel or asked of the operator.** A rented
@@ -253,6 +254,11 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A skill is knowledge, not authority**: where it and a measurement disagree, the measurement
   wins, and a finding from reading code against a skill is a guess until a failing test reproduces
   it. Whether a skill is loaded is asked of the harness, not read from a directory.
+- **The skills a repository names are applied, not only named.** They are loaded before its code is
+  changed. The code an issue changes is read against them before it is handed over, and the hand-over
+  names each skill with its version; a finding is fixed with a test seen to fail first, or declined
+  with the reason written in the issue. A repository that names skills for the first time opens an
+  issue reading all of its code against them.
 
 ### Code and builds
 
@@ -309,7 +315,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `93ecd5e8699c1f32`
+> **END Shared Area** · sha256 `32234366c7b349ec`
 
 ## What this repository is
 
