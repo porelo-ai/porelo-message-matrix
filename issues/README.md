@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
+| <a id="mx17"></a>[MX17](MX17-The-Transport-Is-Renamed-Porelo.md) | S | - | The transport, its packages, paths, settings and docs renamed Porelo by a script, installed afresh, nothing of Sokar kept | 0 |
 | <a id="mx16"></a>[MX16](MX16-The-Code-Read-Against-Its-Skills.md) | M | - | All of the code read against the seven skills `AGENTS.md` names, each finding fixed with a test seen to fail first or declined with its reason | 0 |
 
 ## Estimated
