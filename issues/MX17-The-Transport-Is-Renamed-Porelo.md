@@ -1,6 +1,6 @@
 # MX17 — The Transport Is Renamed Porelo
 
-**Status:** Estimated, at the operator's word; from `sokar-project` [PJ41](https://github.com/sokar-ai/sokar-project/blob/main/issues/README.md#pj41).
+**Status:** Implementing; from `sokar-project` [PJ41](https://github.com/sokar-ai/sokar-project/blob/main/issues/README.md#pj41).
 **Size:** S - one module: 532 occurrences in 75 of 87 tracked files and 59 paths, done by a script; what makes it
 more than XS is the packages and paths that ship, so the acceptance runs on the VM against a renamed Porelo.
 
@@ -49,6 +49,8 @@ is read or kept.
 - **Published before it builds:** `porelo-parent` `0.2.0` and the tools `0.5.0` (with `porelo-release` and
   `porelo-machines`, which the checks and the build run); for the acceptance, Porelo's snapshot and the renamed
   `porelo-message-sluice-filter` package in Artifactory's renamed repositories.
+- **Versions:** `0.5.0-SNAPSHOT` on `porelo-parent` `0.2.0-SNAPSHOT`, the line Porelo, the tools and the
+  other repositories built on Porelo move to together; the packages `0.5.0~snapshot.<run>`.
 - **Steps:** red first; run the script, `git mv` of the package directories and the homeserver unit, the
   replacement, the exceptions put back; read the whole diff; the changelog's `0.5.0` entry says the transport is
   now Porelo's.
@@ -63,7 +65,3 @@ is read or kept.
   the transport installed from its renamed package, `setup` on a fresh local homeserver, a message sent, polled and
   read, and `retire`.
 - No `sokar` path, setting or account is created on the VM by the transport, checked after the acceptance.
-
-## To be checked
-
-- Whether this repository's version moves to `0.5.0-SNAPSHOT` with Porelo and the tools, or keeps its own line.

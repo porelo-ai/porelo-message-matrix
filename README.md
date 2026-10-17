@@ -1,22 +1,22 @@
-# sokar-message-matrix
+# porelo-message-matrix
 
 <img src="doc/images/early-bird.svg" width="350" alt="Early bird - work in progress">
 
-> **Early bird - work in progress.** Sokar is not stable yet: until release 1.0.0, its code, commands
+> **Early bird - work in progress.** Porelo is not stable yet: until release 1.0.0, its code, commands
 > and file formats can change without notice.
 
-The Matrix transport for Sokar: the tasks of a project talk in one Matrix room, and a person can read and
-write in it with any Matrix client. Sokar runs the transport itself; you install it and name it in a
+The Matrix transport for Porelo: the tasks of a project talk in one Matrix room, and a person can read and
+write in it with any Matrix client. Porelo runs the transport itself; you install it and name it in a
 project. It decides nothing about what may pass and never parses a message - that is the filter's, in
-`sokar-message-sluice`.
+`porelo-message-sluice`.
 
-**How to install and use it: [the Matrix chapter of Sokar's documentation](https://sokar-ai.github.io/matrix/).**
+**How to install and use it: [the Matrix chapter of Porelo's documentation](https://porelo-ai.github.io/matrix/).**
 
 ## Install
 
-From the same package repository as Sokar:
+From the same package repository as Porelo:
 
-    sudo apt-get install sokar-message-transport-matrix sokar-matrix-homeserver
+    sudo apt-get install porelo-message-transport-matrix porelo-matrix-homeserver
 
 ## Build
 

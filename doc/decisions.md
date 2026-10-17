@@ -11,12 +11,12 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [A position from an earlier database is refused, by the rooms kept beside it](#a-position-from-an-earlier-database-is-refused-by-the-rooms-kept-beside-it) | A poll whose account is in none of the saved rooms stops with 78. |
 | [`max_bytes` is what every message fits, not what most do](#max_bytes-is-what-every-message-fits-not-what-most-do) | 10240 bytes, the worst case of escaping in a 64 KiB event. |
 | [A receipt is looked up by the event's own room, and read means read up to](#a-receipt-is-looked-up-by-the-events-own-room-and-read-means-read-up-to) | The room comes from the event; a receipt on a later event means read. |
-| [Accepted risk: the homeserver holds the conversation unencrypted](#accepted-risk-the-homeserver-holds-the-conversation-unencrypted) | No end-to-end encryption on a homeserver the operator runs; the filter and Sokar's signatures carry the guarantees. |
+| [Accepted risk: the homeserver holds the conversation unencrypted](#accepted-risk-the-homeserver-holds-the-conversation-unencrypted) | No end-to-end encryption on a homeserver the operator runs; the filter and Porelo's signatures carry the guarantees. |
 | [The packages are built beside the executable, in one module](#the-packages-are-built-beside-the-executable-in-one-module) | All four packages come from the native profile of the executable's module. |
-| [The local homeserver is chosen, never pulled in](#the-local-homeserver-is-chosen-never-pulled-in) | `Provides: sokar-homeserver`; the transport neither depends on it nor recommends it. |
-| [The transport brings the filter](#the-transport-brings-the-filter) | The transport's package depends on `sokar-message-sluice-filter`. |
+| [The local homeserver is chosen, never pulled in](#the-local-homeserver-is-chosen-never-pulled-in) | `Provides: porelo-homeserver`; the transport neither depends on it nor recommends it. |
+| [The transport brings the filter](#the-transport-brings-the-filter) | The transport's package depends on `porelo-message-sluice-filter`. |
 | [A homeserver's certificate: public, the operator's own, or - for development - unchecked](#a-homeservers-certificate-public-the-operators-own-or-for-development-unchecked) | A public certificate, a CA file, or the check switched off loudly for development. |
-| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback, a password reset redacted at once, the project's room taken only if it is Sokar's. |
+| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 
 ## The homeserver is Tuwunel
 
@@ -50,15 +50,15 @@ implements the current client API and states that it is maintained by full-time 
 for more in a server that holds the whole conversation than tens of megabytes do.
 
 **What would change the answer:** Tuwunel's maintenance stopping, or memory becoming the constraint on
-the machines Sokar runs on. Conduit is then the measured alternative, configured the same way with the
+the machines Porelo runs on. Conduit is then the measured alternative, configured the same way with the
 prefix `CONDUIT_`, `CONDUIT_CONFIG` set empty and the container port `6167`.
 
 ## A message is a text event: a line for a person, the message and its signature beside it
 
 **Decided:** `send` puts the message into the room as one `m.text` event: the message as a JSON string in
-`org.fuin.sokar.message`, its detached signature, base64, in `org.fuin.sokar.signature`, and as the
-`body` the line Sokar made for a person, `--shown`.
-Sokar writes the line from the checked message's text alone, and Matrix says whom it is for: in the room,
+`org.fuin.porelo.message`, its detached signature, base64, in `org.fuin.porelo.signature`, and as the
+`body` the line Porelo made for a person, `--shown`.
+Porelo writes the line from the checked message's text alone, and Matrix says whom it is for: in the room,
 each account it names is a mention (`send --mention`: a pill before the line and `m.mentions`), and one
 for the whole room mentions nobody; to a person alone, it goes into their direct chat (`send --to @user`).
 The transport carries the line unread; only the line is ever cut, saying its full length; `poll` reads
@@ -74,10 +74,10 @@ field beside it; the largest message escaped at its worst, with a 2 KiB signatur
 taken.
 
 **What follows:** a JSON string carries text only, so a message whose bytes are not valid UTF-8 is
-refused rather than carried with its bytes silently replaced. Sokar's messages are JSON, so this refuses
-nothing Sokar sends. A room with events of the earlier form is reset rather than read.
+refused rather than carried with its bytes silently replaced. Porelo's messages are JSON, so this refuses
+nothing Porelo sends. A room with events of the earlier form is reset rather than read.
 
-**What would change the answer:** Sokar sending messages that are not text, or the size of one event
+**What would change the answer:** Porelo sending messages that are not text, or the size of one event
 (64 KiB for the whole event) becoming too small for a message and its line.
 
 ## A person's words reach the tasks; whom they are meant for is what Matrix states
@@ -85,21 +85,21 @@ nothing Sokar sends. A room with events of the earlier form is reset rather than
 **Decided:** a person talks with the tasks through messaging alone. A person writes in the project's
 room, or in a direct chat with one task's account, and the tasks get it.
 - `poll --persons` (the relay) hands over a person's text in the room. `poll --direct` (each task's
-  account) hands over what is said in its direct chats. Each is a file of its own kind beside the Sokar
+  account) hands over what is said in its direct chats. Each is a file of its own kind beside the Porelo
   messages.
 - **Every task reads the whole room.** `to` only
   says whom a message is meant for: the accounts the client marked as mentioned, and the sender of what
   it replies to.
-- A person's words are not filtered on the way in. Sokar takes them only from a member of the room.
+- A person's words are not filtered on the way in. Porelo takes them only from a member of the room.
 
 **Why so:** the transport still reads no meaning into a message. A mention and a reply are structure that
-the person's client puts into the event; the text itself is handed over as typed. Sokar's own messages
+the person's client puts into the event; the text itself is handed over as typed. Porelo's own messages
 are still told by the transport's marks, the message field and the signature beside it. A person's file
-has no `.sig`, and its name says whose it is. Whether and how it reaches a task is Sokar's.
+has no `.sig`, and its name says whose it is. Whether and how it reaches a task is Porelo's.
 A direct chat is taken only from somebody who already shares the project's room with the task's account,
 so no stranger opens a way in, and only unencrypted: a task holds no keys, so an encrypted chat is declined
 with a reason the person's client shows, and an encrypted message is named on stderr, never lost
-silently. `describe` announces both, so a Sokar that knows neither never gets such a
+silently. `describe` announces both, so a Porelo that knows neither never gets such a
 file.
 
 **What would change the answer:** a person's words needing a check on the way in after all; the transport
@@ -107,15 +107,15 @@ hands them over the same way.
 
 ## The position of a poll is saved after its files
 
-**Decided:** `poll` keeps the homeserver's sync position under `$XDG_STATE_HOME/sokar/transports/matrix/`,
+**Decided:** `poll` keeps the homeserver's sync position under `$XDG_STATE_HOME/porelo/transports/matrix/`,
 one file per homeserver and account, and saves it only once every file of that poll is written.
 
-**Why:** Sokar passes a transport no directory for its state, and drops a message whose id it has
+**Why:** Porelo passes a transport no directory for its state, and drops a message whose id it has
 already delivered. So delivering a message twice after a crash costs nothing, while skipping one loses
 it: the position is saved late, never early. A lock beside it keeps two polls of one account from
 writing the same position.
 
-**What would change the answer:** Sokar giving transports a state directory of their own.
+**What would change the answer:** Porelo giving transports a state directory of their own.
 
 ## A position from an earlier database is refused, by the rooms kept beside it
 
@@ -138,12 +138,12 @@ account was taken out of looks the same from here, and a person should decide.
 **Why:** Matrix limits an event to 64 KiB in all, and a message travels inside it as a JSON string, where
 escaping grows it by up to six times. Measured against Tuwunel with a 256-byte signature: plain ASCII
 fits 64,397 bytes, three-byte UTF-8 64,401, quotes 32,197, control characters 10,727. A limit is only
-something Sokar can rely on if it holds whatever the message contains, so it is the worst case, with room
+something Porelo can rely on if it holds whatever the message contains, so it is the worst case, with room
 for the envelope and a signature of up to 2 KiB. `send` keeps the same number rather than trying a larger
 message, so what `describe` says and what `send` does never disagree.
 
-**What would change the answer:** Sokar's messages being known never to contain characters that escape
-to more than two bytes - Sokar's messages are JSON, whose strings already escape control characters -
+**What would change the answer:** Porelo's messages being known never to contain characters that escape
+to more than two bytes - Porelo's messages are JSON, whose strings already escape control characters -
 which would allow 30 KiB; or messages carried as a file upload instead of an event body.
 
 ## A receipt is looked up by the event's own room, and read means read up to
@@ -155,10 +155,10 @@ event's own `room_id`, and answers `read` when `--by`'s read receipt is on that 
 on a later event is the only sign that an earlier one was read. The room is taken from the event and not
 from the path it was asked under because Tuwunel, measured, answers an event asked for under any room the
 account is in - so trusting the path picked the admin room, where the addressee is not, whenever that
-room happened to be listed first. Sokar names `--by`, because which account a message was for is inside
+room happened to be listed first. Porelo names `--by`, because which account a message was for is inside
 the message, which the transport does not read.
 
-**What would change the answer:** Sokar handing the room to `receipt` as well; the lookup through the
+**What would change the answer:** Porelo handing the room to `receipt` as well; the lookup through the
 account's rooms is then no longer needed.
 
 ## Accepted risk: the homeserver holds the conversation unencrypted
@@ -174,10 +174,10 @@ receives every message, including the ones addressed to another task, and delive
 afterwards, by the receiving host.
 
 **Why it stays.**
-- **On one machine the exposure adds nothing.** The homeserver runs in podman beside Sokar, published on
+- **On one machine the exposure adds nothing.** The homeserver runs in podman beside Porelo, published on
   loopback only, with federation off - measured: the machine's own address gets no answer, and the
-  federation API refuses. The messages stay on the host, where Sokar's own mailboxes already hold them.
-- **Authenticity never rested on Matrix.** Sokar signs every message and verifies it against the key
+  federation API refuses. The messages stay on the host, where Porelo's own mailboxes already hold them.
+- **Authenticity never rested on Matrix.** Porelo signs every message and verifies it against the key
   listed for the peer; what arrives unverified is held, whatever the room says. So a homeserver can read
   messages but cannot forge one - room membership is not authorization.
 - **Encryption would buy confidentiality against the operator, who runs the server.** For an unattended
@@ -209,7 +209,7 @@ two; a module per package then pays for itself.
 
 ## The local homeserver is chosen, never pulled in
 
-**Decided:** `sokar-matrix-homeserver` declares `Provides: sokar-homeserver`, and the transport's package
+**Decided:** `porelo-matrix-homeserver` declares `Provides: porelo-homeserver`, and the transport's package
 neither depends on it nor recommends it. A machine's setup offers it as a kind of its own, beside the
 transports, chosen with Matrix unless the project names a homeserver of its own.
 
@@ -217,24 +217,24 @@ transports, chosen with Matrix unless the project names a homeserver of its own.
 default; offered on its own, it is one deliberate choice in the same place as the transport, and a
 machine that chose Matrix alone is told by `setup`'s 78 what is missing.
 
-**What would change the answer:** the local homeserver becoming the only arrangement Sokar supports.
+**What would change the answer:** the local homeserver becoming the only arrangement Porelo supports.
 
 ## The transport brings the filter
 
 **Decided:** the transport's package depends on
-`sokar-message-sluice-filter` (`Depends:`, and `Requires:` in the `.rpm`), where Sokar only recommends it.
+`porelo-message-sluice-filter` (`Depends:`, and `Requires:` in the `.rpm`), where Porelo only recommends it.
 
-**Why:** Sokar sends nothing without the filter, so a transport installed without it, by
+**Why:** Porelo sends nothing without the filter, so a transport installed without it, by
 `--no-install-recommends` or by a wizard that installs only what was ticked, can carry nothing, and a
 person meets "no message filter is installed". Depending on it, every way of installing a transport
 brings the filter.
 
-**What would change the answer:** a transport that carries messages Sokar does not filter, which none does.
+**What would change the answer:** a transport that carries messages Porelo does not filter, which none does.
 
 ## A homeserver's certificate: public, the operator's own, or - for development - unchecked
 
 **Decided:** three cases. A public certificate needs nothing. An intranet's CA or a
-self-signed certificate is trusted through `SOKAR_MATRIX_CA_FILE`. `SOKAR_MATRIX_TLS_VERIFY=off` switches
+self-signed certificate is trusted through `PORELO_MATRIX_CA_FILE`. `PORELO_MATRIX_TLS_VERIFY=off` switches
 the check off, for development only, with a warning at every start.
 
 **Why the CA file and not only the switch:** the native executable trusts the authorities it was built
@@ -258,8 +258,8 @@ goes, and the CA file is the only way to trust an unusual certificate.
 - **A password reset is redacted from the admin room at once.** Tuwunel sets a password only through an
   admin-room command, and the command and the server's reply both hold it. Both are redacted right after,
   so no event the homeserver serves still holds the password.
-- **The project's room is taken only if it is Sokar's.** It must have been made by Sokar's administrator,
-  be invite-only, and have guests forbidden. A room somebody else put under `#sokar-<project>` first, or
+- **The project's room is taken only if it is Porelo's.** It must have been made by Porelo's administrator,
+  be invite-only, and have guests forbidden. A room somebody else put under `#porelo-<project>` first, or
   one opened since, is refused: tasks and people would otherwise be put into a room of somebody else's
   making.
 

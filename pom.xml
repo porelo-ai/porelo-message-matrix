@@ -5,48 +5,48 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.fuin.sokar</groupId>
-        <artifactId>sokar-parent</artifactId>
-        <version>0.1.4-SNAPSHOT</version>
+        <groupId>org.fuin.porelo</groupId>
+        <artifactId>porelo-parent</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
         <relativePath/>
     </parent>
 
-    <groupId>org.fuin.sokar</groupId>
-    <artifactId>sokar-message-matrix</artifactId>
-    <version>0.4.2-SNAPSHOT</version>
+    <groupId>org.fuin.porelo</groupId>
+    <artifactId>porelo-message-matrix</artifactId>
+    <version>0.5.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>Sokar Message Matrix</name>
+    <name>Porelo Message Matrix</name>
     <description>The Matrix transport: a project's room, where tasks talk</description>
-    <url>https://github.com/sokar-ai/sokar-message-matrix/</url>
+    <url>https://github.com/porelo-ai/porelo-message-matrix/</url>
 
     <scm>
-        <connection>scm:git:git://github.com/sokar-ai/sokar-message-matrix.git</connection>
-        <developerConnection>scm:git:git@github.com:sokar-ai/sokar-message-matrix.git</developerConnection>
-        <url>https://github.com/sokar-ai/sokar-message-matrix/</url>
+        <connection>scm:git:git://github.com/porelo-ai/porelo-message-matrix.git</connection>
+        <developerConnection>scm:git:git@github.com:porelo-ai/porelo-message-matrix.git</developerConnection>
+        <url>https://github.com/porelo-ai/porelo-message-matrix/</url>
     </scm>
 
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>https://github.com/sokar-ai/sokar-message-matrix/issues</url>
+        <url>https://github.com/porelo-ai/porelo-message-matrix/issues</url>
     </issueManagement>
 
     <properties>
         <jspecify.version>1.0.1</jspecify.version>
         <assertj.version>3.27.7</assertj.version>
         <jackson.version>2.22.1</jackson.version>
-        <main.class>org.fuin.sokar.message.matrix.Main</main.class>
-        <transport.name>sokar-message-transport-matrix</transport.name>
-        <!-- Named as sokar names its snapshots; CI sets the run and clears the local suffix. -->
-        <sokar.snapshot.run>0</sokar.snapshot.run>
-        <sokar.snapshot.suffix>+local.${maven.build.timestamp}</sokar.snapshot.suffix>
+        <main.class>org.fuin.porelo.message.matrix.Main</main.class>
+        <transport.name>porelo-message-transport-matrix</transport.name>
+        <!-- Named as porelo names its snapshots; CI sets the run and clears the local suffix. -->
+        <porelo.snapshot.run>0</porelo.snapshot.run>
+        <porelo.snapshot.suffix>+local.${maven.build.timestamp}</porelo.snapshot.suffix>
         <!-- The newest glibc and zlib symbol versions the native executable needs, measured with objdump -T;
              PackagesIT checks the packages against the executable built. -->
         <matrix.glibc.floor>2.34</matrix.glibc.floor>
         <matrix.zlib.floor>1.2.2</matrix.zlib.floor>
-        <deb.version>0.4.2~snapshot.${sokar.snapshot.run}${sokar.snapshot.suffix}</deb.version>
-        <rpm.release>snapshot.${sokar.snapshot.run}</rpm.release>
+        <deb.version>0.5.0~snapshot.${porelo.snapshot.run}${porelo.snapshot.suffix}</deb.version>
+        <rpm.release>snapshot.${porelo.snapshot.run}</rpm.release>
         <package.doc>/usr/share/doc/${transport.name}</package.doc>
-        <homeserver.name>sokar-matrix-homeserver</homeserver.name>
+        <homeserver.name>porelo-matrix-homeserver</homeserver.name>
         <homeserver.unit>${project.build.directory}/homeserver/${homeserver.name}.service</homeserver.unit>
         <!-- What the integration tests run under -Pnative. -->
         <transport.executable>${project.build.directory}/${transport.name}</transport.executable>
@@ -83,7 +83,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
             </plugin>
-            <!-- The integration tests run against the real homeserver in podman, which every Sokar machine has. -->
+            <!-- The integration tests run against the real homeserver in podman, which every Porelo machine has. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -125,7 +125,7 @@
                             <imageName>${transport.name}</imageName>
                             <mainClass>${main.class}</mainClass>
                             <buildArgs>
-                                <!-- The baseline every x86-64 CPU has, as every Sokar executable: the default
+                                <!-- The baseline every x86-64 CPU has, as every Porelo executable: the default
                                      would ask for AVX2 and refuse to start on an older machine. -->
                                 <buildArg>-march=x86-64</buildArg>
                             </buildArgs>
@@ -152,10 +152,10 @@
                                     <goal>java</goal>
                                 </goals>
                                 <configuration>
-                                    <mainClass>org.fuin.sokar.message.matrix.HomeserverUnit</mainClass>
+                                    <mainClass>org.fuin.porelo.message.matrix.HomeserverUnit</mainClass>
                                     <classpathScope>test</classpathScope>
                                     <arguments>
-                                        <argument>${project.basedir}/homeserver/sokar-matrix-homeserver.service</argument>
+                                        <argument>${project.basedir}/homeserver/porelo-matrix-homeserver.service</argument>
                                         <argument>${project.basedir}/homeserver/Dockerfile</argument>
                                         <argument>${homeserver.unit}</argument>
                                     </arguments>
@@ -202,7 +202,7 @@
                                             <type>file</type>
                                             <mapper>
                                                 <type>perm</type>
-                                                <prefix>/usr/libexec/sokar/transports</prefix>
+                                                <prefix>/usr/libexec/porelo/transports</prefix>
                                                 <user>root</user>
                                                 <group>root</group>
                                                 <filemode>755</filemode>
@@ -286,22 +286,22 @@
                                 </goals>
                                 <configuration>
                                 <name>${transport.name}</name>
-                                <version>0.4.2</version>
+                                <version>0.5.0</version>
                                 <release>${rpm.release}</release>
                                 <license>GPL-3.0-or-later</license>
                                 <group>Applications/Communications</group>
-                                <summary>The Matrix transport for Sokar</summary>
-                                <description>Carries messages Sokar's filter let through into a project's Matrix room, and brings the room's messages back into a task's mailbox.</description>
-                                <url>https://github.com/sokar-ai/sokar-message-matrix</url>
+                                <summary>The Matrix transport for Porelo</summary>
+                                <description>Carries messages Porelo's filter let through into a project's Matrix room, and brings the room's messages back into a task's mailbox.</description>
+                                <url>https://github.com/porelo-ai/porelo-message-matrix</url>
                                 <needarch>x86_64</needarch>
                                 <!-- What the new-machine wizard offers as a transport. -->
                                 <provides>
-                                    <provide>sokar-transport</provide>
+                                    <provide>porelo-transport</provide>
                                 </provides>
-                                <!-- Sokar sends nothing without the filter; required here, a person never meets that. -->
+                                <!-- Porelo sends nothing without the filter; required here, a person never meets that. -->
                                 <requires>
-                                    <require>sokar</require>
-                                    <require>sokar-message-sluice-filter</require>
+                                    <require>porelo</require>
+                                    <require>porelo-message-sluice-filter</require>
                                     <require>libc.so.6(GLIBC_${matrix.glibc.floor})(64bit)</require>
                                     <require>libz.so.1(ZLIB_${matrix.zlib.floor})(64bit)</require>
                                 </requires>
@@ -309,7 +309,7 @@
                                 <defaultGroupname>root</defaultGroupname>
                                 <mappings>
                                     <mapping>
-                                        <directory>/usr/libexec/sokar/transports</directory>
+                                        <directory>/usr/libexec/porelo/transports</directory>
                                         <directoryIncluded>false</directoryIncluded>
                                         <filemode>755</filemode>
                                         <sources>
@@ -349,17 +349,17 @@
                                 <configuration>
                                     <name>${homeserver.name}</name>
                                     <classifier>homeserver</classifier>
-                                    <version>0.4.2</version>
+                                    <version>0.5.0</version>
                                     <release>${rpm.release}</release>
                                     <license>GPL-3.0-or-later</license>
                                     <group>Applications/Communications</group>
-                                    <summary>The local Matrix homeserver for Sokar's transport</summary>
-                                    <description>A systemd user unit that runs the homeserver Sokar's Matrix transport talks to, in rootless podman, on loopback only, for the account that enables it.</description>
-                                    <url>https://github.com/sokar-ai/sokar-message-matrix</url>
+                                    <summary>The local Matrix homeserver for Porelo's transport</summary>
+                                    <description>A systemd user unit that runs the homeserver Porelo's Matrix transport talks to, in rootless podman, on loopback only, for the account that enables it.</description>
+                                    <url>https://github.com/porelo-ai/porelo-message-matrix</url>
                                     <needarch>noarch</needarch>
                                     <!-- How a machine's setup knows to offer it beside the transport: it is chosen, never pulled in. -->
                                     <provides>
-                                        <provide>sokar-homeserver</provide>
+                                        <provide>porelo-homeserver</provide>
                                     </provides>
                                     <requires>
                                         <require>${transport.name}</require>
@@ -398,7 +398,7 @@
                             </execution>
                         </executions>
                         </plugin>
-                    <!-- The integration tests run the executable itself, as Sokar does, not the classes in this JVM. -->
+                    <!-- The integration tests run the executable itself, as Porelo does, not the classes in this JVM. -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
@@ -407,8 +407,8 @@
                                 <transport.executable>${transport.executable}</transport.executable>
                                 <!-- The raw parts a package's version is made of, so a test can work it out
                                      itself rather than read back deb.version or rpm.release. -->
-                                <sokar.snapshot.run>${sokar.snapshot.run}</sokar.snapshot.run>
-                                <sokar.snapshot.suffix>${sokar.snapshot.suffix}</sokar.snapshot.suffix>
+                                <porelo.snapshot.run>${porelo.snapshot.run}</porelo.snapshot.run>
+                                <porelo.snapshot.suffix>${porelo.snapshot.suffix}</porelo.snapshot.suffix>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

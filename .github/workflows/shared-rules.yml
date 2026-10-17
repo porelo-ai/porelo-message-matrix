@@ -45,27 +45,27 @@ jobs:
       - name: Install the pinned GraalVM
         run: >-
           "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.machines.Main jdk --github
+          org.fuin.porelo.machines.Main jdk --github
 
       - name: Refuse a shared rules block whose hash does not fit its text
         run: >-
           java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.release.Main check-shared AGENTS.md
+          org.fuin.porelo.release.Main check-shared AGENTS.md
 
       - name: Refuse a link to an issue's file and an issue number in any file
         run: >-
           java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.release.Main check-citations .
+          org.fuin.porelo.release.Main check-citations .
 
       - name: Refuse a page missing from the site's navigation or a link out of doc
         run: >-
           java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.release.Main check-doc-site doc mkdocs.yml
+          org.fuin.porelo.release.Main check-doc-site doc mkdocs.yml
 
       - name: Refuse a module without a README.md, or one that does not link its submodules
         run: >-
           java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.release.Main check-readmes .
+          org.fuin.porelo.release.Main check-readmes .
 
       - name: The tests that read a document
         run: ./mvnw -B -ntp -s settings.xml -Pdocuments test

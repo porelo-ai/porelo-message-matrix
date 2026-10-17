@@ -1,24 +1,24 @@
 # The Matrix transport
 
-The Matrix transport for Sokar: the tasks of a project talk in one Matrix room, and a person can read and
-write in it with any Matrix client. Sokar runs the transport itself; you install it and name it in a
+The Matrix transport for Porelo: the tasks of a project talk in one Matrix room, and a person can read and
+write in it with any Matrix client. Porelo runs the transport itself; you install it and name it in a
 project.
 
 This chapter holds:
 
 - this page: installing the transport, using it in a project, and joining the conversation as a person;
 - [The local homeserver](homeserver.md): where it keeps its data, its settings, and how to reset it;
-- [The transport](transport.md): the program's verbs and exit codes, as Sokar runs it;
+- [The transport](transport.md): the program's verbs and exit codes, as Porelo runs it;
 - [Decisions](decisions.md): why it is built this way, and the risks accepted.
 
 ## Install
 
-From the same package repository as Sokar, the transport and - for a homeserver on this machine - the
+From the same package repository as Porelo, the transport and - for a homeserver on this machine - the
 local homeserver:
 
-    sudo apt-get install sokar-message-transport-matrix sokar-matrix-homeserver
+    sudo apt-get install porelo-message-transport-matrix porelo-matrix-homeserver
 
-Sokar's "new machine" setup offers both. The homeserver is never pulled in by the transport, so a machine
+Porelo's "new machine" setup offers both. The homeserver is never pulled in by the transport, so a machine
 that uses a central homeserver does not get one.
 
 ## Use it in a project
@@ -48,7 +48,7 @@ editor says so before anything is committed.
 
 ## Read along and write as a person
 
-    sokar talk join <project> <your name>
+    porelo talk join <project> <your name>
 
 prints a login, once: the homeserver, your user, the room and a password. On the local homeserver,
 forward its port (8008 unless taken) to reach it from your computer, and sign in with any Matrix client.

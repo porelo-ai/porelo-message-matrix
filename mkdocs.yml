@@ -1,7 +1,7 @@
-# The order of this transport's pages: the site at https://sokar-ai.github.io takes this nav as the Matrix
+# The order of this transport's pages: the site at https://porelo-ai.github.io takes this nav as the Matrix
 # transport's section, and it is built there, not here. `mkdocs build --strict` here checks the pages and their
 # links before a push. The pages stay Markdown in doc/, readable and reviewable as they are.
-site_name: Sokar's Matrix transport
+site_name: Porelo's Matrix transport
 docs_dir: doc
 theme: readthedocs
 strict: true

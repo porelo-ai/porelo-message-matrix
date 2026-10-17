@@ -1,13 +1,13 @@
-Package: sokar-message-transport-matrix
+Package: porelo-message-transport-matrix
 Version: [[deb.version]]
 Section: net
 Priority: optional
 Architecture: amd64
 Maintainer: Michael Schnell <michael@fuin.org>
-Depends: sokar, sokar-message-sluice-filter, libc6 (>= [[matrix.glibc.floor]]), zlib1g (>= 1:[[matrix.zlib.floor]])
-Provides: sokar-transport
-Homepage: https://github.com/sokar-ai/sokar-message-matrix
-Description: The Matrix transport for Sokar
- Carries messages Sokar's filter let through into a project's Matrix room,
- and brings the room's messages back into a task's mailbox. Sokar finds it
- by scanning /usr/libexec/sokar/transports/ and drives it over files.
+Depends: porelo, porelo-message-sluice-filter, libc6 (>= [[matrix.glibc.floor]]), zlib1g (>= 1:[[matrix.zlib.floor]])
+Provides: porelo-transport
+Homepage: https://github.com/porelo-ai/porelo-message-matrix
+Description: The Matrix transport for Porelo
+ Carries messages Porelo's filter let through into a project's Matrix room,
+ and brings the room's messages back into a task's mailbox. Porelo finds it
+ by scanning /usr/libexec/porelo/transports/ and drives it over files.

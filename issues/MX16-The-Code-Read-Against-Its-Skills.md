@@ -34,7 +34,7 @@ other repositories' code, so it was never read.
   - `security-audit` against what crosses a trust boundary: `Trust` (the self-signed and CA-file trust
     managers), `MatrixClient` (redirects refused, TLS), `AdminRoom` and `Accounts` (commands to the admin
     room, passwords), `HomeserverToken`, `Poll` and `Person` (bytes from the room written into the inbound
-    directory, `writeAtomically`), the workflows' permissions, `homeserver/sokar-matrix-homeserver.service`
+    directory, `writeAtomically`), the workflows' permissions, `homeserver/porelo-matrix-homeserver.service`
     and the `deb` control files;
   - `concurrency-review` against what runs at once: two `poll` or `send` of one project started together
     (the state file, the inbound files, the atomic moves), the interrupt handling in `AdminRoom` and

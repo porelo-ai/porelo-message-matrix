@@ -54,12 +54,12 @@ jobs:
       - name: Install the pinned GraalVM
         run: >-
           "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.machines.Main jdk --github
+          org.fuin.porelo.machines.Main jdk --github
 
       - name: Refuse an action that is not pinned
         run: >-
           java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.sokar.release.Main check-actions .github
+          org.fuin.porelo.release.Main check-actions .github
 
       # main publishes snapshots and a tag a release; each refuses the other's version, so a release is
       # never a snapshot by mistake and a snapshot never takes a release's number.
@@ -67,7 +67,7 @@ jobs:
         id: channel
         run: |
           set -euo pipefail
-          version=$(sed -n '/<artifactId>sokar-message-matrix<\/artifactId>/{n;s/.*<version>\(.*\)<\/version>.*/\1/p;}' pom.xml)
+          version=$(sed -n '/<artifactId>porelo-message-matrix<\/artifactId>/{n;s/.*<version>\(.*\)<\/version>.*/\1/p;}' pom.xml)
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
             [ "${GITHUB_REF_NAME}" = "v${version}" ] || { echo "the tag ${GITHUB_REF_NAME} is not v${version}, the pom's version"; exit 1; }
             case "$version" in *-SNAPSHOT) echo "a tag on a snapshot version: ${version}"; exit 1;; esac
@@ -79,7 +79,7 @@ jobs:
           else
             case "$version" in *-SNAPSHOT) ;; *) echo "a branch carries a release version: ${version}"; exit 1;; esac
             echo "channel=snapshots" >> "$GITHUB_OUTPUT"
-            echo "args=-Dsokar.snapshot.run=${{ github.run_number }} -Dsokar.snapshot.suffix=" >> "$GITHUB_OUTPUT"
+            echo "args=-Dporelo.snapshot.run=${{ github.run_number }} -Dporelo.snapshot.suffix=" >> "$GITHUB_OUTPUT"
           fi
 
       # A release depends only on releases: every version in the effective pom - parent, dependencies, the
@@ -88,8 +88,8 @@ jobs:
         if: github.ref_type == 'tag'
         run: |
           ./mvnw -B -ntp -q -s settings.xml help:effective-pom -Doutput="$RUNNER_TEMP/effective-pom.xml"
-          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.sokar.release.Main \
-            check-releases "$RUNNER_TEMP/effective-pom.xml" --requires org.fuin.sokar:sokar-release
+          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
+            check-releases "$RUNNER_TEMP/effective-pom.xml" --requires org.fuin.porelo:porelo-release
 
       - name: Build, test against the native executable, and package
         timeout-minutes: 20
@@ -126,19 +126,19 @@ jobs:
           if [ "$CHANNEL" = releases ]; then
             base="${JF_URL%/}/artifactory"
             for p in target/*.deb; do
-              if curl -sfL "$base/sokar-dist-deb/dists/releases/main/binary-amd64/Packages" \
-                  | grep -qxF "Filename: pool/main/s/$(dpkg-deb -f "$p" Package)/$(basename "$p")"; then
+              if curl -sfL "$base/porelo-dist-deb/dists/releases/main/binary-amd64/Packages" \
+                  | grep -qxF "Filename: pool/main/p/$(dpkg-deb -f "$p" Package)/$(basename "$p")"; then
                 echo "$(basename "$p") is released already"; exit 1
               fi
             done
           fi
           for p in target/*.deb; do
             name=$(dpkg-deb -f "$p" Package); arch=$(dpkg-deb -f "$p" Architecture)
-            jf rt upload "$p" "sokar-dist-deb/pool/main/s/$name/" --flat=true \
+            jf rt upload "$p" "porelo-dist-deb/pool/main/p/$name/" --flat=true \
               --target-props="deb.distribution=${CHANNEL};deb.component=main;deb.architecture=$arch"
           done
           for p in target/rpm/*/RPMS/*/*.rpm; do
-            jf rt upload "$p" "sokar-dist-rpm/${CHANNEL}/" --flat=true
+            jf rt upload "$p" "porelo-dist-rpm/${CHANNEL}/" --flat=true
           done
 
       # Artifactory indexes after the upload, by itself and without a word when it fails, so the index is
@@ -154,18 +154,18 @@ jobs:
           set -euo pipefail
           base="${JF_URL%/}/artifactory"
           missing() {
-            curl -sfL "$base/sokar-dist-deb/dists/${CHANNEL}/main/binary-amd64/Packages" > "$RUNNER_TEMP/Packages" \
+            curl -sfL "$base/porelo-dist-deb/dists/${CHANNEL}/main/binary-amd64/Packages" > "$RUNNER_TEMP/Packages" \
               || : > "$RUNNER_TEMP/Packages"
             for p in target/*.deb; do
-              grep -qxF "Filename: pool/main/s/$(dpkg-deb -f "$p" Package)/$(basename "$p")" "$RUNNER_TEMP/Packages" \
-                || echo "sokar-dist-deb: $(basename "$p")"
+              grep -qxF "Filename: pool/main/p/$(dpkg-deb -f "$p" Package)/$(basename "$p")" "$RUNNER_TEMP/Packages" \
+                || echo "porelo-dist-deb: $(basename "$p")"
             done
-            primary=$(curl -sfL "$base/sokar-dist-rpm/${CHANNEL}/repodata/repomd.xml" \
+            primary=$(curl -sfL "$base/porelo-dist-rpm/${CHANNEL}/repodata/repomd.xml" \
               | grep -o 'href="repodata/[^"]*primary\.xml\.gz"' | cut -d'"' -f2 || true)
-            { [ -n "$primary" ] && curl -sfL "$base/sokar-dist-rpm/${CHANNEL}/$primary" | gunzip; } > "$RUNNER_TEMP/primary.xml" \
+            { [ -n "$primary" ] && curl -sfL "$base/porelo-dist-rpm/${CHANNEL}/$primary" | gunzip; } > "$RUNNER_TEMP/primary.xml" \
               || : > "$RUNNER_TEMP/primary.xml"
             for p in target/rpm/*/RPMS/*/*.rpm; do
-              grep -qF "$(basename "$p")\"" "$RUNNER_TEMP/primary.xml" || echo "sokar-dist-rpm: $(basename "$p")"
+              grep -qF "$(basename "$p")\"" "$RUNNER_TEMP/primary.xml" || echo "porelo-dist-rpm: $(basename "$p")"
             done
           }
           for i in $(seq 60); do
