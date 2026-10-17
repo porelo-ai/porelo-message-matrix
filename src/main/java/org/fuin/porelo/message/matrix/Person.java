@@ -78,7 +78,12 @@ final class Person {
             if (to.isEmpty()) {
                 final Matcher m = MATRIX_TO.matcher(content.path("formatted_body").asText(""));
                 while (m.find()) {
-                    to.add(java.net.URLDecoder.decode(m.group(1), StandardCharsets.UTF_8));
+                    try {
+                        to.add(java.net.URLDecoder.decode(m.group(1), StandardCharsets.UTF_8));
+                    } catch (final IllegalArgumentException ex) {
+                        // An escape that is none names nobody; the message is delivered all the
+                        // same.
+                    }
                 }
             }
             if (!replyTo.isEmpty()) {

@@ -80,8 +80,8 @@ final class AdminRoom {
                         .asText("");
         final Instant deadline = Instant.now().plus(ANSWER_TIMEOUT);
         while (Instant.now().isBefore(deadline)) {
-            // The newest first, down to the command: whatever the server said after it is its
-            // answer.
+            // The newest first, down to the command. The server's answer names the command it
+            // answers; another command's answer, or a notice of its own, is passed over.
             final JsonNode chunk =
                     admin.get(
                                     "/_matrix/client/v3/rooms/"
@@ -93,7 +93,13 @@ final class AdminRoom {
                     break;
                 }
                 if ("m.room.message".equals(event.path("type").asText())
-                        && !adminId.equals(event.path("sender").asText())) {
+                        && !adminId.equals(event.path("sender").asText())
+                        && sent.equals(
+                                event.path("content")
+                                        .path("m.relates_to")
+                                        .path("m.in_reply_to")
+                                        .path("event_id")
+                                        .asText())) {
                     return new Reply(
                             sent,
                             event.path("event_id").asText(""),

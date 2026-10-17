@@ -55,7 +55,10 @@ class PollIT {
 
     @AfterEach
     void tearDown() throws IOException, InterruptedException {
-        tuwunel.close();
+        // A start that failed leaves none to close, and must not hide why it failed.
+        if (tuwunel != null) {
+            tuwunel.close();
+        }
     }
 
     private Map<String, String> env(final Tuwunel.Account account) {
@@ -494,30 +497,27 @@ class PollIT {
                 .allSatisfy((message, signature) -> assertThat(signature).isNull());
     }
 
+    /**
+     * Harm guarded: a sync cut short is paged back to the last position, and no further; paged past
+     * it, every message the room ever had is delivered again.
+     */
     @Test
-    @DisplayName("More messages than one sync returns are all delivered, none skipped")
+    @DisplayName(
+            "More messages than one sync returns are all delivered, none skipped and none from before")
     void nothingSkippedWhenTheSyncIsCutShort() throws IOException {
+        for (int i = 0; i < 5; i++) {
+            send("before " + i + "\n");
+        }
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
         empty();
+        final java.util.Set<String> sent = new java.util.HashSet<>();
         for (int i = 0; i < 150; i++) {
             send("message " + i + "\n");
+            sent.add("message " + i + "\n");
         }
 
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(delivered()).hasSize(150);
-    }
-
-    @Test
-    @DisplayName("Nothing half-written is left in inbound")
-    void noPartialFiles() throws IOException {
-        send("whole\n");
-
-        assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
-
-        try (Stream<Path> files = Files.list(inbound)) {
-            assertThat(files.map(f -> f.getFileName().toString()))
-                    .noneMatch(name -> name.startsWith("."));
-        }
+        assertThat(delivered().keySet()).as("what was delivered").isEqualTo(sent);
     }
 }

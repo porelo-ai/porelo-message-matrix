@@ -85,4 +85,18 @@ class SettingsTest {
                                 .homeserver())
                 .hasToString(url);
     }
+
+    /**
+     * Harm guarded: a ca_file no path can name - a NUL in it - ended the verb with 1 and a stack
+     * trace, an exit Porelo has no meaning for, instead of the refusal it reads.
+     */
+    @Test
+    @DisplayName("A ca_file that is no path is refused with 78")
+    void caFileThatIsNoPathRefused() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> settings("{\"ca_file\":\"/etc/ssl/a\\u0000b.pem\"}"))
+                .as("the refusal")
+                .isInstanceOf(Failure.class)
+                .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
+    }
 }

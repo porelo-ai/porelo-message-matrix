@@ -9,7 +9,7 @@ import java.util.Map;
 /** The transport's entry point, called by Porelo with a verb and its arguments. */
 public final class Main {
 
-    private static final String NAME = "porelo-message-transport-matrix";
+    static final String NAME = "porelo-message-transport-matrix";
 
     private Main() {}
 
@@ -57,7 +57,7 @@ public final class Main {
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "clear" ->
-                        Lifecycle.run(args[0], rest, env, in, out);
+                        Lifecycle.run(args[0], rest, env, in, out, err);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");
                     return Exit.USAGE;

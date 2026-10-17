@@ -159,6 +159,45 @@ class PollTest {
         assertThat(stderr()).contains("another poll for this account is running");
     }
 
+    /**
+     * Harm guarded: two polls of one account at once - two porelod, or a poll started by hand -
+     * both write the position, and a message is delivered twice or the position goes back. The lock
+     * is held by another process here, as it would be, not by this one.
+     */
+    @Test
+    @DisplayName("While a poll in another process holds the account, it is 75")
+    void anotherProcessPolls() throws Exception {
+        homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, "{\"next_batch\":\"s1\"}");
+        assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
+        final Path lockFile;
+        try (Stream<Path> files = Files.list(dir.resolve("state/porelo/transports/matrix"))) {
+            lockFile = files.filter(f -> f.toString().endsWith(".lock")).findFirst().orElseThrow();
+        }
+        homeserver.answer(200, WHOAMI);
+        final Process holder =
+                new ProcessBuilder(
+                                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                                "-cp",
+                                System.getProperty("java.class.path"),
+                                LockHolder.class.getName(),
+                                lockFile.toString())
+                        .redirectError(ProcessBuilder.Redirect.INHERIT)
+                        .start();
+        try {
+            final java.io.BufferedReader said =
+                    new java.io.BufferedReader(
+                            new java.io.InputStreamReader(
+                                    holder.getInputStream(), StandardCharsets.UTF_8));
+            assertThat(said.readLine()).as("the other process").isEqualTo("held");
+
+            assertThat(poll()).as(stderr()).isEqualTo(Exit.TEMPORARY);
+        } finally {
+            holder.getOutputStream().close();
+            holder.waitFor();
+        }
+        assertThat(stderr()).contains("another poll for this account is running");
+    }
+
     @Test
     @DisplayName("Without XDG_STATE_HOME or HOME there is nowhere to keep the position: 78")
     void noStateDirectory() {

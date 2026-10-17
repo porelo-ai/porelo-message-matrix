@@ -12,6 +12,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * {@code read}'s refusals, and where it posts. That the sender then sees it is proven in {@code
@@ -73,11 +76,20 @@ class ReadTest {
                         });
     }
 
-    @Test
-    @DisplayName("A name poll gave a message stands for the event it recorded")
-    void referenceByName() throws Exception {
-        final java.nio.file.Path state = java.nio.file.Files.createTempDirectory("state");
-        final String name = Reference.of(EVENT, 1_790_000_000_000L);
+    /**
+     * Harm guarded: Porelo names a message by the file the poll wrote, a person's too; a name not
+     * taken ends {@code read} with 64, and the person never sees their message read.
+     */
+    @ParameterizedTest(name = "a person''s: {0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName(
+            "A name poll gave a message, a task's or a person's, stands for the event it recorded")
+    void referenceByName(final boolean person, @TempDir final java.nio.file.Path state)
+            throws Exception {
+        final String name =
+                person
+                        ? Reference.ofPerson(EVENT, 1_790_000_000_000L)
+                        : Reference.of(EVENT, 1_790_000_000_000L);
         Reference.remember(
                 Poll.stateDirectory(Map.of("XDG_STATE_HOME", state.toString())), name, EVENT);
         homeserver

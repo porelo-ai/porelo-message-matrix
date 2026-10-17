@@ -12,6 +12,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -67,24 +68,144 @@ class LoopbackOnlyTest {
                                 "join", "--project", "p", "--person", "n", "--loopback-only"
                             };
                 };
-        // The fake stands where a remote server would be reached; it must hear nothing.
-        final String remote =
-                homeserver.url().replace("http://127.0.0.1", "https://matrix.example.org");
+        final String remote = "https://matrix.example.org";
 
         assertThat(run("{\"homeserver\":\"" + remote + "\"}", args)).isEqualTo(Exit.CONFIG);
         assertThat(errBytes.toString(StandardCharsets.UTF_8))
                 .contains("only this machine's loopback");
-        assertThat(homeserver.requests()).isEmpty();
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({"http://127.0.0.1:8008", "http://localhost:8008", "http://[::1]:8008"})
+    @CsvSource({"127.0.0.1", "localhost", "[::1]"})
     @DisplayName("A loopback homeserver passes the check - what follows is the verb's own")
-    void loopbackPasses(final String url) {
+    void loopbackPasses(final String host) {
+        // The fake's port, so nothing outside the test is reached, whatever the name resolves to.
+        final String url = homeserver.url().replace("127.0.0.1", host);
+
         run("{\"homeserver\":\"" + url + "\"}", "setup", "--project", "p", "--loopback-only");
 
         assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("what stderr says")
                 .doesNotContain("only this machine's loopback");
+    }
+
+    /**
+     * Harm guarded: the verbs after setup reach the homeserver Porelo kept from setup, and carry
+     * the admin token there; plain http to another host would send it readable.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+        "'enroll --project p --task t'",
+        "'retire --project p --task t'",
+        "'join --project p --person n'"
+    })
+    @DisplayName(
+            "The kept homeserver in plain http on another host is refused with 78, before any request")
+    void keptPlainHttpElsewhereIsRefused(final String line) {
+        final int exit =
+                run(
+                        Map.of(
+                                Config.HOMESERVER,
+                                "http://matrix.example.org",
+                                Config.ADMIN_TOKEN,
+                                "a"),
+                        "{}",
+                        line.split(" "));
+
+        assertThat(exit).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.CONFIG);
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("the refusal")
+                .contains("plain http on another host");
+    }
+
+    /**
+     * Harm guarded as above; {@code clear} says in {@code kept} what it could not remove, and ends
+     * with 0, so the refusal is read there.
+     */
+    @Test
+    @DisplayName("clear keeps the project's room when the kept homeserver is plain http elsewhere")
+    void clearRefusesKeptPlainHttpElsewhere() {
+        final ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+        final int exit =
+                Main.run(
+                        new String[] {"clear", "--project", "p"},
+                        Map.of(
+                                Config.HOMESERVER,
+                                "http://matrix.example.org",
+                                Config.ADMIN_TOKEN,
+                                "a"),
+                        new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)),
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.OK);
+        assertThat(outBytes.toString(StandardCharsets.UTF_8))
+                .as("what clear kept, and why")
+                .contains("plain http on another host");
+    }
+
+    /**
+     * Harm guarded: an offline project's verbs after setup reach the homeserver Porelo kept, not
+     * the settings' one; one elsewhere would be reached although the project may reach nothing.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"enroll --task t", "join --person n"})
+    @DisplayName("Under --loopback-only, a kept homeserver elsewhere is refused with 78")
+    void keptHomeserverElsewhereIsRefusedOffline(final String rest) {
+        final String[] verb = rest.split(" ");
+        final int exit =
+                run(
+                        Map.of(
+                                Config.HOMESERVER,
+                                "https://matrix.example.org",
+                                Config.ADMIN_TOKEN,
+                                "a"),
+                        "{}",
+                        verb[0],
+                        "--project",
+                        "p",
+                        verb[1],
+                        verb[2],
+                        "--loopback-only");
+
+        assertThat(exit).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.CONFIG);
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("the refusal")
+                .contains("only this machine's loopback");
+    }
+
+    /**
+     * Harm guarded: with the certificate unchecked, whoever answers in the homeserver's place
+     * receives the admin token; switched off in the project's settings, it must be as loud as in
+     * the environment.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"setup", "enroll"})
+    @DisplayName("tls_verify off in the project's settings is warned of on stderr")
+    void verifyOffInSettingsIsWarned(final String verb) {
+        final String[] args =
+                "setup".equals(verb)
+                        ? new String[] {"setup", "--project", "p"}
+                        : new String[] {"enroll", "--project", "p", "--task", "t"};
+
+        run(
+                Map.of(Config.HOMESERVER, "https://127.0.0.1:1", Config.ADMIN_TOKEN, "a"),
+                "{\"homeserver\":\"https://127.0.0.1:1\",\"tls_verify\":\"off\"}",
+                args);
+
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("what stderr says")
+                .contains("WARNING")
+                .contains("tls_verify");
+    }
+
+    private int run(final Map<String, String> env, final String settings, final String... args) {
+        return Main.run(
+                args,
+                env,
+                new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8)),
+                new PrintStream(OutputStream.nullOutputStream()),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8));
     }
 
     @ParameterizedTest(name = "clear {0}")

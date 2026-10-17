@@ -45,7 +45,10 @@ class ReceiptIT {
 
     @AfterEach
     void tearDown() throws IOException, InterruptedException {
-        tuwunel.close();
+        // A start that failed leaves none to close, and must not hide why it failed.
+        if (tuwunel != null) {
+            tuwunel.close();
+        }
     }
 
     private Map<String, String> env(final Tuwunel.Account account) {

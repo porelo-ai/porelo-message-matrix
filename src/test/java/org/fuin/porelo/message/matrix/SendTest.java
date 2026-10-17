@@ -105,6 +105,45 @@ class SendTest {
             assertThat(content.path("body").asText()).isEqualTo("foo to alice: hello");
         }
 
+        /**
+         * Harm guarded: the pills repeat the line as HTML, where a quote or an angle bracket grows
+         * to six characters; kept past the limit, the homeserver refuses the event and Porelo the
+         * message, for good.
+         */
+        @Test
+        @DisplayName("a mention on a line that fills the event as HTML is sent without its pill")
+        void pillsLeftOutWhereTheyWouldNotFit() throws IOException {
+            final ObjectNode content = content(MESSAGE);
+
+            Send.mention(content, java.util.Map.of("@a:x", "Ann"), "<\"".repeat(20_000));
+
+            assertThat(MatrixClient.JSON.writeValueAsBytes(content))
+                    .as("the event")
+                    .hasSizeLessThanOrEqualTo(Send.CONTENT_BYTES);
+            assertThat(content.has("formatted_body")).as("a pill").isFalse();
+            assertThat(content.path("body").asText()).as("the line").startsWith("Ann: <\"<\"");
+        }
+
+        /**
+         * Harm guarded: a person chooses their own display name; one near 64 KiB ended every send
+         * that mentions them with 1, and the message was never sent.
+         */
+        @Test
+        @DisplayName("a mention whose name fills the event is sent without its pill")
+        void mentionWithAHugeNameIsSent() throws IOException {
+            final ObjectNode content = content(MESSAGE);
+
+            Send.mention(content, java.util.Map.of("@a:x", "x".repeat(70_000)), "hello");
+
+            assertThat(MatrixClient.JSON.writeValueAsBytes(content))
+                    .as("the event")
+                    .hasSizeLessThanOrEqualTo(Send.CONTENT_BYTES);
+            assertThat(content.has("formatted_body")).as("a pill").isFalse();
+            assertThat(content.path("m.mentions").path("user_ids").get(0).asText())
+                    .as("whom it mentions")
+                    .isEqualTo("@a:x");
+        }
+
         @Test
         @DisplayName(
                 "the line is cut to what fits and says how long it was; the message stays whole")

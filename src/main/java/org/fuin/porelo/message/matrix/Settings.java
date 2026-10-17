@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,6 +19,12 @@ import org.jspecify.annotations.Nullable;
  * nothing.
  */
 record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyTls) {
+
+    /** Said on stderr whenever the project's settings switch the certificate check off. */
+    static final String VERIFY_OFF_WARNING =
+            "WARNING: tls_verify is off in the project's settings - the homeserver's certificate is"
+                    + " not checked, and whoever answers in its place receives the admin token. For"
+                    + " development only.";
 
     static final Set<String> KEYS = Set.of("homeserver", "ca_file", "tls_verify");
 
@@ -103,7 +110,13 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
         if (value.isMissingNode() || value.isNull()) {
             return null;
         }
-        final Path path = Path.of(value.asText(""));
+        final Path path;
+        try {
+            path = Path.of(value.asText(""));
+        } catch (final InvalidPathException ex) {
+            throw new Failure(
+                    Exit.CONFIG, "the project's ca_file is no path: " + ex.getReason(), ex);
+        }
         // Relative to what is not the transport's to know: the project's checkout is Porelo's.
         if (!path.isAbsolute()) {
             throw new Failure(

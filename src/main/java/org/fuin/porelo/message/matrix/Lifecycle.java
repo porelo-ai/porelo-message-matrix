@@ -7,9 +7,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -51,7 +56,8 @@ final class Lifecycle {
             final List<String> args,
             final Map<String, String> env,
             final InputStream in,
-            final PrintStream out)
+            final PrintStream out,
+            final PrintStream err)
             throws Failure {
         if ("clear".equals(verb) && args.isEmpty()) {
             // The account's own homeserver and what the transport keeps: no project, so no settings
@@ -61,6 +67,10 @@ final class Lifecycle {
         }
         final Options options = options(verb, args);
         final Settings settings = Settings.read(in);
+        // As loud as the environment's switch: said on every start, so it never goes unnoticed.
+        if (!settings.verifyTls()) {
+            err.println(Main.NAME + " " + verb + ": " + Settings.VERIFY_OFF_WARNING);
+        }
         // An offline project may reach this machine's loopback and nothing else - refused before
         // any request.
         if (options.loopbackOnly()
@@ -70,6 +80,18 @@ final class Lifecycle {
                     Exit.CONFIG,
                     "the project may reach only this machine's loopback, and its homeserver is "
                             + settings.homeserver());
+        }
+        // After setup, the verbs reach the homeserver Porelo kept from it, which must be loopback
+        // too.
+        final String kept = env.get(Config.HOMESERVER);
+        if (options.loopbackOnly() && !"setup".equals(verb) && kept != null) {
+            final URI url = Config.homeserver(kept);
+            if (!loopback(url)) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "the project may reach only this machine's loopback, and its homeserver is "
+                                + url);
+            }
         }
         final ObjectNode answer =
                 switch (verb) {
@@ -107,7 +129,13 @@ final class Lifecycle {
             registrationToken = local.registrationToken();
         } else {
             url = settings.homeserver();
-            reaches = url.getPort() < 0 ? url.getHost() : url.getHost() + ":" + url.getPort();
+            // Host and port, as the contract says, the scheme's own port where the URL names none.
+            reaches =
+                    url.getHost()
+                            + ":"
+                            + (url.getPort() >= 0
+                                    ? url.getPort()
+                                    : "https".equals(url.getScheme()) ? 443 : 80);
             registrationToken =
                     required(
                             env,
@@ -361,18 +389,73 @@ final class Lifecycle {
             report.kept("the poll position of " + relay, failure.getMessage());
             return report.answer();
         }
-        final String key = Poll.key(place.nobody().config(), relay);
-        for (final String suffix : List.of(".since", ".lock")) {
-            try {
-                if (Files.deleteIfExists(stateDir.resolve(key + suffix))
-                        && ".since".equals(suffix)) {
+        forgetPosition(
+                stateDir, Poll.key(place.nobody().config(), relay), relay, report, POLL_WAIT);
+        return report.answer();
+    }
+
+    /** How long {@code clear} waits for the relay's poll to end: its long sync and a margin. */
+    private static final Duration POLL_WAIT = Duration.ofSeconds(45);
+
+    /**
+     * Forgets the relay's poll position and its lock, holding the lock the poll takes: a poll still
+     * in its long sync would otherwise write the position back once it answers. It waits for such a
+     * poll to end, and past the wait keeps the position and says why.
+     */
+    static void forgetPosition(
+            final Path stateDir,
+            final String key,
+            final String relay,
+            final Report report,
+            final Duration wait) {
+        final Path lockFile = stateDir.resolve(key + ".lock");
+        if (!Files.exists(lockFile) && !Files.exists(stateDir.resolve(key + ".since"))) {
+            return;
+        }
+        try (FileChannel channel =
+                FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            final FileLock held = awaitLock(channel, wait);
+            if (held == null) {
+                report.kept(
+                        "the poll position of " + relay,
+                        "a poll of it was still running after "
+                                + wait.toSeconds()
+                                + " s; clear again once it has ended");
+                return;
+            }
+            try (held) {
+                if (Files.deleteIfExists(stateDir.resolve(key + ".since"))) {
                     report.removed("the poll position of " + relay);
                 }
-            } catch (final IOException ex) {
-                report.kept(stateDir.resolve(key + suffix).toString(), ex.getMessage());
+                Files.deleteIfExists(lockFile);
+            }
+        } catch (final IOException ex) {
+            report.kept("the poll position of " + relay, ex.getMessage());
+        }
+    }
+
+    private static @Nullable FileLock awaitLock(final FileChannel channel, final Duration wait)
+            throws IOException {
+        final Instant deadline = Instant.now().plus(wait);
+        while (true) {
+            try {
+                final FileLock lock = channel.tryLock();
+                if (lock != null) {
+                    return lock;
+                }
+            } catch (final OverlappingFileLockException ex) {
+                // A poll in this process holds it: waited for like any other.
+            }
+            if (!Instant.now().isBefore(deadline)) {
+                return null;
+            }
+            try {
+                Thread.sleep(250);
+            } catch (final InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return null;
             }
         }
-        return report.answer();
     }
 
     /** What {@code clear} took away, and what it could not, each with why. */
@@ -445,12 +528,7 @@ final class Lifecycle {
             throws Failure {
         final String homeserver =
                 required(env, Config.HOMESERVER, "the project's secrets from setup are missing");
-        final URI url;
-        try {
-            url = new URI(homeserver);
-        } catch (final URISyntaxException ex) {
-            throw new Failure(Exit.CONFIG, Config.HOMESERVER + " is not a URL: " + homeserver, ex);
-        }
+        final URI url = Config.homeserver(homeserver);
         final MatrixClient nobody = client(url, "", settings);
         final MatrixClient admin =
                 nobody.as(

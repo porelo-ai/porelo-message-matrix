@@ -41,7 +41,7 @@ authority:
 |---|---|
 | `homeserver` | The homeserver's URL, e.g. `https://matrix.example.org`; plain `http` only on this machine's loopback. Absent: this machine's own |
 | `ca_file` | An absolute path to a PEM file: an intranet's CA, or a self-signed server's certificate |
-| `tls_verify` | `off` checks no certificate. For development only, never for use |
+| `tls_verify` | `off` checks no certificate, and warns on stderr at every start. For development only, never for use |
 
 A setting the transport does not know is refused, and so is a relative `ca_file`; the interface's
 editor says so before anything is committed.

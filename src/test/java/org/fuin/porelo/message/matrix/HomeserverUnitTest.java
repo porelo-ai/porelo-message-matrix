@@ -87,4 +87,23 @@ class HomeserverUnitTest {
                 .contains("-p 127.0.0.1:${PORELO_MATRIX_PORT}:8008")
                 .contains("TUWUNEL_ALLOW_FEDERATION=false");
     }
+
+    /**
+     * Harm guarded: the transport reads and writes the port and the registration token under {@code
+     * $XDG_CONFIG_HOME} when it is set, the unit's own {@code homeserver-token} too; a unit that
+     * names {@code ~/.config} then mounts another token than the one setup registers with, or runs
+     * on another port than the one setup waits on.
+     */
+    @Test
+    @DisplayName(
+            "The unit finds its port and token where the transport puts them, under XDG_CONFIG_HOME")
+    void sameDirectoryAsTheTransport() throws IOException {
+        final String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+
+        assertThat(template)
+                .as("the unit")
+                .contains("EnvironmentFile=-%E/porelo/matrix/homeserver.conf")
+                .contains("-v %E/porelo/matrix/registration-token:/run/secrets/registration-token")
+                .doesNotContain("%h/.config");
+    }
 }

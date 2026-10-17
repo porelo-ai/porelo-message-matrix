@@ -46,6 +46,31 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
         if (token == null || token.isBlank()) {
             throw new Failure(Exit.CONFIG, ACCESS_TOKEN + " is not set");
         }
+        final URI uri = homeserver(homeserver);
+        final String verify = env.getOrDefault(TLS_VERIFY, "on");
+        if (!"on".equals(verify) && !"off".equals(verify)) {
+            throw new Failure(
+                    Exit.CONFIG, TLS_VERIFY + " must be 'on' or 'off', not '" + verify + "'");
+        }
+        final String caFile = env.get(CA_FILE);
+        if (caFile != null && !caFile.isBlank() && "off".equals(verify)) {
+            // Which of the two was meant cannot be told, so neither is guessed.
+            throw new Failure(
+                    Exit.CONFIG,
+                    CA_FILE + " and " + TLS_VERIFY + "=off contradict each other; set one");
+        }
+        return new Config(
+                uri,
+                token,
+                caFile == null || caFile.isBlank() ? null : Path.of(caFile),
+                "on".equals(verify));
+    }
+
+    /**
+     * The homeserver's URL as Porelo passes it: {@code https}, or {@code http} only on this
+     * machine's loopback, since a token travels in every request to it.
+     */
+    static URI homeserver(final String homeserver) throws Failure {
         final URI uri;
         try {
             uri =
@@ -75,23 +100,7 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
                             + " is plain http on another host, where the token"
                             + " would travel readable; use https, or http only on this machine's loopback");
         }
-        final String verify = env.getOrDefault(TLS_VERIFY, "on");
-        if (!"on".equals(verify) && !"off".equals(verify)) {
-            throw new Failure(
-                    Exit.CONFIG, TLS_VERIFY + " must be 'on' or 'off', not '" + verify + "'");
-        }
-        final String caFile = env.get(CA_FILE);
-        if (caFile != null && !caFile.isBlank() && "off".equals(verify)) {
-            // Which of the two was meant cannot be told, so neither is guessed.
-            throw new Failure(
-                    Exit.CONFIG,
-                    CA_FILE + " and " + TLS_VERIFY + "=off contradict each other; set one");
-        }
-        return new Config(
-                uri,
-                token,
-                caFile == null || caFile.isBlank() ? null : Path.of(caFile),
-                "on".equals(verify));
+        return uri;
     }
 
     @Override

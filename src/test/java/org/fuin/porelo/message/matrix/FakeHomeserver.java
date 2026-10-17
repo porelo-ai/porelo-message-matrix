@@ -21,7 +21,7 @@ final class FakeHomeserver implements AutoCloseable {
     record Request(
             String method, String rawPath, String query, String authorization, String body) {}
 
-    private record Answer(int status, String body) {}
+    private record Answer(int status, String body, String location) {}
 
     private final HttpServer server;
 
@@ -40,7 +40,13 @@ final class FakeHomeserver implements AutoCloseable {
     }
 
     synchronized FakeHomeserver answer(final int status, final String body) {
-        answers.add(new Answer(status, body));
+        answers.add(new Answer(status, body, null));
+        return this;
+    }
+
+    /** A redirect elsewhere, as a homeserver taken over or misconfigured might answer. */
+    synchronized FakeHomeserver redirect(final int status, final String location) {
+        answers.add(new Answer(status, "", location));
         return this;
     }
 
@@ -64,11 +70,16 @@ final class FakeHomeserver implements AutoCloseable {
             answer =
                     answers.isEmpty()
                             ? new Answer(
-                                    500, "{\"errcode\":\"M_UNKNOWN\",\"error\":\"nothing queued\"}")
+                                    500,
+                                    "{\"errcode\":\"M_UNKNOWN\",\"error\":\"nothing queued\"}",
+                                    null)
                             : answers.poll();
         }
         final byte[] bytes = answer.body().getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
+        if (answer.location() != null) {
+            exchange.getResponseHeaders().add("Location", answer.location());
+        }
         exchange.sendResponseHeaders(answer.status(), bytes.length == 0 ? -1 : bytes.length);
         try (OutputStream out = exchange.getResponseBody()) {
             out.write(bytes);

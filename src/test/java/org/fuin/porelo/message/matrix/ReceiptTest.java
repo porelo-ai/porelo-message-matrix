@@ -75,4 +75,34 @@ class ReceiptTest {
                 .isEqualTo(
                         "/_matrix/client/v3/rooms/%21project/state/m.room.member/%40bob%3Amatrix.test");
     }
+
+    /**
+     * Harm guarded: a receipt in a thread says nothing of the room's main timeline, where Porelo's
+     * messages are; taken as read, a task stops waiting on a person who never read its message.
+     */
+    @Test
+    @DisplayName("A receipt in a thread does not make a message read")
+    void receiptInAThreadIsNotRead() throws IOException {
+        final String event =
+                "{\"event_id\":\""
+                        + EVENT
+                        + "\",\"room_id\":\""
+                        + PROJECT
+                        + "\",\"type\":\"m.room.message\"}";
+        homeserver
+                .answer(200, "{\"joined_rooms\":[\"" + PROJECT + "\"]}")
+                .answer(200, event)
+                .answer(
+                        200,
+                        "{\"next_batch\":\"s1\",\"rooms\":{\"join\":{\""
+                                + PROJECT
+                                + "\":{\"ephemeral\":{\"events\":[{\"type\":\"m.receipt\",\"content\":"
+                                + "{\""
+                                + EVENT
+                                + "\":{\"m.read\":{\"@bob:matrix.test\":{\"ts\":1790000000000,"
+                                + "\"thread_id\":\"$root\"}}}}}]}}}}}")
+                .answer(200, "{\"membership\":\"join\"}");
+
+        assertThat(receipt()).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo("delivered");
+    }
 }

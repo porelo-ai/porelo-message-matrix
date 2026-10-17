@@ -43,7 +43,10 @@ class LifecycleIT {
 
     @AfterEach
     void tearDown() throws IOException, InterruptedException {
-        tuwunel.close();
+        // A start that failed leaves none to close, and must not hide why it failed.
+        if (tuwunel != null) {
+            tuwunel.close();
+        }
     }
 
     /**
@@ -136,6 +139,12 @@ class LifecycleIT {
                 run(kept, "enroll", "--project", PROJECT, "--task", "porelo-demo-alice");
         run(kept, "join", "--project", PROJECT, "--person", "carol");
         final String server = AdminRoom.server(alice.path("address").asText());
+        // The relay has polled, so it keeps a position: clear must forget it, or the project set
+        // up again ends every poll with 78, its position naming rooms it is no longer in.
+        final Path inbound = Files.createDirectories(dir.resolve("inbound"));
+        assertThat(attempt(kept, "poll", "--into", inbound.toString(), "--persons").exit())
+                .as("the relay's poll before clear")
+                .isEqualTo(Exit.OK);
 
         final JsonNode cleared = run(kept, "clear", "--project", PROJECT);
 
@@ -143,8 +152,10 @@ class LifecycleIT {
                 .extracting(JsonNode::asText)
                 .containsExactlyInAnyOrder(
                         "the account @porelo-relay-demo:" + server,
-                                "the account @porelo-demo-alice:" + server,
-                        "the account @carol:" + server, "the room #porelo-demo:" + server);
+                        "the account @porelo-demo-alice:" + server,
+                        "the account @carol:" + server,
+                        "the room #porelo-demo:" + server,
+                        "the poll position of @porelo-relay-demo:" + server);
         assertThat(cleared.path("kept")).isEmpty();
         assertThat(status(tuwunel.url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(401);
@@ -171,6 +182,16 @@ class LifecycleIT {
                                 tuwunel.url(),
                                 aliceAgain.path("secrets").path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(200);
+        final Transport.Result polled =
+                attempt(
+                        with(kept, anew.path("secrets")),
+                        "poll",
+                        "--into",
+                        inbound.toString(),
+                        "--persons");
+        assertThat(polled.exit())
+                .as("the relay's poll after setup anew: %s", polled.err())
+                .isEqualTo(Exit.OK);
     }
 
     @Test

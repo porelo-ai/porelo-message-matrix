@@ -168,14 +168,22 @@ final class LocalHomeserver {
     }
 
     private static void awaitUp(final URI url) throws Failure {
+        awaitUp(url, START_TIMEOUT);
+    }
+
+    /** Until the homeserver answers on its port, within the limit given. */
+    static void awaitUp(final URI url, final Duration within) throws Failure {
         final HttpClient http =
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-        final Instant deadline = Instant.now().plus(START_TIMEOUT);
+        final Instant deadline = Instant.now().plus(within);
         while (Instant.now().isBefore(deadline)) {
             try {
                 final HttpResponse<Void> response =
                         http.send(
+                                // A port that takes the connection and never answers holds
+                                // no request past this, so the limit above is kept.
                                 HttpRequest.newBuilder(url.resolve("/_matrix/client/versions"))
+                                        .timeout(Duration.ofSeconds(2))
                                         .build(),
                                 HttpResponse.BodyHandlers.discarding());
                 if (response.statusCode() == 200) {
@@ -198,11 +206,7 @@ final class LocalHomeserver {
         }
         throw new Failure(
                 Exit.TEMPORARY,
-                "the homeserver at "
-                        + url
-                        + " did not answer within "
-                        + START_TIMEOUT.toSeconds()
-                        + " s");
+                "the homeserver at " + url + " did not answer within " + within.toSeconds() + " s");
     }
 
     /**

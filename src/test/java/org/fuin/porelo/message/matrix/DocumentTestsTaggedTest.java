@@ -44,7 +44,11 @@ class DocumentTestsTaggedTest {
         assertThat(tests)
                 .extracting(path -> path.getFileName().toString())
                 .as("the test sources the guard reads")
-                .contains("MainTest.java", "SendTest.java", "DocumentTestsTaggedTest.java");
+                .contains(
+                        "MainTest.java",
+                        "SendTest.java",
+                        "DocumentTestsTaggedTest.java",
+                        "PollIT.java");
         assertThat(tests)
                 .filteredOn(path -> READS_DOCUMENTS.matcher(read(path)).find())
                 .filteredOn(path -> !read(path).contains(TAG))
@@ -76,7 +80,12 @@ class DocumentTestsTaggedTest {
 
     private static List<Path> tests() throws IOException {
         try (Stream<Path> sources = Files.walk(TESTS)) {
-            return sources.filter(path -> path.getFileName().toString().endsWith("Test.java"))
+            // Unit and integration tests alike: an integration test that reads a document is a
+            // documents test too.
+            return sources.filter(
+                            path ->
+                                    path.getFileName().toString().endsWith("Test.java")
+                                            || path.getFileName().toString().endsWith("IT.java"))
                     .sorted()
                     .toList();
         }

@@ -2,14 +2,19 @@ package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -77,5 +82,51 @@ class LocalHomeserverTest {
                 .isEqualTo(Path.of("/c/porelo/matrix"));
         assertThat(LocalHomeserver.directory(Map.of("HOME", "/h")))
                 .isEqualTo(Path.of("/h/.config/porelo/matrix"));
+    }
+
+    /**
+     * Harm guarded: a port that takes the connection and never answers - another program on it, or
+     * a homeserver hung while it starts - holds {@code setup}, and Porelo's task start with it,
+     * without end.
+     */
+    @Test
+    @DisplayName("A port that never answers ends the wait at its limit, with 75")
+    void silentPortEndsTheWait() throws Exception {
+        try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+            final List<Socket> held = new ArrayList<>();
+            final Thread acceptor =
+                    Thread.ofVirtual()
+                            .start(
+                                    () -> {
+                                        try {
+                                            while (true) {
+                                                held.add(silent.accept());
+                                            }
+                                        } catch (final IOException ex) {
+                                            // closed
+                                        }
+                                    });
+            final URI url = URI.create("http://127.0.0.1:" + silent.getLocalPort());
+
+            final Failure failure =
+                    assertTimeoutPreemptively(
+                            Duration.ofSeconds(30),
+                            () -> {
+                                try {
+                                    LocalHomeserver.awaitUp(url, Duration.ofSeconds(3));
+                                    return null;
+                                } catch (final Failure ex) {
+                                    return ex;
+                                }
+                            });
+
+            assertThat(failure).as("the end of the wait").isNotNull();
+            assertThat(failure.exitCode()).as("its exit").isEqualTo(Exit.TEMPORARY);
+            silent.close();
+            acceptor.join();
+            for (final Socket socket : held) {
+                socket.close();
+            }
+        }
     }
 }

@@ -1,7 +1,8 @@
 # The local homeserver of one account that runs Porelo, on loopback. Shipped disabled, like porelod: the
 # account enables it with `systemctl --user enable --now porelo-matrix-homeserver`. Its port and server
-# name come from ~/.config/porelo/matrix/homeserver.conf when set there. The image is filled in at build
-# time from the FROM line of homeserver/Dockerfile, the one place it is pinned.
+# name come from porelo/matrix/homeserver.conf under $XDG_CONFIG_HOME (%E, ~/.config by default) when
+# set there, where the transport writes them. The image is filled in at build time from the FROM line of
+# homeserver/Dockerfile, the one place it is pinned.
 [Unit]
 Description=The Matrix homeserver Porelo's transport talks to, on loopback
 Wants=podman-user-wait-network-online.service
@@ -11,7 +12,7 @@ RequiresMountsFor=%t/containers
 [Service]
 Environment=PORELO_MATRIX_PORT=8008
 Environment=PORELO_MATRIX_SERVER_NAME=localhost
-EnvironmentFile=-%h/.config/porelo/matrix/homeserver.conf
+EnvironmentFile=-%E/porelo/matrix/homeserver.conf
 Environment=PODMAN_SYSTEMD_UNIT=%n
 ExecStartPre=/usr/libexec/porelo/transports/porelo-message-transport-matrix homeserver-token
 # The shape podman's own quadlet generator gives a container unit, so a stop is a clean one. The container
@@ -26,7 +27,7 @@ ExecStart=/usr/bin/podman run --rm -d --cidfile=%t/%N.cid --name matrix-homeserv
     -e TUWUNEL_ADDRESS=0.0.0.0 -e TUWUNEL_PORT=8008 -e TUWUNEL_DATABASE_PATH=/data \
     -e TUWUNEL_ALLOW_FEDERATION=false -e TUWUNEL_ALLOW_REGISTRATION=true \
     -e TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/registration-token \
-    -v %h/.config/porelo/matrix/registration-token:/run/secrets/registration-token:ro,Z \
+    -v %E/porelo/matrix/registration-token:/run/secrets/registration-token:ro,Z \
     -v porelo-matrix-homeserver:/data \
     -p 127.0.0.1:${PORELO_MATRIX_PORT}:8008 \
     @IMAGE@

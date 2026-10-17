@@ -56,7 +56,10 @@ class DirectIT {
 
     @AfterEach
     void tearDown() throws IOException, InterruptedException {
-        tuwunel.close();
+        // A start that failed leaves none to close, and must not hide why it failed.
+        if (tuwunel != null) {
+            tuwunel.close();
+        }
     }
 
     private Map<String, String> env(final Tuwunel.Account account) {
@@ -213,11 +216,11 @@ class DirectIT {
         final Tuwunel.Account other = tuwunel.register("other");
         assertThat(sendTo(other.userId(), "{\"first\":1}")).as(this::stderr).isEqualTo(Exit.OK);
         assertThat(sendTo(other.userId(), "{\"second\":1}")).as(this::stderr).isEqualTo(Exit.OK);
-        assertThat(
-                        Direct.rooms(new MatrixClient(Config.from(env(task))), task.userId())
-                                .get(other.userId()))
-                .as("one chat with them, opened by the first message and used by the second")
-                .hasSize(1)
-                .allSatisfy(room -> assertThat(room).startsWith("!"));
+        // What the person sees, not what the task keeps: a second chat would leave them a second
+        // invitation, and what they write in the first would be read nowhere.
+        assertThat(tuwunel.invitedRooms(other))
+                .as(
+                        "the chats they are invited to, opened by the first message and used by the second")
+                .hasSize(1);
     }
 }

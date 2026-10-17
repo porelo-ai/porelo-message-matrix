@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
@@ -39,15 +38,18 @@ final class HomeserverToken {
         final Path file = file(env);
         try {
             if (Files.exists(file)) {
-                // An existing token is kept: the accounts already registered with it are not the
-                // point, but
-                // Porelo may hold it, and a new one would lock Porelo out without a word.
+                // An existing token is kept: Porelo may hold it, and a new one would lock Porelo
+                // out without a word. An empty file is none - a start stopped before writing it -
+                // and Porelo can hold nothing of it, so it is made anew.
                 if (!Files.getPosixFilePermissions(file).equals(OWNER_ONLY)) {
                     throw new Failure(
                             Exit.CONFIG,
                             file + " is readable by more than its owner; fix it or remove it");
                 }
-                return;
+                if (Files.size(file) > 0) {
+                    return;
+                }
+                Files.delete(file);
             }
             final Path dir = file.getParent();
             if (dir != null && !Files.isDirectory(dir)) {
@@ -56,13 +58,23 @@ final class HomeserverToken {
             final byte[] random = new byte[BYTES];
             new SecureRandom().nextBytes(random);
             final String token = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
-            // Created with its final permissions, so it is never readable by others, not even for a
-            // moment.
-            Files.createFile(file, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
-            Files.writeString(
-                    file, token, StandardCharsets.US_ASCII, StandardOpenOption.TRUNCATE_EXISTING);
+            // Written whole beside it with its final permissions, never readable by others, then
+            // linked in under its name: a link never replaces a token another start made first, and
+            // the name never stands for a file half written.
+            final Path draft =
+                    Files.createTempFile(
+                            file.getParent(),
+                            ".registration-token-",
+                            ".draft",
+                            PosixFilePermissions.asFileAttribute(OWNER_ONLY));
+            try {
+                Files.writeString(draft, token, StandardCharsets.US_ASCII);
+                Files.createLink(file, draft);
+            } finally {
+                Files.deleteIfExists(draft);
+            }
         } catch (final FileAlreadyExistsException ex) {
-            // Another start made it between the check and the creation: that one is the token.
+            // Another start made it between the check and the link: that one is the token.
             return;
         } catch (final IOException ex) {
             throw new Failure(

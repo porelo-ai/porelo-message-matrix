@@ -1,6 +1,6 @@
 # MX16 — The Code Read Against Its Skills
 
-**Status:** Backlog; after the reformatting ([MX18](README.md#mx18)), so its diff carries no formatting.
+**Status:** Implementing; after the reformatting ([MX18](README.md#mx18)), so its diff carries no formatting.
 **Size:** L - grown from M with its findings: thirteen fixes and nine tests, several against a real homeserver;
 about 3,300 lines of Java under `src/main`, 4,200 under `src/test`, the pom, three workflows
 and the homeserver's unit, read once against seven skills; each finding is fixed with its own test, and any
@@ -58,8 +58,8 @@ other repositories' code, so it was never read.
 ## Findings
 
 Read on `5f20172` with the seven skills at the versions above, each zip's SHA-256 checked against the table and
-the repository's; line numbers are that commit's. Each is a guess until its test is seen red. None is fixed yet:
-the fixes come after the reformatting.
+the repository's; line numbers are that commit's. Each test below was seen red on the code before its fix, or on a mutation of
+the code it guards where it repairs a test that could not fail; what came of each is in *Outcome*.
 
 **To fix, no interface changes:**
 
@@ -105,7 +105,7 @@ the fixes come after the reformatting.
     so both read alike and the fix changes nothing Porelo does. Red: `reaches` of `https://h` is `h:443`.
 13. **`actions/checkout` keeps the job's token in `.git/config`** (`security-audit`), in `build.yml` and
     `shared-rules.yml`: nothing sets `persist-credentials: false`, so every later step, and any action it runs,
-    can read the token. No step pushes with git. **Fixed in MX18's commit**, since the tools that check the style
+    can read the token. No step pushes with git. **Fixed in [MX18](README.md#mx18)'s commit**, since the tools that check the style
     refuse such a checkout too: red was the shared `check-actions` on the workflows before it.
 
 **Tests that cannot fail** (`test-quality`), each shown by a change to the code it stays green on. Under the
@@ -156,4 +156,27 @@ ends an interrupt with 75; `AdminRoom`'s argument pattern stops a second command
 `Lifecycle.ours`; the unit publishes on loopback only with federation off; the packages' modes; the workflows'
 permissions and pinned actions. **`graal`:** `-march=x86-64` is the one build argument and right; no reachability
 metadata is needed, as Jackson is used as a tree only; `CpuBaselineIT` fails closed.
+
+## Outcome
+
+- **Fixed, each with its test seen red first:** 1 (`PersonTest`), 2 (`LoopbackOnlyTest`, the four verbs and
+  `clear`'s `kept`), 3 (`AdminRoomTest`; Tuwunel's reply names its command in `m.relates_to.m.in_reply_to`,
+  measured), 4 (`DirectTest`), 5 (`LocalHomeserverTest`, a port that never answers), 6 (`LoopbackOnlyTest`),
+  7 (`HomeserverUnitTest`; the unit now reads `%E`, `$XDG_CONFIG_HOME` or `~/.config`), 8
+  (`HomeserverTokenTest`), 9 and 16 (`SendTest`), 10 (`SettingsTest`).
+- **Fixed without a test**, as it does no harm: 12, since Porelo reads a host with and without its port alike.
+- **13, `persist-credentials`:** fixed in [MX18](README.md#mx18)'s commit.
+- **Tests repaired, each seen red on a mutation of what it guards:** 14 (`LifecycleIT`, `.since` kept), 15
+  (`RedirectTest`, `Redirect.NORMAL`), 17 (`PollTest`, the `tryLock` null branch dropped; the lock held by
+  `LockHolder` in a JVM of its own), 18 (`PollIT`, `to=since` dropped), 19 (`LoopbackOnlyTest`), 20
+  (`DirectIT`, a new chat at every send), 21 (`ReadTest`, `person-` dropped; `ReceiptTest`, `thread_id`
+  ignored).
+- **22:** `PollIT.noPartialFiles` is deleted; that a file appears only whole stays a guess, said as one, since no
+  test here tells a moved file from one written in place. The two `PollIT` tests timed by sleeps stay: they never
+  fail wrongly, and at worst check less on a slow runner.
+- **23:** repaired without a test of its own. `Tuwunel.reset` binds the same port again, since the tests' clients
+  hold its URL; the moment between is left.
+- **11:** Porelo clears without stopping the relay's poll, as Agent Core read in porelo, so the race holds. Fixed
+  with `ForgetPositionTest`, seen red first: `clear` takes the poll's lock before it forgets the position, waits
+  up to 45 s for a poll that holds it, and past that keeps the position and says why in `kept`.
 

@@ -46,21 +46,43 @@ final class Direct {
         return rooms;
     }
 
-    /** Adds a room to the account's {@code m.direct} for that person, keeping what is there. */
+    /** How often a chat left out by another writer of {@code m.direct} is written again. */
+    private static final int REMEMBER_ATTEMPTS = 5;
+
+    /**
+     * Adds a room to the account's {@code m.direct} for that person, keeping what is there. The
+     * account data is written whole, so another writer at the same moment - the task's {@code send}
+     * beside its {@code poll} - can write over it: it is read back, and written again with what the
+     * other wrote, until it holds the room.
+     */
     static void remember(
             final MatrixClient client, final String self, final String person, final String room)
             throws Failure {
-        final Map<String, Set<String>> rooms = rooms(client, self);
-        rooms.computeIfAbsent(person, p -> new LinkedHashSet<>()).add(room);
-        final ObjectNode data = MatrixClient.JSON.createObjectNode();
-        rooms.forEach(
-                (who, ids) -> {
-                    final ArrayNode list = data.putArray(who);
-                    ids.forEach(list::add);
-                });
-        client.put(
-                "/_matrix/client/v3/user/" + MatrixClient.segment(self) + "/account_data/m.direct",
-                data);
+        final String path =
+                "/_matrix/client/v3/user/" + MatrixClient.segment(self) + "/account_data/m.direct";
+        for (int attempt = 0; attempt < REMEMBER_ATTEMPTS; attempt++) {
+            final Map<String, Set<String>> rooms = rooms(client, self);
+            rooms.computeIfAbsent(person, p -> new LinkedHashSet<>()).add(room);
+            final ObjectNode data = MatrixClient.JSON.createObjectNode();
+            rooms.forEach(
+                    (who, ids) -> {
+                        final ArrayNode list = data.putArray(who);
+                        ids.forEach(list::add);
+                    });
+            client.put(path, data);
+            if (rooms(client, self).getOrDefault(person, Set.of()).contains(room)) {
+                return;
+            }
+        }
+        throw new Failure(
+                Exit.TEMPORARY,
+                "the direct chat "
+                        + room
+                        + " with "
+                        + person
+                        + " was written over in m.direct "
+                        + REMEMBER_ATTEMPTS
+                        + " times by another writer; the chat is joined but not read until it is there");
     }
 
     /**

@@ -206,6 +206,10 @@ final class Send {
         // The pills are the formatted twin of the body as it was fitted; left out where they would
         // not fit too.
         final String body = content.path("body").asText();
+        // A name that fills the event leaves the body cut inside the names: no pill matches it.
+        if (!body.startsWith(head)) {
+            return;
+        }
         content.put("format", "org.matrix.custom.html");
         content.put("formatted_body", pills + ": " + html(body.substring(head.length())));
         if (size(content) > CONTENT_BYTES) {

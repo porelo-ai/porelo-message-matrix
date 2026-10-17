@@ -18,6 +18,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The homeserver of {@code homeserver/Dockerfile}, started in rootless podman on loopback for one
@@ -104,21 +105,39 @@ final class Tuwunel implements AutoCloseable {
         // Never "porelo-…": the build runs in a developer's own podman, where Porelo takes such a
         // name for a task.
         final String container = "tuwunel-it-" + random().substring(0, 8).toLowerCase();
-        podman(
-                "run",
-                "-d",
-                "--rm",
-                "--name",
-                container,
-                "--env-file",
-                env.toString(),
-                "-p",
-                "127.0.0.1::8008",
-                image());
-        final String port = podman("port", container, "8008/tcp").strip().replaceAll(".*:", "");
-        final Tuwunel tuwunel = new Tuwunel(container, dir, token, "http://127.0.0.1:" + port);
-        tuwunel.awaitUp();
-        return tuwunel;
+        // A start that fails half-way removes what it made - the container and the directory with
+        // the token - before it says why.
+        try {
+            podman(
+                    "run",
+                    "-d",
+                    "--rm",
+                    "--name",
+                    container,
+                    "--env-file",
+                    env.toString(),
+                    "-p",
+                    "127.0.0.1::8008",
+                    image());
+            final String port = podman("port", container, "8008/tcp").strip().replaceAll(".*:", "");
+            final Tuwunel tuwunel = new Tuwunel(container, dir, token, "http://127.0.0.1:" + port);
+            tuwunel.awaitUp();
+            return tuwunel;
+        } catch (final IOException | InterruptedException | RuntimeException ex) {
+            try {
+                podman("rm", "-f", "-i", container);
+            } catch (final IOException | RuntimeException cleanup) {
+                ex.addSuppressed(cleanup);
+            }
+            try (Stream<Path> files = Files.walk(dir)) {
+                for (final Path file : files.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(file);
+                }
+            } catch (final IOException cleanup) {
+                ex.addSuppressed(cleanup);
+            }
+            throw ex;
+        }
     }
 
     String url() {
@@ -343,6 +362,14 @@ final class Tuwunel implements AutoCloseable {
     }
 
     /** Every {@code m.room.message} the account sees in the room, oldest first. */
+    /** The rooms an account is invited to and has not answered, as its own sync has them. */
+    List<String> invitedRooms(final Account account) throws IOException, InterruptedException {
+        final JsonNode sync = call("GET", "/_matrix/client/v3/sync?timeout=0", account, null, 200);
+        final List<String> rooms = new java.util.ArrayList<>();
+        sync.path("rooms").path("invite").properties().forEach(e -> rooms.add(e.getKey()));
+        return rooms;
+    }
+
     List<JsonNode> messages(final Account account, final String room)
             throws IOException, InterruptedException {
         final JsonNode sync = call("GET", "/_matrix/client/v3/sync?timeout=0", account, null, 200);

@@ -13,9 +13,9 @@ this account". With lingering on, the homeserver comes back after a reboot witho
 
 | What | Where | Default |
 |---|---|---|
-| Port, on `127.0.0.1` only | `PORELO_MATRIX_PORT` in `~/.config/porelo/matrix/homeserver.conf` | the first free one from `8008` |
+| Port, on `127.0.0.1` only | `PORELO_MATRIX_PORT` in `~/.config/porelo/matrix/homeserver.conf`, under `$XDG_CONFIG_HOME` when it is set | the first free one from `8008` |
 | Server name, part of every account id; fixed once the database exists | `PORELO_MATRIX_SERVER_NAME` in the same file | `localhost` |
-| Registration token, made on first start, readable by the account alone | `~/.config/porelo/matrix/registration-token` | - |
+| Registration token, made on first start, readable by the account alone | `~/.config/porelo/matrix/registration-token`, under `$XDG_CONFIG_HOME` when it is set | - |
 | Database | the podman volume `porelo-matrix-homeserver` | - |
 | Container | `matrix-homeserver`, acted on only by the id in `$XDG_RUNTIME_DIR/porelo-matrix-homeserver.cid` | - |
 

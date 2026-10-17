@@ -58,6 +58,38 @@ class HomeserverTokenTest {
         assertThat(Files.readString(token(), StandardCharsets.US_ASCII)).isEqualTo(first);
     }
 
+    /**
+     * Harm guarded: a start stopped between making the file and writing it leaves it empty; kept,
+     * every later setup fails on it with 78 and the homeserver takes no registration, until
+     * somebody removes it by hand.
+     */
+    @Test
+    @DisplayName("An empty token file, left by a start stopped half-way, is made anew")
+    void replacesAnEmptyToken() throws IOException {
+        Files.createDirectories(
+                token().getParent(),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+        Files.createFile(
+                token(),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as(errBytes.toString(StandardCharsets.UTF_8))
+                .isEqualTo(Exit.OK);
+
+        assertThat(Files.readString(token(), StandardCharsets.US_ASCII))
+                .as("the token")
+                .matches("[A-Za-z0-9_-]{43}");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(token())))
+                .as("who may read it")
+                .isEqualTo("rw-------");
+        try (var left = Files.list(token().getParent())) {
+            assertThat(left.map(p -> p.getFileName().toString()).toList())
+                    .as("what is left in the directory")
+                    .containsExactly("registration-token");
+        }
+    }
+
     @Test
     @DisplayName("XDG_CONFIG_HOME is where it goes when it is set")
     void followsXdgConfigHome() {
