@@ -15,7 +15,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * {@code poll}'s refusals, against a homeserver that answers what each test needs. What it delivers is
- * proven against the real one in {@code PollIT}.
+ * {@code poll}'s refusals, against a homeserver that answers what each test needs. What it delivers
+ * is proven against the real one in {@code PollIT}.
  */
 class PollTest {
 
@@ -34,8 +33,7 @@ class PollTest {
 
     private static final String JOINED = "{\"joined_rooms\":[\"!room:matrix.test\"]}";
 
-    @TempDir
-    private Path dir;
+    @TempDir private Path dir;
 
     private FakeHomeserver homeserver;
 
@@ -66,7 +64,11 @@ class PollTest {
         final String[] all = new String[args.length + 1];
         all[0] = "poll";
         System.arraycopy(args, 0, all, 1, args.length);
-        return Main.run(all, env, new PrintStream(OutputStream.nullOutputStream()), new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+        return Main.run(
+                all,
+                env,
+                new PrintStream(OutputStream.nullOutputStream()),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8));
     }
 
     private int poll() {
@@ -89,8 +91,17 @@ class PollTest {
         assertThat(poll(env())).isEqualTo(Exit.USAGE);
         assertThat(poll(env(), "--to", inbound.toString())).isEqualTo(Exit.USAGE);
         assertThat(poll(env(), "--into", dir.resolve("missing").toString())).isEqualTo(Exit.USAGE);
-        for (final String[] wrong : new String[][] {{"--wait"}, {"--wait", "0"}, {"--wait", "31"}, {"--wait", "x"},
-                {"--persons", "--direct"}, {"--persons", "--persons"}, {"--wait", "5", "--wait", "5"}, {"--later"}}) {
+        for (final String[] wrong :
+                new String[][] {
+                    {"--wait"},
+                    {"--wait", "0"},
+                    {"--wait", "31"},
+                    {"--wait", "x"},
+                    {"--persons", "--direct"},
+                    {"--persons", "--persons"},
+                    {"--wait", "5", "--wait", "5"},
+                    {"--later"}
+                }) {
             final String[] args = new String[wrong.length + 2];
             args[0] = "--into";
             args[1] = inbound.toString();
@@ -125,7 +136,8 @@ class PollTest {
 
         assertThat(poll()).isEqualTo(Exit.PROTOCOL);
         try (Stream<Path> files = Files.list(dir.resolve("state/porelo/transports/matrix"))) {
-            assertThat(files.map(f -> f.getFileName().toString())).noneMatch(name -> name.endsWith(".since"));
+            assertThat(files.map(f -> f.getFileName().toString()))
+                    .noneMatch(name -> name.endsWith(".since"));
         }
     }
 
@@ -161,19 +173,26 @@ class PollTest {
     @Test
     @DisplayName("The position is kept under XDG_STATE_HOME, and sent back on the next sync")
     void positionIsKept() {
-        homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, "{\"next_batch\":\"s42\"}")
-                .answer(200, WHOAMI).answer(200, JOINED).answer(200, "{\"next_batch\":\"s43\"}");
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, JOINED)
+                .answer(200, "{\"next_batch\":\"s42\"}")
+                .answer(200, WHOAMI)
+                .answer(200, JOINED)
+                .answer(200, "{\"next_batch\":\"s43\"}");
 
         assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
         assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
 
-        assertThat(homeserver.requests().get(1).rawPath()).isEqualTo("/_matrix/client/v3/joined_rooms");
+        assertThat(homeserver.requests().get(1).rawPath())
+                .isEqualTo("/_matrix/client/v3/joined_rooms");
         assertThat(homeserver.requests().get(2).rawPath()).isEqualTo("/_matrix/client/v3/sync");
-        assertThat(homeserver.requests()).extracting(FakeHomeserver.Request::query)
-                .satisfies(queries -> {
-                    assertThat(queries.get(2)).doesNotContain("since=");
-                    assertThat(queries.get(5)).contains("since=s42");
-                });
+        assertThat(homeserver.requests())
+                .extracting(FakeHomeserver.Request::query)
+                .satisfies(
+                        queries -> {
+                            assertThat(queries.get(2)).doesNotContain("since=");
+                            assertThat(queries.get(5)).contains("since=s42");
+                        });
     }
-
 }

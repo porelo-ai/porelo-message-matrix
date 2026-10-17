@@ -3,6 +3,8 @@
 !.gitkeep
 !.mvn
 !.github
+!.editorconfig
+!.git-blame-ignore-revs
 target
 *.log
 *.iml

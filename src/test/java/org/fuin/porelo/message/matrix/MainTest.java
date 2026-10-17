@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,5 +36,4 @@ class MainTest {
     private String stderr() {
         return errBytes.toString(StandardCharsets.UTF_8);
     }
-
 }

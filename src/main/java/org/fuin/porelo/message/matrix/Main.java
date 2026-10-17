@@ -6,15 +6,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The transport's entry point, called by Porelo with a verb and its arguments.
- */
+/** The transport's entry point, called by Porelo with a verb and its arguments. */
 public final class Main {
 
     private static final String NAME = "porelo-message-transport-matrix";
 
-    private Main() {
-    }
+    private Main() {}
 
     public static void main(final String[] args) {
         System.exit(run(args, System.getenv(), System.in, System.out, System.err));
@@ -23,12 +20,20 @@ public final class Main {
     /**
      * Runs one invocation and answers its exit code, so a test can call it without ending the JVM.
      */
-    static int run(final String[] args, final Map<String, String> env, final PrintStream out, final PrintStream err) {
+    static int run(
+            final String[] args,
+            final Map<String, String> env,
+            final PrintStream out,
+            final PrintStream err) {
         return run(args, env, InputStream.nullInputStream(), out, err);
     }
 
     /** With stdin, which the lifecycle verbs read the project's settings from. */
-    static int run(final String[] args, final Map<String, String> env, final InputStream in, final PrintStream out,
+    static int run(
+            final String[] args,
+            final Map<String, String> env,
+            final InputStream in,
+            final PrintStream out,
             final PrintStream err) {
         // Fail closed: an unknown verb stops with an exit code rather than being guessed at.
         if (args.length == 0) {
@@ -51,7 +56,8 @@ public final class Main {
                 case "rename" -> Rename.run(rest, Config.from(env));
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "settings" -> SettingsCheck.run(rest, in, out);
-                case "setup", "enroll", "retire", "join", "clear" -> Lifecycle.run(args[0], rest, env, in, out);
+                case "setup", "enroll", "retire", "join", "clear" ->
+                        Lifecycle.run(args[0], rest, env, in, out);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");
                     return Exit.USAGE;
@@ -63,5 +69,4 @@ public final class Main {
             return failure.exitCode();
         }
     }
-
 }

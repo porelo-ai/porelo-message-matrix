@@ -2,6 +2,8 @@ package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -13,28 +15,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Stream;
-
 import org.jspecify.annotations.Nullable;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 /**
- * {@code poll} against the real homeserver the transport is built for, on loopback in podman. Each test
- * gets its own homeserver, so what one delivers cannot leak into another.
+ * {@code poll} against the real homeserver the transport is built for, on loopback in podman. Each
+ * test gets its own homeserver, so what one delivers cannot leak into another.
  */
 class PollIT {
 
     private static final byte[] SIGNATURE = {0, 1, 2, (byte) 0xfe, (byte) 0xff, '\n', '-', '-'};
 
-    @TempDir
-    private Path dir;
+    @TempDir private Path dir;
 
     private Tuwunel tuwunel;
 
@@ -63,8 +59,13 @@ class PollIT {
     }
 
     private Map<String, String> env(final Tuwunel.Account account) {
-        return Map.of(Config.HOMESERVER, tuwunel.url(), Config.ACCESS_TOKEN, account.accessToken(),
-                "XDG_STATE_HOME", dir.resolve("state").toString());
+        return Map.of(
+                Config.HOMESERVER,
+                tuwunel.url(),
+                Config.ACCESS_TOKEN,
+                account.accessToken(),
+                "XDG_STATE_HOME",
+                dir.resolve("state").toString());
     }
 
     private void send(final String message) throws IOException {
@@ -74,8 +75,16 @@ class PollIT {
     private void send(final String message, final byte[] signature) throws IOException {
         final Path file = Files.writeString(dir.resolve("out"), message, StandardCharsets.UTF_8);
         final Path sig = Files.write(dir.resolve("out.sig"), signature);
-        assertThat(Transport.run(new String[] {"send", file.toString(), sig.toString(), "--to", room}, env(alice),
-                new PrintStream(OutputStream.nullOutputStream()), new PrintStream(errBytes, true, StandardCharsets.UTF_8))).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(
+                        Transport.run(
+                                new String[] {
+                                    "send", file.toString(), sig.toString(), "--to", room
+                                },
+                                env(alice),
+                                new PrintStream(OutputStream.nullOutputStream()),
+                                new PrintStream(errBytes, true, StandardCharsets.UTF_8)))
+                .as(this::stderr)
+                .isEqualTo(Exit.OK);
     }
 
     private int poll() {
@@ -88,86 +97,125 @@ class PollIT {
         args[1] = "--into";
         args[2] = inbound.toString();
         System.arraycopy(extra, 0, args, 3, extra.length);
-        return Transport.run(args, env(bob), new PrintStream(OutputStream.nullOutputStream()),
+        return Transport.run(
+                args,
+                env(bob),
+                new PrintStream(OutputStream.nullOutputStream()),
                 new PrintStream(errBytes, true, StandardCharsets.UTF_8));
     }
 
     @Test
-    @DisplayName("poll --wait answers as soon as a message arrives, and waits as long as asked when none does")
+    @DisplayName(
+            "poll --wait answers as soon as a message arrives, and waits as long as asked when none does")
     void waitingPollAnswersWhenAMessageArrives() throws Exception {
         assertThat(poll("--persons")).as(this::stderr).isEqualTo(Exit.OK);
 
         final long quiet = System.nanoTime();
         assertThat(poll("--persons", "--wait", "3")).as(this::stderr).isEqualTo(Exit.OK);
-        assertThat(java.time.Duration.ofNanos(System.nanoTime() - quiet)).as("waited for news that never came")
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - quiet))
+                .as("waited for news that never came")
                 .isGreaterThanOrEqualTo(java.time.Duration.ofMillis(2500));
         assertThat(persons()).isEmpty();
 
-        final Thread person = Thread.ofVirtual().start(() -> {
-            try {
-                Thread.sleep(1500);
-                tuwunel.say(alice, room, "said while the poll waits");
-            } catch (final Exception ex) {
-                throw new IllegalStateException(ex);
-            }
-        });
+        final Thread person =
+                Thread.ofVirtual()
+                        .start(
+                                () -> {
+                                    try {
+                                        Thread.sleep(1500);
+                                        tuwunel.say(alice, room, "said while the poll waits");
+                                    } catch (final Exception ex) {
+                                        throw new IllegalStateException(ex);
+                                    }
+                                });
         final long start = System.nanoTime();
         assertThat(poll("--wait", "25", "--persons")).as(this::stderr).isEqualTo(Exit.OK);
         final java.time.Duration took = java.time.Duration.ofNanos(System.nanoTime() - start);
         person.join();
-        assertThat(took).as("answered when the message came, not when the wait ran out")
+        assertThat(took)
+                .as("answered when the message came, not when the wait ran out")
                 .isLessThan(java.time.Duration.ofSeconds(15));
-        assertThat(persons()).singleElement().satisfies(p ->
-                assertThat(p.path("body").asText()).isEqualTo("said while the poll waits"));
+        assertThat(persons())
+                .singleElement()
+                .satisfies(
+                        p ->
+                                assertThat(p.path("body").asText())
+                                        .isEqualTo("said while the poll waits"));
     }
 
     @Test
-    @DisplayName("poll --wait goes on waiting through an answer with nothing to hand over, such as a read receipt")
+    @DisplayName(
+            "poll --wait goes on waiting through an answer with nothing to hand over, such as a read receipt")
     void waitingPollIsNotEndedByAReadReceipt() throws Exception {
         tuwunel.say(alice, room, "said before the wait");
         assertThat(poll("--persons")).as(this::stderr).isEqualTo(Exit.OK);
         final String read = tuwunel.messages(bob, room).getLast().path("event_id").asText();
         empty();
 
-        // A read receipt is filtered out of the answer, yet it ends the homeserver's wait: the answer comes empty.
-        final Thread others = Thread.ofVirtual().start(() -> {
-            try {
-                Thread.sleep(1000);
-                tuwunel.read(bob, room, read);
-                Thread.sleep(3000);
-                tuwunel.say(alice, room, "said after the receipt");
-            } catch (final Exception ex) {
-                throw new IllegalStateException(ex);
-            }
-        });
+        // A read receipt is filtered out of the answer, yet it ends the homeserver's wait: the
+        // answer comes empty.
+        final Thread others =
+                Thread.ofVirtual()
+                        .start(
+                                () -> {
+                                    try {
+                                        Thread.sleep(1000);
+                                        tuwunel.read(bob, room, read);
+                                        Thread.sleep(3000);
+                                        tuwunel.say(alice, room, "said after the receipt");
+                                    } catch (final Exception ex) {
+                                        throw new IllegalStateException(ex);
+                                    }
+                                });
         final long start = System.nanoTime();
         assertThat(poll("--wait", "25", "--persons")).as(this::stderr).isEqualTo(Exit.OK);
         final java.time.Duration took = java.time.Duration.ofNanos(System.nanoTime() - start);
         others.join();
-        assertThat(persons()).as("answered with the message, not with the receipt's empty answer after %s", took)
-                .singleElement().satisfies(p -> assertThat(p.path("body").asText()).isEqualTo("said after the receipt"));
-        assertThat(took).as("answered when the message came, not when the wait ran out")
+        assertThat(persons())
+                .as("answered with the message, not with the receipt's empty answer after %s", took)
+                .singleElement()
+                .satisfies(
+                        p ->
+                                assertThat(p.path("body").asText())
+                                        .isEqualTo("said after the receipt"));
+        assertThat(took)
+                .as("answered when the message came, not when the wait ran out")
                 .isLessThan(java.time.Duration.ofSeconds(15));
     }
 
     private int poll(final boolean persons) {
-        return Transport.run(persons ? new String[] {"poll", "--into", inbound.toString(), "--persons"}
-                : new String[] {"poll", "--into", inbound.toString()}, env(bob),
-                new PrintStream(OutputStream.nullOutputStream()), new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+        return Transport.run(
+                persons
+                        ? new String[] {"poll", "--into", inbound.toString(), "--persons"}
+                        : new String[] {"poll", "--into", inbound.toString()},
+                env(bob),
+                new PrintStream(OutputStream.nullOutputStream()),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8));
     }
 
-    /** What is in inbound: each message by its text, mapped to its signature's bytes, or null without one. */
+    /**
+     * What is in inbound: each message by its text, mapped to its signature's bytes, or null
+     * without one.
+     */
     private Map<String, byte @Nullable []> delivered() throws IOException {
         final Map<String, byte @Nullable []> messages = new TreeMap<>();
         try (Stream<Path> files = Files.list(inbound)) {
             for (final Path file : files.toList()) {
                 final String name = file.getFileName().toString();
-                assertThat(name).as("every file in inbound is a message or its signature, named as the filter takes names").matches("[0-9]{8}T[0-9]{9}--matrix-(person-)?[0-9a-f-]{36}\\.json(\\.sig|\\.sender)?");
+                assertThat(name)
+                        .as(
+                                "every file in inbound is a message or its signature, named as the filter takes names")
+                        .matches(
+                                "[0-9]{8}T[0-9]{9}--matrix-(person-)?[0-9a-f-]{36}\\.json(\\.sig|\\.sender)?");
                 if (name.endsWith(".json") && !name.contains("--matrix-person-")) {
-                    assertThat(file.resolveSibling(name + ".sender")).as("every Porelo message names its sender's account")
-                            .content(StandardCharsets.UTF_8).isEqualTo(alice.userId());
+                    assertThat(file.resolveSibling(name + ".sender"))
+                            .as("every Porelo message names its sender's account")
+                            .content(StandardCharsets.UTF_8)
+                            .isEqualTo(alice.userId());
                     final Path sig = file.resolveSibling(name + ".sig");
-                    messages.put(Files.readString(file, StandardCharsets.UTF_8), Files.exists(sig) ? Files.readAllBytes(sig) : null);
+                    messages.put(
+                            Files.readString(file, StandardCharsets.UTF_8),
+                            Files.exists(sig) ? Files.readAllBytes(sig) : null);
                 }
             }
         }
@@ -194,20 +242,23 @@ class PollIT {
 
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(delivered()).containsOnlyKeys("Grüße ✓\n\tline two\r\n", "second\n")
+        assertThat(delivered())
+                .containsOnlyKeys("Grüße ✓\n\tline two\r\n", "second\n")
                 .allSatisfy((message, signature) -> assertThat(signature).isEqualTo(SIGNATURE));
     }
 
     /** The position files poll keeps, one per account and homeserver. */
     private List<Path> positions() throws IOException {
-        try (Stream<Path> files = Files.list(dir.resolve("state").resolve("porelo/transports/matrix"))) {
+        try (Stream<Path> files =
+                Files.list(dir.resolve("state").resolve("porelo/transports/matrix"))) {
             return files.filter(f -> f.getFileName().toString().endsWith(".since")).toList();
         }
     }
 
     @Test
-    @DisplayName("A position from before the homeserver was reset is refused with 78, not answered with nothing;"
-            + " removed, the rooms are polled from their start")
+    @DisplayName(
+            "A position from before the homeserver was reset is refused with 78, not answered with nothing;"
+                    + " removed, the rooms are polled from their start")
     void resetHomeserverIsSaid() throws Exception {
         send("before\n");
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
@@ -231,14 +282,19 @@ class PollIT {
     }
 
     @Test
-    @DisplayName("A position kept before the rooms were kept beside it is taken, and the rooms are added")
+    @DisplayName(
+            "A position kept before the rooms were kept beside it is taken, and the rooms are added")
     void positionWithoutRoomsIsTaken() throws IOException {
         send("first\n");
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
         final Path position = positions().getFirst();
-        assertThat(Files.readAllLines(position, StandardCharsets.UTF_8)).as("the position, then the room").hasSize(2)
-                .last().isEqualTo(room);
-        Files.writeString(position, Files.readAllLines(position, StandardCharsets.UTF_8).getFirst() + "\n");
+        assertThat(Files.readAllLines(position, StandardCharsets.UTF_8))
+                .as("the position, then the room")
+                .hasSize(2)
+                .last()
+                .isEqualTo(room);
+        Files.writeString(
+                position, Files.readAllLines(position, StandardCharsets.UTF_8).getFirst() + "\n");
         empty();
         send("second\n");
 
@@ -264,18 +320,23 @@ class PollIT {
     }
 
     @Test
-    @DisplayName("Without --persons a person's chat is skipped as before, and stderr says how to have it")
+    @DisplayName(
+            "Without --persons a person's chat is skipped as before, and stderr says how to have it")
     void withoutPersonsChatIsSkipped() throws IOException, InterruptedException {
         tuwunel.say(alice, room, "typed in a client");
 
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
 
         assertThat(persons()).isEmpty();
-        assertThat(stderr()).contains("skipped 1 room message(s): not a Porelo message (poll --persons", "from " + alice.userId());
+        assertThat(stderr())
+                .contains(
+                        "skipped 1 room message(s): not a Porelo message (poll --persons",
+                        "from " + alice.userId());
     }
 
     @Test
-    @DisplayName("With --persons, a person's chat that names nobody is handed over all the same, meant for nobody in particular")
+    @DisplayName(
+            "With --persons, a person's chat that names nobody is handed over all the same, meant for nobody in particular")
     void chatIsSkippedAndSaidSo() throws IOException, InterruptedException {
         tuwunel.say(alice, room, "typed in a client");
         send("{\"a\":\"porelo message\"}");
@@ -283,11 +344,14 @@ class PollIT {
         assertThat(poll(true)).as(this::stderr).isEqualTo(Exit.OK);
 
         assertThat(delivered()).containsOnlyKeys("{\"a\":\"porelo message\"}");
-        assertThat(persons()).singleElement().satisfies(p -> {
-            assertThat(p.path("sender").asText()).isEqualTo(alice.userId());
-            assertThat(p.path("body").asText()).isEqualTo("typed in a client");
-            assertThat(p.path("to")).isEmpty();
-        });
+        assertThat(persons())
+                .singleElement()
+                .satisfies(
+                        p -> {
+                            assertThat(p.path("sender").asText()).isEqualTo(alice.userId());
+                            assertThat(p.path("body").asText()).isEqualTo("typed in a client");
+                            assertThat(p.path("to")).isEmpty();
+                        });
         assertThat(stderr()).doesNotContain("skipped");
     }
 
@@ -296,7 +360,8 @@ class PollIT {
     }
 
     @Test
-    @DisplayName("A person's message is handed over for the accounts it mentions, and for the sender of what it replies to")
+    @DisplayName(
+            "A person's message is handed over for the accounts it mentions, and for the sender of what it replies to")
     void personsMessageForWhomItNames() throws IOException, InterruptedException {
         final Tuwunel.Account carol = tuwunel.register("carol");
         final String talk = tuwunel.createRoom(alice, bob, carol);
@@ -308,35 +373,55 @@ class PollIT {
         reply.putObject("m.relates_to").putObject("m.in_reply_to").put("event_id", alicesWords);
         final String replied = tuwunel.sayContent(carol, talk, reply);
         final ObjectNode pill = text("alice: a pill");
-        pill.put("format", "org.matrix.custom.html").put("formatted_body",
-                "<a href=\"https://matrix.to/#/" + alice.userId() + "\">alice</a>: a pill");
+        pill.put("format", "org.matrix.custom.html")
+                .put(
+                        "formatted_body",
+                        "<a href=\"https://matrix.to/#/" + alice.userId() + "\">alice</a>: a pill");
         tuwunel.sayContent(carol, talk, pill);
 
         assertThat(poll(true)).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(persons()).filteredOn(p -> !p.path("to").isEmpty()).hasSize(3).allSatisfy(p -> {
-            assertThat(p.path("sender").asText()).isEqualTo(carol.userId());
-            assertThat(p.path("to")).extracting(JsonNode::asText).containsExactly(alice.userId());
-            assertThat(p.path("at").asText()).endsWith("Z");
-        });
-        assertThat(persons()).anySatisfy(p -> {
-            assertThat(p.path("eventId").asText()).isEqualTo(mentioned);
-            assertThat(p.path("body").asText()).isEqualTo("alice: please look at this");
-            assertThat(p.has("replyTo")).isFalse();
-        }).anySatisfy(p -> {
-            assertThat(p.path("eventId").asText()).isEqualTo(replied);
-            assertThat(p.path("replyTo").asText()).isEqualTo(alicesWords);
-        });
-        assertThat(persons()).filteredOn(p -> p.path("to").isEmpty()).singleElement()
+        assertThat(persons())
+                .filteredOn(p -> !p.path("to").isEmpty())
+                .hasSize(3)
+                .allSatisfy(
+                        p -> {
+                            assertThat(p.path("sender").asText()).isEqualTo(carol.userId());
+                            assertThat(p.path("to"))
+                                    .extracting(JsonNode::asText)
+                                    .containsExactly(alice.userId());
+                            assertThat(p.path("at").asText()).endsWith("Z");
+                        });
+        assertThat(persons())
+                .anySatisfy(
+                        p -> {
+                            assertThat(p.path("eventId").asText()).isEqualTo(mentioned);
+                            assertThat(p.path("body").asText())
+                                    .isEqualTo("alice: please look at this");
+                            assertThat(p.has("replyTo")).isFalse();
+                        })
+                .anySatisfy(
+                        p -> {
+                            assertThat(p.path("eventId").asText()).isEqualTo(replied);
+                            assertThat(p.path("replyTo").asText()).isEqualTo(alicesWords);
+                        });
+        assertThat(persons())
+                .filteredOn(p -> p.path("to").isEmpty())
+                .singleElement()
                 .satisfies(p -> assertThat(p.path("sender").asText()).isEqualTo(alice.userId()));
     }
 
     @Test
-    @DisplayName("A notice and an edit are not handed over, each said why; naming only its writer and the poller names nobody")
+    @DisplayName(
+            "A notice and an edit are not handed over, each said why; naming only its writer and the poller names nobody")
     void notAPersonsMessageForAnybody() throws IOException, InterruptedException {
         final Tuwunel.Account carol = tuwunel.register("carol");
         final String talk = tuwunel.createRoom(alice, bob, carol);
-        final ObjectNode notice = MatrixClient.JSON.createObjectNode().put("msgtype", "m.notice").put("body", "a bot");
+        final ObjectNode notice =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("msgtype", "m.notice")
+                        .put("body", "a bot");
         notice.putObject("m.mentions").putArray("user_ids").add(alice.userId());
         tuwunel.sayContent(carol, talk, notice);
         final String first = tuwunel.sayContent(carol, talk, text("first"));
@@ -350,9 +435,15 @@ class PollIT {
 
         assertThat(poll(true)).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(persons()).extracting(p -> p.path("body").asText()).containsExactly("first", "me and the poller");
+        assertThat(persons())
+                .extracting(p -> p.path("body").asText())
+                .containsExactly("first", "me and the poller");
         assertThat(persons()).allSatisfy(p -> assertThat(p.path("to")).isEmpty());
-        assertThat(stderr()).contains("skipped 2 room message(s)", "no text (m.notice)", "an edit of an earlier message");
+        assertThat(stderr())
+                .contains(
+                        "skipped 2 room message(s)",
+                        "no text (m.notice)",
+                        "an edit of an earlier message");
     }
 
     /** The persons' messages handed over, each as the JSON Porelo reads. */
@@ -360,8 +451,12 @@ class PollIT {
         final List<JsonNode> found = new java.util.ArrayList<>();
         try (Stream<Path> files = Files.list(inbound)) {
             for (final Path file : files.sorted().toList()) {
-                if (file.getFileName().toString().matches("[0-9]{8}T[0-9]{9}--matrix-person-[0-9a-f-]{36}\\.json")) {
-                    assertThat(Files.exists(file.resolveSibling(file.getFileName() + ".sig"))).as("a person's message has no .sig").isFalse();
+                if (file.getFileName()
+                        .toString()
+                        .matches("[0-9]{8}T[0-9]{9}--matrix-person-[0-9a-f-]{36}\\.json")) {
+                    assertThat(Files.exists(file.resolveSibling(file.getFileName() + ".sig")))
+                            .as("a person's message has no .sig")
+                            .isFalse();
                     found.add(MatrixClient.JSON.readTree(file.toFile()));
                 }
             }
@@ -370,7 +465,8 @@ class PollIT {
     }
 
     @Test
-    @DisplayName("An event of the earlier form, the message in its body, is not delivered, and is said on stderr")
+    @DisplayName(
+            "An event of the earlier form, the message in its body, is not delivered, and is said on stderr")
     void earlierFormIsSkipped() throws IOException, InterruptedException {
         tuwunel.sayInTheEarlierForm(alice, room, "{\"a\":\"earlier\"}");
         send("{\"a\":\"now\"}");
@@ -379,17 +475,22 @@ class PollIT {
 
         assertThat(delivered()).containsOnlyKeys("{\"a\":\"now\"}");
         assertThat(persons()).isEmpty();
-        assertThat(stderr()).contains("skipped 1 room message(s): a Porelo message of the earlier form", "from " + alice.userId());
+        assertThat(stderr())
+                .contains(
+                        "skipped 1 room message(s): a Porelo message of the earlier form",
+                        "from " + alice.userId());
     }
 
     @Test
-    @DisplayName("A Porelo message that came without a signature arrives without a .sig, for Porelo to hold")
+    @DisplayName(
+            "A Porelo message that came without a signature arrives without a .sig, for Porelo to hold")
     void unsignedPoreloMessageHasNoSig() throws IOException {
         send("unsigned\n", new byte[0]);
 
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
 
-        assertThat(delivered()).containsOnlyKeys("unsigned\n")
+        assertThat(delivered())
+                .containsOnlyKeys("unsigned\n")
                 .allSatisfy((message, signature) -> assertThat(signature).isNull());
     }
 
@@ -415,8 +516,8 @@ class PollIT {
         assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
 
         try (Stream<Path> files = Files.list(inbound)) {
-            assertThat(files.map(f -> f.getFileName().toString())).noneMatch(name -> name.startsWith("."));
+            assertThat(files.map(f -> f.getFileName().toString()))
+                    .noneMatch(name -> name.startsWith("."));
         }
     }
-
 }

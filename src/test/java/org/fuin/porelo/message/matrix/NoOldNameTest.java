@@ -12,16 +12,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * No tracked file of this repository says the product's old name, but where it says what the old name was. The
- * repository was renamed by a script; a word it left behind, or one written later out of habit, names a path, a
- * package or a setting that is no longer there. The old name is spelled here in two pieces, so that this file does
- * not say it.
+ * No tracked file of this repository says the product's old name, but where it says what the old
+ * name was. The repository was renamed by a script; a word it left behind, or one written later out
+ * of habit, names a path, a package or a setting that is no longer there. The old name is spelled
+ * here in two pieces, so that this file does not say it.
  */
 @Tag("documents")
 class NoOldNameTest {
@@ -40,7 +39,8 @@ class NoOldNameTest {
     private static final Pattern RELEASED = Pattern.compile("## \\[\\d.*");
 
     @Test
-    @DisplayName("No tracked file says the old name, in its path or in a line, but the rename's own record")
+    @DisplayName(
+            "No tracked file says the old name, in its path or in a line, but the rename's own record")
     void noTrackedFileSaysTheOldName() throws IOException, InterruptedException {
         final List<String> files = tracked();
         final List<String> found = new ArrayList<>();
@@ -64,21 +64,33 @@ class NoOldNameTest {
         }
 
         // A guard that reads nothing passes forever: assert what it read, then what it checks.
-        assertThat(files).as("the tracked files the guard reads")
+        assertThat(files)
+                .as("the tracked files the guard reads")
                 .contains("pom.xml", "AGENTS.md", "CHANGELOG.md", "issues/README.md");
         assertThat(found).as("tracked files that say the old name").isEmpty();
     }
 
     @Test
-    @DisplayName("The old name is seen in any case, and the changelog's released sections are where it stops")
+    @DisplayName(
+            "The old name is seen in any case, and the changelog's released sections are where it stops")
     void seesTheOldNameInAnyCase() {
-        assertThat(List.of(OLD, "So" + "kar", "SO" + "KAR_MATRIX_PORT", "org.fuin." + OLD + ".message"))
-                .as("spellings of the old name").allMatch(NoOldNameTest::says);
+        assertThat(
+                        List.of(
+                                OLD,
+                                "So" + "kar",
+                                "SO" + "KAR_MATRIX_PORT",
+                                "org.fuin." + OLD + ".message"))
+                .as("spellings of the old name")
+                .allMatch(NoOldNameTest::says);
         assertThat(List.of("porelo", "Porelo", "PORELO_MATRIX_PORT", "soka", "kar"))
-                .as("words that are not the old name").noneMatch(NoOldNameTest::says);
+                .as("words that are not the old name")
+                .noneMatch(NoOldNameTest::says);
         assertThat(List.of("## [0.4.1] - 2026-10-08", "## [0.4.0] - 2026-10-05"))
-                .as("released headings").allMatch(line -> RELEASED.matcher(line).matches());
-        assertThat(RELEASED.matcher("## [Unreleased]").matches()).as("the unreleased heading is read").isFalse();
+                .as("released headings")
+                .allMatch(line -> RELEASED.matcher(line).matches());
+        assertThat(RELEASED.matcher("## [Unreleased]").matches())
+                .as("the unreleased heading is read")
+                .isFalse();
     }
 
     private static boolean says(final String text) {
@@ -86,7 +98,8 @@ class NoOldNameTest {
     }
 
     private static List<String> tracked() throws IOException, InterruptedException {
-        final ProcessBuilder builder = new ProcessBuilder("git", "ls-files", "-z").redirectErrorStream(true);
+        final ProcessBuilder builder =
+                new ProcessBuilder("git", "ls-files", "-z").redirectErrorStream(true);
         // The machine's own git configuration is not part of the test.
         builder.environment().put("GIT_CONFIG_GLOBAL", "/dev/null");
         final Process git = builder.start();
@@ -105,5 +118,4 @@ class NoOldNameTest {
             throw new UncheckedIOException("Cannot read " + path, ex);
         }
     }
-
 }

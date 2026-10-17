@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `8f49d85552af3cd1` · changed 2026-10-16T16:20Z
+> **BEGIN Shared Area** · sha256 `01f9fdbdfaaa9c51` · changed 2026-10-17T17:31Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -172,8 +172,19 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A test that waits on an agent, a model or any paid service fails fast on a loop**: it stops as
   soon as the same failure repeats, instead of waiting out its time, and names what repeated. A run
   seen looping is reported at once, so the operator can cancel it.
-- **A defect is fixed only after a unit or integration test reproduces it.** The test fails first,
-  then the fix makes it pass.
+- **A test guards what can do harm, not everything that can be wrong.** Tests go where a fault costs
+  something: a secret or a credential that leaks, a check that can be passed around, data lost or
+  written twice, work that leaves without review, a command that does the wrong thing, a contract
+  another repository reads, a crash or a hang. There they are thorough: the failure paths too, red
+  first.
+- **What only reads wrong is fixed, not guarded:** a wording, a label, a colour, a layout, the order
+  of an output, a translation, formatting the formatter already checks. Nobody writes a test for it.
+  A test that holds a text verbatim is deleted when the text changes, not changed with it.
+- **Before a test is written, it names the harm it prevents.** If it cannot, it is not written. A
+  finding of a reading that names none is fixed without a test.
+- **A defect that can do harm is fixed only after a unit or integration test reproduces it.** The
+  test fails first, then the fix makes it pass; the rules on tests below hold within the three
+  above.
 - **A test is trusted only once it has been seen to fail**: break the code on purpose, watch the
   test go red, and restore it. A break that does not compile proves nothing.
 - **A guard asserts what its reference set is, not only that it has entries**: an empty set, one
@@ -268,9 +279,10 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A comment says why, never what, in one line where it can.** Reasoning that does not fit goes into
   documentation or a decision, and a small named method is preferred over a comment explaining a
   block.
-- **Dot files are not committed.** `.gitignore` ignores `.*` and excepts only what a build needs -
-  `.github`, `.gitignore` and `.gitkeep`, in a Maven repository also `.mvn` - and what is true of one
-  machine goes into `.AGENTS.md`.
+- **Dot files are not committed.** `.gitignore` ignores `.*` and excepts only what a build or the
+  shared code style needs - `.github`, `.gitignore`, `.gitkeep`, `.editorconfig` and
+  `.git-blame-ignore-revs`, in a Maven repository also `.mvn` - and what is true of one machine goes
+  into `.AGENTS.md`.
 - **Maven is the build system: a Java repository builds, checks and tests with Java and Maven only.**
   Another build tool only where the platform a repository builds for supports no other - an IntelliJ
   plugin, since JetBrains supports only Gradle - named with the reason in its repository's own part. A
@@ -315,7 +327,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `8f49d85552af3cd1`
+> **END Shared Area** · sha256 `01f9fdbdfaaa9c51`
 
 ## What this repository is
 

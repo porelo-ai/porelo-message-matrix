@@ -10,15 +10,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Map;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class HomeserverTokenTest {
 
-    @TempDir
-    private Path home;
+    @TempDir private Path home;
 
     private final ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
 
@@ -32,13 +30,21 @@ class HomeserverTokenTest {
     }
 
     @Test
-    @DisplayName("It makes the token once, readable by its owner alone, in a directory only its owner can enter")
+    @DisplayName(
+            "It makes the token once, readable by its owner alone, in a directory only its owner can enter")
     void makesTheToken() throws IOException {
-        assertThat(run(Map.of("HOME", home.toString()))).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.OK);
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as(errBytes.toString(StandardCharsets.UTF_8))
+                .isEqualTo(Exit.OK);
 
-        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(token()))).isEqualTo("rw-------");
-        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(token().getParent()))).isEqualTo("rwx------");
-        assertThat(Files.readString(token(), StandardCharsets.US_ASCII)).matches("[A-Za-z0-9_-]{43}");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(token())))
+                .isEqualTo("rw-------");
+        assertThat(
+                        PosixFilePermissions.toString(
+                                Files.getPosixFilePermissions(token().getParent())))
+                .isEqualTo("rwx------");
+        assertThat(Files.readString(token(), StandardCharsets.US_ASCII))
+                .matches("[A-Za-z0-9_-]{43}");
     }
 
     @Test
@@ -57,7 +63,8 @@ class HomeserverTokenTest {
     void followsXdgConfigHome() {
         final Path config = home.resolve("elsewhere");
 
-        assertThat(run(Map.of("HOME", home.toString(), "XDG_CONFIG_HOME", config.toString()))).isEqualTo(Exit.OK);
+        assertThat(run(Map.of("HOME", home.toString(), "XDG_CONFIG_HOME", config.toString())))
+                .isEqualTo(Exit.OK);
 
         assertThat(config.resolve("porelo/matrix/registration-token")).isRegularFile();
         assertThat(token()).doesNotExist();
@@ -70,7 +77,8 @@ class HomeserverTokenTest {
         Files.setPosixFilePermissions(token(), PosixFilePermissions.fromString("rw-r--r--"));
 
         assertThat(run(Map.of("HOME", home.toString()))).isEqualTo(Exit.CONFIG);
-        assertThat(errBytes.toString(StandardCharsets.UTF_8)).contains("readable by more than its owner");
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .contains("readable by more than its owner");
     }
 
     @Test
@@ -78,5 +86,4 @@ class HomeserverTokenTest {
     void nowhereToPutIt() {
         assertThat(run(Map.of())).isEqualTo(Exit.CONFIG);
     }
-
 }

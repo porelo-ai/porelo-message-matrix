@@ -1,5 +1,8 @@
 package org.fuin.porelo.message.matrix;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -10,21 +13,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 /**
- * {@code settings}: a project's settings for this transport, checked as a draft before anybody commits them -
- * what {@code setup} would refuse anywhere, and what only this machine lacks. It asks nothing of the network
- * and reads no environment, so an editor can call it on every change.
+ * {@code settings}: a project's settings for this transport, checked as a draft before anybody
+ * commits them - what {@code setup} would refuse anywhere, and what only this machine lacks. It
+ * asks nothing of the network and reads no environment, so an editor can call it on every change.
  */
 final class SettingsCheck {
 
-    private SettingsCheck() {
-    }
+    private SettingsCheck() {}
 
-    static void run(final List<String> args, final InputStream in, final PrintStream out) throws Failure {
+    static void run(final List<String> args, final InputStream in, final PrintStream out)
+            throws Failure {
         if (!args.isEmpty()) {
             throw new Failure(Exit.USAGE, "usage: settings < <the project's settings as JSON>");
         }
@@ -59,8 +58,11 @@ final class SettingsCheck {
         }
     }
 
-    /** Every finding at once, in the order of the keys - an editor shows them all, not the first. */
-    private static void check(final JsonNode node, final List<String> refused, final List<String> warnings) {
+    /**
+     * Every finding at once, in the order of the keys - an editor shows them all, not the first.
+     */
+    private static void check(
+            final JsonNode node, final List<String> refused, final List<String> warnings) {
         final Map<String, JsonNode> keys = new TreeMap<>();
         node.properties().forEach(entry -> keys.put(entry.getKey(), entry.getValue()));
         for (final String key : keys.keySet()) {
@@ -76,14 +78,18 @@ final class SettingsCheck {
         try {
             final Path caFile = Settings.caFile(node.path("ca_file"));
             if (caFile != null && !Files.isReadable(caFile)) {
-                warnings.add("the ca_file " + caFile + " is not there, or not readable, on this machine");
+                warnings.add(
+                        "the ca_file "
+                                + caFile
+                                + " is not there, or not readable, on this machine");
             }
         } catch (final Failure failure) {
             refused.add(failure.getMessage());
         }
         try {
             if (!Settings.verify(node.path("tls_verify"))) {
-                warnings.add("tls_verify off checks no certificate: for development only, not recommended");
+                warnings.add(
+                        "tls_verify off checks no certificate: for development only, not recommended");
                 if (!node.path("ca_file").isMissingNode() && !node.path("ca_file").isNull()) {
                     refused.add(Settings.CONTRADICTION);
                 }
@@ -92,5 +98,4 @@ final class SettingsCheck {
             refused.add(failure.getMessage());
         }
     }
-
 }

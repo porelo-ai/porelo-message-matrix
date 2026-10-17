@@ -6,12 +6,12 @@ docs_dir: doc
 theme: readthedocs
 strict: true
 nav:
-  - Install and use: index.md
-  - The transport: transport.md
-  - The homeserver: homeserver.md
-  - Decisions: decisions.md
+    - Install and use: index.md
+    - The transport: transport.md
+    - The homeserver: homeserver.md
+    - Decisions: decisions.md
 validation:
-  links:
-    not_found: warn
-    anchors: warn
-    unrecognized_links: warn
+    links:
+        not_found: warn
+        anchors: warn
+        unrecognized_links: warn

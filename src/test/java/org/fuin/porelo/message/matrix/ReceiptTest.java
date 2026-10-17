@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,20 +41,30 @@ class ReceiptTest {
     }
 
     private String receipt() throws IOException {
-        final int exit = Main.run(new String[] {"receipt", EVENT, "--by", "@bob:matrix.test"},
-                Map.of(Config.HOMESERVER, homeserver.url(), Config.ACCESS_TOKEN, "t"),
-                new PrintStream(outBytes, true, StandardCharsets.UTF_8), new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+        final int exit =
+                Main.run(
+                        new String[] {"receipt", EVENT, "--by", "@bob:matrix.test"},
+                        Map.of(Config.HOMESERVER, homeserver.url(), Config.ACCESS_TOKEN, "t"),
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8));
         assertThat(exit).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.OK);
         return MatrixClient.JSON.readTree(outBytes.toByteArray()).path("state").asText();
     }
 
     @Test
-    @DisplayName("An event a homeserver answers under the wrong room is looked for in its own room, as its room_id says")
+    @DisplayName(
+            "An event a homeserver answers under the wrong room is looked for in its own room, as its room_id says")
     void trustsTheEventsOwnRoom() throws IOException {
-        final String event = "{\"event_id\":\"" + EVENT + "\",\"room_id\":\"" + PROJECT + "\",\"type\":\"m.room.message\"}";
+        final String event =
+                "{\"event_id\":\""
+                        + EVENT
+                        + "\",\"room_id\":\""
+                        + PROJECT
+                        + "\",\"type\":\"m.room.message\"}";
         homeserver
                 .answer(200, "{\"joined_rooms\":[\"" + OTHER + "\",\"" + PROJECT + "\"]}")
-                // Asked under the admin room, the event comes back anyway - naming the room it is really in.
+                // Asked under the admin room, the event comes back anyway - naming the room it is
+                // really in.
                 .answer(200, event)
                 .answer(200, event)
                 .answer(200, "{\"next_batch\":\"s1\",\"rooms\":{\"join\":{}}}")
@@ -63,7 +72,7 @@ class ReceiptTest {
 
         assertThat(receipt()).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo("delivered");
         assertThat(homeserver.requests().getLast().rawPath())
-                .isEqualTo("/_matrix/client/v3/rooms/%21project/state/m.room.member/%40bob%3Amatrix.test");
+                .isEqualTo(
+                        "/_matrix/client/v3/rooms/%21project/state/m.room.member/%40bob%3Amatrix.test");
     }
-
 }

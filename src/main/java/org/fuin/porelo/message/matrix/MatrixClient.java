@@ -1,31 +1,28 @@
 package org.fuin.porelo.message.matrix;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
-import java.net.http.HttpConnectTimeoutException;
-import java.net.http.HttpTimeoutException;
-import java.nio.channels.UnresolvedAddressException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
-
 import org.jspecify.annotations.Nullable;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /**
- * The few client-API calls the transport makes, each turned into a JSON answer or a {@link Failure} whose
- * exit code says whether Porelo should try again.
+ * The few client-API calls the transport makes, each turned into a JSON answer or a {@link Failure}
+ * whose exit code says whether Porelo should try again.
  */
 final class MatrixClient {
 
@@ -42,9 +39,10 @@ final class MatrixClient {
     MatrixClient(final Config config) throws Failure {
         this.config = config;
         // A redirect would carry the token to wherever the homeserver points, so none is followed.
-        final HttpClient.Builder builder = HttpClient.newBuilder()
-                .connectTimeout(CONNECT_TIMEOUT)
-                .followRedirects(HttpClient.Redirect.NEVER);
+        final HttpClient.Builder builder =
+                HttpClient.newBuilder()
+                        .connectTimeout(CONNECT_TIMEOUT)
+                        .followRedirects(HttpClient.Redirect.NEVER);
         final SSLContext tls = Trust.context(config);
         if (tls != null) {
             builder.sslContext(tls);
@@ -52,28 +50,42 @@ final class MatrixClient {
         this.http = builder.build();
     }
 
-    /** A status and a JSON body, as the homeserver gave them - for the calls whose refusals are answers. */
+    /**
+     * A status and a JSON body, as the homeserver gave them - for the calls whose refusals are
+     * answers.
+     */
     record Answer(int status, JsonNode body) {
 
         String errcode() {
             return body.path("errcode").asText("");
         }
-
     }
 
     Config config() {
         return config;
     }
 
-    /** The same homeserver and trust, acting as another account - or as nobody, with an empty token. */
+    /**
+     * The same homeserver and trust, acting as another account - or as nobody, with an empty token.
+     */
     MatrixClient as(final String accessToken) throws Failure {
-        return new MatrixClient(new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()));
+        return new MatrixClient(
+                new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()));
     }
 
-    /** Sends and answers what came back, whatever its status; only an unreachable server is a failure. */
-    Answer exchange(final String method, final String path, @Nullable final JsonNode body) throws Failure {
-        final HttpRequest.Builder builder = request(path).method(method,
-                body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(bytes(body)));
+    /**
+     * Sends and answers what came back, whatever its status; only an unreachable server is a
+     * failure.
+     */
+    Answer exchange(final String method, final String path, @Nullable final JsonNode body)
+            throws Failure {
+        final HttpRequest.Builder builder =
+                request(path)
+                        .method(
+                                method,
+                                body == null
+                                        ? HttpRequest.BodyPublishers.noBody()
+                                        : HttpRequest.BodyPublishers.ofByteArray(bytes(body)));
         if (body != null) {
             builder.header("Content-Type", "application/json");
         }
@@ -93,22 +105,28 @@ final class MatrixClient {
     }
 
     JsonNode put(final String path, final JsonNode body) throws Failure {
-        return call(request(path).PUT(HttpRequest.BodyPublishers.ofByteArray(bytes(body)))
-                .header("Content-Type", "application/json"));
+        return call(
+                request(path)
+                        .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes(body)))
+                        .header("Content-Type", "application/json"));
     }
 
     JsonNode post(final String path, final JsonNode body) throws Failure {
-        return call(request(path).POST(HttpRequest.BodyPublishers.ofByteArray(bytes(body)))
-                .header("Content-Type", "application/json"));
+        return call(
+                request(path)
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bytes(body)))
+                        .header("Content-Type", "application/json"));
     }
 
     JsonNode get(final String path) throws Failure {
         return call(request(path).GET());
     }
 
-    /** Like {@link #get}, but a 404 - the event or state is not there, or not visible - answers null. */
-    @Nullable
-    JsonNode find(final String path) throws Failure {
+    /**
+     * Like {@link #get}, but a 404 - the event or state is not there, or not visible - answers
+     * null.
+     */
+    @Nullable JsonNode find(final String path) throws Failure {
         try {
             return get(path);
         } catch (final NotFound ex) {
@@ -124,12 +142,12 @@ final class MatrixClient {
         NotFound(final String reason) {
             super(Exit.PROTOCOL, reason);
         }
-
     }
 
     private HttpRequest.Builder request(final String path) {
-        final HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(config.homeserver() + path))
-                .timeout(REQUEST_TIMEOUT);
+        final HttpRequest.Builder builder =
+                HttpRequest.newBuilder(URI.create(config.homeserver() + path))
+                        .timeout(REQUEST_TIMEOUT);
         // Registration and login are made by nobody yet; every other call as the account.
         if (!config.accessToken().isEmpty()) {
             builder.header("Authorization", "Bearer " + config.accessToken());
@@ -141,11 +159,18 @@ final class MatrixClient {
         try {
             return http.send(request, HttpResponse.BodyHandlers.ofByteArray());
         } catch (final SSLHandshakeException ex) {
-            // Not a moment's trouble: a certificate this machine does not trust stays untrusted, and whoever
+            // Not a moment's trouble: a certificate this machine does not trust stays untrusted,
+            // and whoever
             // presents it may not be the homeserver. Retrying would only send the token again.
-            throw new Failure(Exit.CONFIG, "homeserver " + config.homeserver() + " is not trusted: " + ex.getMessage(), ex);
+            throw new Failure(
+                    Exit.CONFIG,
+                    "homeserver " + config.homeserver() + " is not trusted: " + ex.getMessage(),
+                    ex);
         } catch (final IOException ex) {
-            throw new Failure(Exit.TEMPORARY, "homeserver " + config.homeserver() + " not reachable: " + cause(ex), ex);
+            throw new Failure(
+                    Exit.TEMPORARY,
+                    "homeserver " + config.homeserver() + " not reachable: " + cause(ex),
+                    ex);
         } catch (final InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new Failure(Exit.TEMPORARY, "interrupted while calling the homeserver", ex);
@@ -159,8 +184,14 @@ final class MatrixClient {
         if (status >= 200 && status < 300) {
             return parse(response.body(), request);
         }
-        final String reason = request.method() + " " + request.uri().getPath() + " answered " + status + " "
-                + matrixError(response.body());
+        final String reason =
+                request.method()
+                        + " "
+                        + request.uri().getPath()
+                        + " answered "
+                        + status
+                        + " "
+                        + matrixError(response.body());
         if (status == 401 || status == 403) {
             throw new Failure(Exit.NOT_PERMITTED, reason);
         }
@@ -180,24 +211,30 @@ final class MatrixClient {
         try {
             final JsonNode node = JSON.readTree(body);
             if (node == null || !node.isObject()) {
-                throw new Failure(Exit.PROTOCOL, request.uri().getPath() + " answered something that is not a JSON object");
+                throw new Failure(
+                        Exit.PROTOCOL,
+                        request.uri().getPath() + " answered something that is not a JSON object");
             }
             return node;
         } catch (final IOException ex) {
-            throw new Failure(Exit.PROTOCOL, request.uri().getPath() + " answered something that is not JSON", ex);
+            throw new Failure(
+                    Exit.PROTOCOL,
+                    request.uri().getPath() + " answered something that is not JSON",
+                    ex);
         }
     }
 
     /**
-     * Why a connection failed, in words a person can act on. The JDK's connect failures often carry no
-     * message of their own, and "ConnectException" alone does not tell a stopped homeserver from a
-     * mistyped name.
+     * Why a connection failed, in words a person can act on. The JDK's connect failures often carry
+     * no message of their own, and "ConnectException" alone does not tell a stopped homeserver from
+     * a mistyped name.
      */
     static String cause(final Throwable failure) {
         String deepest = null;
         boolean notAccepted = false;
         for (Throwable t = failure; t != null; t = t.getCause()) {
-            // The JDK's client reports a refused connection as a ConnectException with no message at all,
+            // The JDK's client reports a refused connection as a ConnectException with no message
+            // at all,
             // so "refused" cannot be read - only that nothing accepted the connection.
             notAccepted |= t instanceof ConnectException;
             if (t instanceof UnresolvedAddressException || t instanceof UnknownHostException) {
@@ -210,7 +247,8 @@ final class MatrixClient {
                 return "no answer within " + REQUEST_TIMEOUT.toSeconds() + " s";
             }
             final String message = t.getMessage();
-            if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("connection refused")) {
+            if (message != null
+                    && message.toLowerCase(java.util.Locale.ROOT).contains("connection refused")) {
                 return "connection refused";
             }
             if (message != null && !message.isBlank()) {
@@ -220,7 +258,9 @@ final class MatrixClient {
         if (deepest != null) {
             return deepest;
         }
-        return notAccepted ? "the connection was not accepted (refused, or no route)" : failure.getClass().getName();
+        return notAccepted
+                ? "the connection was not accepted (refused, or no route)"
+                : failure.getClass().getName();
     }
 
     /** The homeserver's own words for a refusal, so the person reading stderr sees why. */
@@ -243,5 +283,4 @@ final class MatrixClient {
             throw new IllegalStateException("A JSON tree could not be written", ex);
         }
     }
-
 }

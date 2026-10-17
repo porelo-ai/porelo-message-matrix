@@ -14,25 +14,22 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
-
 import org.jspecify.annotations.Nullable;
 
 /**
- * Which homeservers the transport believes to be who they say. By default the authorities built into the
- * executable - a public certificate. With a CA file, the certificates in it as well - an intranet's own
- * authority, or a server's self-signed certificate. Checking switched off trusts every server, which is
- * for development alone: whoever answers gets the token.
+ * Which homeservers the transport believes to be who they say. By default the authorities built
+ * into the executable - a public certificate. With a CA file, the certificates in it as well - an
+ * intranet's own authority, or a server's self-signed certificate. Checking switched off trusts
+ * every server, which is for development alone: whoever answers gets the token.
  */
 final class Trust {
 
-    private Trust() {
-    }
+    private Trust() {}
 
     /** The TLS context for the configuration, or null for the platform's default. */
     static @Nullable SSLContext context(final Config config) throws Failure {
@@ -55,19 +52,31 @@ final class Trust {
     }
 
     private static X509ExtendedTrustManager platform() throws GeneralSecurityException {
-        final TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        final TrustManagerFactory factory =
+                TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         factory.init((KeyStore) null);
         return extended(factory);
     }
 
-    private static X509ExtendedTrustManager fromFile(final Path file) throws Failure, GeneralSecurityException {
+    private static X509ExtendedTrustManager fromFile(final Path file)
+            throws Failure, GeneralSecurityException {
         final Collection<? extends Certificate> certificates;
         try (InputStream in = Files.newInputStream(file)) {
             certificates = CertificateFactory.getInstance("X.509").generateCertificates(in);
         } catch (final IOException ex) {
-            throw new Failure(Exit.CONFIG, "cannot read " + Config.CA_FILE + " " + file + ": " + ex.getMessage(), ex);
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot read " + Config.CA_FILE + " " + file + ": " + ex.getMessage(),
+                    ex);
         } catch (final CertificateException ex) {
-            throw new Failure(Exit.CONFIG, Config.CA_FILE + " " + file + " holds no readable certificate: " + ex.getMessage(), ex);
+            throw new Failure(
+                    Exit.CONFIG,
+                    Config.CA_FILE
+                            + " "
+                            + file
+                            + " holds no readable certificate: "
+                            + ex.getMessage(),
+                    ex);
         }
         if (certificates.isEmpty()) {
             throw new Failure(Exit.CONFIG, Config.CA_FILE + " " + file + " holds no certificate");
@@ -82,7 +91,8 @@ final class Trust {
         for (final Certificate certificate : certificates) {
             store.setCertificateEntry("ca-" + i++, certificate);
         }
-        final TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        final TrustManagerFactory factory =
+                TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         factory.init(store);
         return extended(factory);
     }
@@ -97,8 +107,9 @@ final class Trust {
     }
 
     /**
-     * Trusts a server either of two managers trusts. Both are the platform's own, which check the server's
-     * name against its certificate as well - so a CA file widens whom to trust, never how carefully.
+     * Trusts a server either of two managers trusts. Both are the platform's own, which check the
+     * server's name against its certificate as well - so a CA file widens whom to trust, never how
+     * carefully.
      */
     private static final class Either extends X509ExtendedTrustManager {
 
@@ -129,58 +140,66 @@ final class Trust {
         }
 
         @Override
-        public void checkServerTrusted(final X509Certificate[] chain, final String authType, final Socket socket)
+        public void checkServerTrusted(
+                final X509Certificate[] chain, final String authType, final Socket socket)
                 throws CertificateException {
             either(m -> m.checkServerTrusted(chain, authType, socket));
         }
 
         @Override
-        public void checkServerTrusted(final X509Certificate[] chain, final String authType, final SSLEngine engine)
+        public void checkServerTrusted(
+                final X509Certificate[] chain, final String authType, final SSLEngine engine)
                 throws CertificateException {
             either(m -> m.checkServerTrusted(chain, authType, engine));
         }
 
         @Override
-        public void checkServerTrusted(final X509Certificate[] chain, final String authType) throws CertificateException {
+        public void checkServerTrusted(final X509Certificate[] chain, final String authType)
+                throws CertificateException {
             either(m -> m.checkServerTrusted(chain, authType));
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType, final Socket socket)
+        public void checkClientTrusted(
+                final X509Certificate[] chain, final String authType, final Socket socket)
                 throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType, final SSLEngine engine)
+        public void checkClientTrusted(
+                final X509Certificate[] chain, final String authType, final SSLEngine engine)
                 throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType) throws CertificateException {
+        public void checkClientTrusted(final X509Certificate[] chain, final String authType)
+                throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
-            final List<X509Certificate> issuers = new ArrayList<>(List.of(first.getAcceptedIssuers()));
+            final List<X509Certificate> issuers =
+                    new ArrayList<>(List.of(first.getAcceptedIssuers()));
             issuers.addAll(List.of(second.getAcceptedIssuers()));
             return issuers.toArray(X509Certificate[]::new);
         }
-
     }
 
     /** Checking switched off: every certificate, for every name. For development alone. */
     private static final class TrustingEveryone extends X509ExtendedTrustManager {
 
         @Override
-        public void checkServerTrusted(final X509Certificate[] chain, final String authType, final Socket socket) {
+        public void checkServerTrusted(
+                final X509Certificate[] chain, final String authType, final Socket socket) {
             // Deliberately nothing: the operator switched checking off.
         }
 
         @Override
-        public void checkServerTrusted(final X509Certificate[] chain, final String authType, final SSLEngine engine) {
+        public void checkServerTrusted(
+                final X509Certificate[] chain, final String authType, final SSLEngine engine) {
             // Deliberately nothing: the operator switched checking off.
         }
 
@@ -190,19 +209,22 @@ final class Trust {
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType, final Socket socket)
+        public void checkClientTrusted(
+                final X509Certificate[] chain, final String authType, final Socket socket)
                 throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType, final SSLEngine engine)
+        public void checkClientTrusted(
+                final X509Certificate[] chain, final String authType, final SSLEngine engine)
                 throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
         @Override
-        public void checkClientTrusted(final X509Certificate[] chain, final String authType) throws CertificateException {
+        public void checkClientTrusted(final X509Certificate[] chain, final String authType)
+                throws CertificateException {
             throw new CertificateException("The transport is never a server");
         }
 
@@ -210,7 +232,5 @@ final class Trust {
         public X509Certificate[] getAcceptedIssuers() {
             return new X509Certificate[0];
         }
-
     }
-
 }

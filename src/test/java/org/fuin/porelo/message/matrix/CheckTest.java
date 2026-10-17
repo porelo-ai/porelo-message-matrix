@@ -9,7 +9,6 @@ import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +38,10 @@ class CheckTest {
         final String[] all = new String[args.length + 1];
         all[0] = "check";
         System.arraycopy(args, 0, all, 1, args.length);
-        return Main.run(all, env, new PrintStream(OutputStream.nullOutputStream()),
+        return Main.run(
+                all,
+                env,
+                new PrintStream(OutputStream.nullOutputStream()),
                 new PrintStream(errBytes, true, StandardCharsets.UTF_8));
     }
 
@@ -52,19 +54,29 @@ class CheckTest {
     }
 
     @Test
-    @DisplayName("A homeserver that knows the token is usable: 0, having only asked whose token it is")
+    @DisplayName(
+            "A homeserver that knows the token is usable: 0, having only asked whose token it is")
     void usable() {
         homeserver.answer(200, "{\"user_id\":\"@bob:matrix.test\"}");
 
         assertThat(check()).as(stderr()).isEqualTo(Exit.OK);
-        assertThat(homeserver.requests()).singleElement().satisfies(request -> {
-            assertThat(request.method()).isEqualTo("GET");
-            assertThat(request.rawPath()).isEqualTo("/_matrix/client/v3/account/whoami");
-        });
+        assertThat(homeserver.requests())
+                .singleElement()
+                .satisfies(
+                        request -> {
+                            assertThat(request.method()).isEqualTo("GET");
+                            assertThat(request.rawPath())
+                                    .isEqualTo("/_matrix/client/v3/account/whoami");
+                        });
     }
 
     @ParameterizedTest(name = "status {0}")
-    @CsvSource({"401, M_UNKNOWN_TOKEN", "403, M_FORBIDDEN", "500, M_UNKNOWN", "429, M_LIMIT_EXCEEDED"})
+    @CsvSource({
+        "401, M_UNKNOWN_TOKEN",
+        "403, M_FORBIDDEN",
+        "500, M_UNKNOWN",
+        "429, M_LIMIT_EXCEEDED"
+    })
     @DisplayName("Whatever the homeserver refuses, it is 2, with the reason and never the token")
     void refused(final int status, final String errcode) {
         homeserver.answer(status, "{\"errcode\":\"" + errcode + "\",\"error\":\"no\"}");
@@ -81,7 +93,13 @@ class CheckTest {
             closedPort = socket.getLocalPort();
         }
 
-        assertThat(check(Map.of(Config.HOMESERVER, "http://127.0.0.1:" + closedPort, Config.ACCESS_TOKEN, TOKEN)))
+        assertThat(
+                        check(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        "http://127.0.0.1:" + closedPort,
+                                        Config.ACCESS_TOKEN,
+                                        TOKEN)))
                 .isEqualTo(Check.NOT_USABLE);
         assertThat(stderr()).contains("not reachable");
     }
@@ -101,5 +119,4 @@ class CheckTest {
 
         assertThat(check()).isEqualTo(Check.NOT_USABLE);
     }
-
 }

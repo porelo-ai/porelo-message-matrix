@@ -1,5 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -10,20 +12,16 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
-
 /**
- * A homeserver on loopback that answers what a test queues and records what it was asked, so each exit
- * code can be reached without a real server.
+ * A homeserver on loopback that answers what a test queues and records what it was asked, so each
+ * exit code can be reached without a real server.
  */
 final class FakeHomeserver implements AutoCloseable {
 
-    record Request(String method, String rawPath, String query, String authorization, String body) {
-    }
+    record Request(
+            String method, String rawPath, String query, String authorization, String body) {}
 
-    private record Answer(int status, String body) {
-    }
+    private record Answer(int status, String body) {}
 
     private final HttpServer server;
 
@@ -54,12 +52,20 @@ final class FakeHomeserver implements AutoCloseable {
         final Answer answer;
         synchronized (this) {
             final String query = exchange.getRequestURI().getRawQuery();
-            requests.add(new Request(exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(),
-                    query == null ? "" : query,
-                    exchange.getRequestHeaders().getFirst("Authorization"),
-                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
-            answer = answers.isEmpty() ? new Answer(500, "{\"errcode\":\"M_UNKNOWN\",\"error\":\"nothing queued\"}")
-                    : answers.poll();
+            requests.add(
+                    new Request(
+                            exchange.getRequestMethod(),
+                            exchange.getRequestURI().getRawPath(),
+                            query == null ? "" : query,
+                            exchange.getRequestHeaders().getFirst("Authorization"),
+                            new String(
+                                    exchange.getRequestBody().readAllBytes(),
+                                    StandardCharsets.UTF_8)));
+            answer =
+                    answers.isEmpty()
+                            ? new Answer(
+                                    500, "{\"errcode\":\"M_UNKNOWN\",\"error\":\"nothing queued\"}")
+                            : answers.poll();
         }
         final byte[] bytes = answer.body().getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -73,5 +79,4 @@ final class FakeHomeserver implements AutoCloseable {
     public void close() {
         server.stop(0);
     }
-
 }

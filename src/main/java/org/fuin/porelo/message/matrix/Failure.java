@@ -1,8 +1,8 @@
 package org.fuin.porelo.message.matrix;
 
 /**
- * Stops one invocation with an exit code and the reason a person reads on stderr. The reason never carries
- * a credential.
+ * Stops one invocation with an exit code and the reason a person reads on stderr. The reason never
+ * carries a credential.
  */
 class Failure extends Exception {
 
@@ -23,5 +23,4 @@ class Failure extends Exception {
     int exitCode() {
         return exitCode;
     }
-
 }

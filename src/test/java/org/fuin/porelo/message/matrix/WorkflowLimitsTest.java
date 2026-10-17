@@ -11,31 +11,36 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * GitHub stops a job after six hours unless it says otherwise, and every minute on a slow runner or a hung
- * step is paid. A job added without a limit would inherit that default, and nothing notices until a run
- * does not end.
+ * GitHub stops a job after six hours unless it says otherwise, and every minute on a slow runner or
+ * a hung step is paid. A job added without a limit would inherit that default, and nothing notices
+ * until a run does not end.
  */
 class WorkflowLimitsTest {
 
     private static final Path WORKFLOWS = Path.of(".github", "workflows");
 
-    /** A job's name: two spaces in, under {@code jobs:}. */
-    private static final Pattern JOB = Pattern.compile("^  ([A-Za-z0-9_-]+):\\s*$");
+    /** A job's name: four spaces in, under {@code jobs:}. */
+    private static final Pattern JOB = Pattern.compile("^    ([A-Za-z0-9_-]+):\\s*$");
 
-    /** The job's own limit, four spaces in; a step's limit is deeper and does not count. */
-    private static final Pattern LIMIT = Pattern.compile("^    timeout-minutes: *[0-9]+\\s*$");
+    /** The job's own limit, eight spaces in; a step's limit is deeper and does not count. */
+    private static final Pattern LIMIT = Pattern.compile("^        timeout-minutes: *[0-9]+\\s*$");
 
     @Test
     @DisplayName("Every job of every workflow has a time limit")
     void everyJobHasALimit() throws IOException {
         final List<Path> files;
         try (Stream<Path> list = Files.list(WORKFLOWS)) {
-            files = list.filter(p -> p.toString().endsWith(".yml") || p.toString().endsWith(".yaml")).sorted().toList();
+            files =
+                    list.filter(
+                                    p ->
+                                            p.toString().endsWith(".yml")
+                                                    || p.toString().endsWith(".yaml"))
+                            .sorted()
+                            .toList();
         }
         assertThat(files).as("the workflows").isNotEmpty();
 
@@ -72,5 +77,4 @@ class WorkflowLimitsTest {
         assertThat(jobs).as("the jobs found").isNotEmpty();
         assertThat(without).as("jobs without timeout-minutes").isEmpty();
     }
-
 }

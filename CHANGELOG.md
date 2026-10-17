@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The code follows the shared style of every Porelo repository: one `.editorconfig`, and `google-java-format`
+  in its AOSP style checked by the build, which refuses code that does not match it. The build takes
+  `porelo-parent` 0.2.1 and the shared tools 0.5.1, and its checkouts keep no token for later steps.
+
 ## [0.5.0] - 2026-10-17
 
 ### Changed

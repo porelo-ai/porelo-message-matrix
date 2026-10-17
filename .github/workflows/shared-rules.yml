@@ -7,65 +7,67 @@ run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.he
 # Once a day, not on a push: every hand-over runs the same checks locally on its exact commit first, and a run per
 # push spent build minutes on what was already known. 03:17 UTC lies outside the hours the repositories are worked in.
 on:
-  schedule:
-    - cron: '17 3 * * *'
-  pull_request:
-  workflow_dispatch:
+    schedule:
+        - cron: '17 3 * * *'
+    pull_request:
+    workflow_dispatch:
 
 permissions:
-  contents: read
+    contents: read
 
 concurrency:
-  group: shared-rules-${{ github.ref }}
-  cancel-in-progress: true
+    group: shared-rules-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: ubuntu-24.04
-    # GitHub's default is six hours, every minute of it paid; the checks and the tagged tests take a few.
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    check:
+        runs-on: ubuntu-24.04
+        # GitHub's default is six hours, every minute of it paid; the checks and the tagged tests take a few.
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.m2/repository
-            ~/.m2/wrapper
-          key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-          restore-keys: maven-
+            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: |
+                      ~/.m2/repository
+                      ~/.m2/wrapper
+                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+                  restore-keys: maven-
 
-      # As in the build: the runner's own Java only runs the tools, which install the pinned GraalVM.
-      - name: Resolve the build's tools
-        run: |
-          test -n "${JAVA_HOME_25_X64:-}" || { echo "the runner has no Java 25 (JAVA_HOME_25_X64)"; exit 1; }
-          JAVA_HOME="$JAVA_HOME_25_X64" ./mvnw -B -ntp -q -U -s settings.xml -Pci-tools dependency:build-classpath \
-            -Dmdep.outputFile="$RUNNER_TEMP/ci-tools.classpath"
+            # As in the build: the runner's own Java only runs the tools, which install the pinned GraalVM.
+            - name: Resolve the build's tools
+              run: |
+                  test -n "${JAVA_HOME_25_X64:-}" || { echo "the runner has no Java 25 (JAVA_HOME_25_X64)"; exit 1; }
+                  JAVA_HOME="$JAVA_HOME_25_X64" ./mvnw -B -ntp -q -U -s settings.xml -Pci-tools dependency:build-classpath \
+                      -Dmdep.outputFile="$RUNNER_TEMP/ci-tools.classpath"
 
-      - name: Install the pinned GraalVM
-        run: >-
-          "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.porelo.machines.Main jdk --github
+            - name: Install the pinned GraalVM
+              run: >-
+                  "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
+                  org.fuin.porelo.machines.Main jdk --github
 
-      - name: Refuse a shared rules block whose hash does not fit its text
-        run: >-
-          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.porelo.release.Main check-shared AGENTS.md
+            - name: Refuse a shared rules block whose hash does not fit its text
+              run: >-
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
+                  org.fuin.porelo.release.Main check-shared AGENTS.md .editorconfig
 
-      - name: Refuse a link to an issue's file and an issue number in any file
-        run: >-
-          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.porelo.release.Main check-citations .
+            - name: Refuse a link to an issue's file and an issue number in any file
+              run: >-
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
+                  org.fuin.porelo.release.Main check-citations .
 
-      - name: Refuse a page missing from the site's navigation or a link out of doc
-        run: >-
-          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.porelo.release.Main check-doc-site doc mkdocs.yml
+            - name: Refuse a page missing from the site's navigation or a link out of doc
+              run: >-
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
+                  org.fuin.porelo.release.Main check-doc-site doc mkdocs.yml
 
-      - name: Refuse a module without a README.md, or one that does not link its submodules
-        run: >-
-          java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-          org.fuin.porelo.release.Main check-readmes .
+            - name: Refuse a module without a README.md, or one that does not link its submodules
+              run: >-
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
+                  org.fuin.porelo.release.Main check-readmes .
 
-      - name: The tests that read a document
-        run: ./mvnw -B -ntp -s settings.xml -Pdocuments test
+            - name: The tests that read a document
+              run: ./mvnw -B -ntp -s settings.xml -Pdocuments test

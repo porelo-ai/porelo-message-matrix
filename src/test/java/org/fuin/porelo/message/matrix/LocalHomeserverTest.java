@@ -12,19 +12,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The local homeserver's port: chosen once, kept in homeserver.conf. Starting the unit is measured on the VM. */
+/**
+ * The local homeserver's port: chosen once, kept in homeserver.conf. Starting the unit is measured
+ * on the VM.
+ */
 class LocalHomeserverTest {
 
-    @TempDir
-    private Path dir;
+    @TempDir private Path dir;
 
     @Test
-    @DisplayName("Without a port in homeserver.conf, a free one from 8008 on is chosen and written there, beside what the file holds")
+    @DisplayName(
+            "Without a port in homeserver.conf, a free one from 8008 on is chosen and written there, beside what the file holds")
     void choosesAndKeeps() throws Exception {
         final Path conf = dir.resolve("porelo/matrix/homeserver.conf");
         Files.createDirectories(conf.getParent());
@@ -34,7 +36,8 @@ class LocalHomeserverTest {
 
         assertThat(port).isBetween(8008, 8099);
         assertThat(Files.readAllLines(conf, StandardCharsets.UTF_8))
-                .containsExactly("PORELO_MATRIX_SERVER_NAME=localhost", "PORELO_MATRIX_PORT=" + port);
+                .containsExactly(
+                        "PORELO_MATRIX_SERVER_NAME=localhost", "PORELO_MATRIX_PORT=" + port);
         assertThat(LocalHomeserver.port(conf)).as("chosen once, then kept").isEqualTo(port);
     }
 
@@ -51,21 +54,28 @@ class LocalHomeserverTest {
     }
 
     @Test
-    @DisplayName("A port already in the file is used as it is, and one that is not a number is refused with 78")
+    @DisplayName(
+            "A port already in the file is used as it is, and one that is not a number is refused with 78")
     void usesTheFile() throws IOException, Failure {
-        final Path conf = Files.writeString(dir.resolve("homeserver.conf"), "PORELO_MATRIX_PORT=18008\n", StandardCharsets.UTF_8);
+        final Path conf =
+                Files.writeString(
+                        dir.resolve("homeserver.conf"),
+                        "PORELO_MATRIX_PORT=18008\n",
+                        StandardCharsets.UTF_8);
         assertThat(LocalHomeserver.port(conf)).isEqualTo(18008);
 
         Files.write(conf, List.of("PORELO_MATRIX_PORT=eighty"), StandardCharsets.UTF_8);
-        assertThatThrownBy(() -> LocalHomeserver.port(conf)).isInstanceOf(Failure.class)
+        assertThatThrownBy(() -> LocalHomeserver.port(conf))
+                .isInstanceOf(Failure.class)
                 .satisfies(ex -> assertThat(((Failure) ex).exitCode()).isEqualTo(Exit.CONFIG));
     }
 
     @Test
     @DisplayName("The configuration directory follows XDG_CONFIG_HOME, else HOME")
     void directory() throws Failure {
-        assertThat(LocalHomeserver.directory(Map.of("XDG_CONFIG_HOME", "/c", "HOME", "/h"))).isEqualTo(Path.of("/c/porelo/matrix"));
-        assertThat(LocalHomeserver.directory(Map.of("HOME", "/h"))).isEqualTo(Path.of("/h/.config/porelo/matrix"));
+        assertThat(LocalHomeserver.directory(Map.of("XDG_CONFIG_HOME", "/c", "HOME", "/h")))
+                .isEqualTo(Path.of("/c/porelo/matrix"));
+        assertThat(LocalHomeserver.directory(Map.of("HOME", "/h")))
+                .isEqualTo(Path.of("/h/.config/porelo/matrix"));
     }
-
 }
