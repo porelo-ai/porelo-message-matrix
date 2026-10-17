@@ -1,6 +1,6 @@
 # MX17 — The Transport Is Renamed Porelo
 
-**Status:** Implementing; from `sokar-project` [PJ41](https://github.com/sokar-ai/sokar-project/blob/main/issues/README.md#pj41).
+**Status:** Review; from `sokar-project` [PJ41](https://github.com/sokar-ai/sokar-project/blob/main/issues/README.md#pj41).
 **Size:** S - one module: 532 occurrences in 75 of 87 tracked files and 59 paths, done by a script; what makes it
 more than XS is the packages and paths that ship, so the acceptance runs on the VM against a renamed Porelo.
 
