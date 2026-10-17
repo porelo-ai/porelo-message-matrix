@@ -3,11 +3,19 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
-## Analyzed
+## Backlog
 
-| # | Size | Blocked by | What it covers | Open questions |
-|---|---|---|---|---|
-| <a id="mx16"></a>[MX16](MX16-The-Code-Read-Against-Its-Skills.md) | M | - | All of the code read against the seven skills `AGENTS.md` names, each finding fixed with a test seen to fail first or declined with its reason | 0 |
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx18"></a>[MX18](MX18-Reformatted-To-The-Shared-Style.md) | S | [PJ29](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj29)'s shared part | The shared `.editorconfig` and `spotless:check` switched on, the Java reformatted once in a commit `git blame` skips |
+| <a id="mx16"></a>[MX16](MX16-The-Code-Read-Against-Its-Skills.md) | L | [MX18](README.md#mx18) | All of the code read against the seven skills `AGENTS.md` names, each finding fixed with a test seen to fail first or declined with its reason |
+
+## Accepted
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | - | - | Clearing one project never cuts a person off from another project on the same homeserver |
+| <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | - | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 
 ## Estimated
 
