@@ -3,12 +3,6 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
-## Review
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx17"></a>[MX17](MX17-The-Transport-Is-Renamed-Porelo.md) | S | - | The transport, its packages, paths, settings and docs renamed Porelo by a script, installed afresh, nothing of Sokar kept |
-
 ## Analyzed
 
 | # | Size | Blocked by | What it covers | Open questions |
@@ -20,3 +14,9 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx12"></a>[MX12](MX12-Several-Machines-On-One-Homeserver.md) | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation |
+
+## Finished
+
+| # | Title | What was built |
+|---|---|---|
+| <a id="mx17"></a>[MX17](README.md#mx17) | The Transport Is Renamed Porelo | The transport, its packages, program, settings, directories and accounts say Porelo, installed afresh; a documents test keeps the old name out of every tracked file |
