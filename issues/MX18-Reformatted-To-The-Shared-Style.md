@@ -1,6 +1,6 @@
 # MX18 — Reformatted To The Shared Style
 
-**Status:** Implementing; this repository's part of `porelo-project`
+**Status:** Review, published as `0.5.1~snapshot.61`; this repository's part of `porelo-project`
 [PJ29](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj29).
 **Size:** S - one module: the plugin switched on and one reformatting run over 59 Java files, of which 58 have
 lines past 100 columns (963 lines in all), and five YAML files from 2 to 4 spaces; only whitespace, line

@@ -1,6 +1,6 @@
 # MX16 — The Code Read Against Its Skills
 
-**Status:** Implementing; after the reformatting ([MX18](README.md#mx18)), so its diff carries no formatting.
+**Status:** Review, published as `0.5.1~snapshot.61`; after the reformatting ([MX18](README.md#mx18)), so its diff carries no formatting.
 **Size:** L - grown from M with its findings: thirteen fixes and nine tests, several against a real homeserver;
 about 3,300 lines of Java under `src/main`, 4,200 under `src/test`, the pom, three workflows
 and the homeserver's unit, read once against seven skills; each finding is fixed with its own test, and any
