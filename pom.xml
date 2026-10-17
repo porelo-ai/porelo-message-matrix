@@ -7,13 +7,13 @@
     <parent>
         <groupId>org.fuin.porelo</groupId>
         <artifactId>porelo-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1-SNAPSHOT</version>
         <relativePath/>
     </parent>
 
     <groupId>org.fuin.porelo</groupId>
     <artifactId>porelo-message-matrix</artifactId>
-    <version>0.5.0</version>
+    <version>0.5.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Porelo Message Matrix</name>
     <description>The Matrix transport: a project's room, where tasks talk</description>
@@ -43,7 +43,7 @@
              PackagesIT checks the packages against the executable built. -->
         <matrix.glibc.floor>2.34</matrix.glibc.floor>
         <matrix.zlib.floor>1.2.2</matrix.zlib.floor>
-        <deb.version>0.5.0~snapshot.${porelo.snapshot.run}${porelo.snapshot.suffix}</deb.version>
+        <deb.version>0.5.1~snapshot.${porelo.snapshot.run}${porelo.snapshot.suffix}</deb.version>
         <rpm.release>snapshot.${porelo.snapshot.run}</rpm.release>
         <package.doc>/usr/share/doc/${transport.name}</package.doc>
         <homeserver.name>porelo-matrix-homeserver</homeserver.name>
@@ -286,7 +286,7 @@
                                 </goals>
                                 <configuration>
                                 <name>${transport.name}</name>
-                                <version>0.5.0</version>
+                                <version>0.5.1</version>
                                 <release>${rpm.release}</release>
                                 <license>GPL-3.0-or-later</license>
                                 <group>Applications/Communications</group>
@@ -349,7 +349,7 @@
                                 <configuration>
                                     <name>${homeserver.name}</name>
                                     <classifier>homeserver</classifier>
-                                    <version>0.5.0</version>
+                                    <version>0.5.1</version>
                                     <release>${rpm.release}</release>
                                     <license>GPL-3.0-or-later</license>
                                     <group>Applications/Communications</group>
