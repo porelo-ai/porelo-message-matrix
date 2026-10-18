@@ -8,11 +8,6 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx21"></a>[MX21](MX21-The-Transport-Keeps-Its-Tokens-From-The-Account.md) | S | - | The running transport not dumpable, so no other process of the account reads its tokens from `/proc`, as porelo's [B23](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b23) did for the daemon |
-
-## Backlog
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 | <a id="mx22"></a>[MX22](MX22-A-Homeserver-Elsewhere-Gets-Its-Registration-Token.md) | S | - | A homeserver elsewhere set up through Porelo, the registration token read from a file the project's settings name |
 
 ## Accepted

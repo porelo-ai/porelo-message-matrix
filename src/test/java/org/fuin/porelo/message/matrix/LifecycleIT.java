@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -110,6 +111,28 @@ class LifecycleIT {
                 .isEqualTo(URI.create(tuwunel.url()).getAuthority());
         assertThat(status(tuwunel.url(), secrets.path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(200);
+    }
+
+    /**
+     * Harm guarded: Porelo hands a transport no variable of its own choosing, so without the file a
+     * homeserver elsewhere could not be set up through Porelo at all.
+     */
+    @Test
+    @DisplayName(
+            "setup on a homeserver elsewhere takes the registration token from the file the settings name")
+    void setupTakesTheTokenFromItsFile() throws Exception {
+        final Path token = Files.writeString(dir.resolve("token"), tuwunel.registrationToken());
+        Files.setPosixFilePermissions(token, PosixFilePermissions.fromString("rw-------"));
+        settings =
+                "{\"homeserver\":\""
+                        + tuwunel.url()
+                        + "\",\"registration_token_file\":\""
+                        + token
+                        + "\"}";
+
+        final JsonNode answer = run(new HashMap<>(), "setup", "--project", PROJECT);
+
+        assertThat(answer.path("account").path(Config.ADMIN_TOKEN).asText()).isNotEmpty();
     }
 
     @Test

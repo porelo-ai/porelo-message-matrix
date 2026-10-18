@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A project on a homeserver elsewhere names its registration token's file as `registration_token_file`, so it
+  can be set up through Porelo, which hands a transport no variable of the person's choosing.
+
 ### Security
 
 - The running transport is not dumpable, so no other process of the account reads its tokens from `/proc`

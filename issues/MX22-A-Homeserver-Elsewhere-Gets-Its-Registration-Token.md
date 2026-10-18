@@ -1,6 +1,6 @@
 # MX22 — A Homeserver Elsewhere Gets Its Registration Token
 
-**Status:** Backlog; found by porelo's [B102](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b102)
+**Status:** Implementing; found by porelo's [B102](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b102)
 walk, which could not set up a project on a homeserver elsewhere; the hand-over [MX12](README.md#mx12) needs too.
 **Size:** S - one module: a setting read and checked beside `ca_file`, the token read from its file where
 `Lifecycle` needs it today, its tests, and the setting in `doc/index.md` and `doc/transport.md`.

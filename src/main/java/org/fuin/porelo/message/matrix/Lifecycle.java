@@ -136,11 +136,7 @@ final class Lifecycle {
                             + (url.getPort() >= 0
                                     ? url.getPort()
                                     : "https".equals(url.getScheme()) ? 443 : 80);
-            registrationToken =
-                    required(
-                            env,
-                            Config.REGISTRATION_TOKEN,
-                            "the project's homeserver is not this account's own");
+            registrationToken = elsewhereToken(settings, env);
         }
         final MatrixClient nobody = client(url, "", settings);
 
@@ -517,11 +513,24 @@ final class Lifecycle {
                 throws Failure {
             return settings.homeserver() == null
                     ? LocalHomeserver.registrationToken(env)
-                    : required(
-                            env,
-                            Config.REGISTRATION_TOKEN,
-                            "the project's homeserver is not this account's own");
+                    : elsewhereToken(settings, env);
         }
+    }
+
+    /**
+     * A homeserver elsewhere's registration token: from the file the settings name, which is how a
+     * person gives it through Porelo, else from the environment.
+     */
+    private static String elsewhereToken(final Settings settings, final Map<String, String> env)
+            throws Failure {
+        final Path file = settings.registrationTokenFile();
+        return file != null
+                ? RegistrationTokenFile.read(file)
+                : required(
+                        env,
+                        Config.REGISTRATION_TOKEN,
+                        "the project's homeserver is not this account's own; name its token's file"
+                                + " as registration_token_file");
     }
 
     private static Place place(final Settings settings, final Map<String, String> env)

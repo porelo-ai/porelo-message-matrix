@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -98,5 +99,32 @@ class SettingsTest {
                 .as("the refusal")
                 .isInstanceOf(Failure.class)
                 .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
+    }
+
+    /**
+     * Harm guarded: a homeserver elsewhere could not be set up through Porelo at all, since nothing
+     * hands the transport its registration token; a relative path would be read against a directory
+     * that is Porelo's, and the setting on the account's own homeserver would silently do nothing.
+     */
+    @Test
+    @DisplayName(
+            "registration_token_file is taken as an absolute path for a homeserver elsewhere, else 78")
+    void registrationTokenFile() throws Failure {
+        assertThat(
+                        settings(
+                                        "{\"homeserver\":\"https://matrix.example.org\","
+                                                + "\"registration_token_file\":\"/home/a/token\"}")
+                                .registrationTokenFile())
+                .hasToString("/home/a/token");
+        for (final String json :
+                List.of(
+                        "{\"homeserver\":\"https://matrix.example.org\","
+                                + "\"registration_token_file\":\"token\"}",
+                        "{\"registration_token_file\":\"/home/a/token\"}")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> settings(json))
+                    .as(json)
+                    .isInstanceOf(Failure.class)
+                    .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
+        }
     }
 }

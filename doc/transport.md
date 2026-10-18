@@ -38,7 +38,8 @@ its environment; each prints one JSON object.
 | `clear` | The account's own homeserver once no project uses it: stops and disables it, removes its container and database, its port and registration token, and every poll position. Reads no settings | the same |
 | `settings` | Checks the settings as a draft, with no network and no environment | `{"refused": […], "warnings": […]}` |
 
-- **Settings:** `homeserver`, `ca_file` (absolute), `tls_verify` (`on`/`off`). Anything else is refused (78).
+- **Settings:** `homeserver`, `ca_file` (absolute), `tls_verify` (`on`/`off`), `registration_token_file`
+  (absolute, only with `homeserver`). Anything else is refused (78).
 - **The printed `secrets` always name `PORELO_MATRIX_CA_FILE` and `PORELO_MATRIX_TLS_VERIFY`**, so an
   inherited value never outweighs what the project configured.
 - **Run again, each keeps what exists.** `retire` twice is harmless, and so is `clear`: it says what it
@@ -46,7 +47,9 @@ its environment; each prints one JSON object.
   own entries for the transport beside it. A project cleared can be set up again.
 - **`--loopback-only`**, for an offline project: a `homeserver` that is not loopback is refused (78)
   before any request.
-- **A homeserver that is not this machine's own** needs `PORELO_MATRIX_REGISTRATION_TOKEN`.
+- **A homeserver that is not this machine's own** needs its registration token: read from
+  `registration_token_file`, which another account must not be able to read (78 otherwise), else from
+  `PORELO_MATRIX_REGISTRATION_TOKEN`.
 - **The project's room is taken only if it is Porelo's:** made by its administrator, invite-only, guests
   forbidden. A room under the alias that is anybody else's, or was opened since, is refused (78) by
   `setup`, `enroll` and `join`, and `clear` leaves it and its members alone.

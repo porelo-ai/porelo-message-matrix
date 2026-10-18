@@ -1,0 +1,54 @@
+package org.fuin.porelo.message.matrix;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
+
+/**
+ * The registration token of a homeserver elsewhere, read from the file the project's settings name.
+ * Porelo hands a transport no variable of the person's choosing, so this file is how the token
+ * reaches it. The token lets anyone register accounts on that homeserver, so a file the group or
+ * others can read is refused rather than read.
+ */
+final class RegistrationTokenFile {
+
+    private RegistrationTokenFile() {}
+
+    static String read(final Path file) throws Failure {
+        try {
+            final Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(file);
+            if (permissions.contains(PosixFilePermission.GROUP_READ)
+                    || permissions.contains(PosixFilePermission.OTHERS_READ)) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "the project's registration_token_file "
+                                + file
+                                + " is readable by other accounts; make it readable by this"
+                                + " account alone (chmod 600)");
+            }
+            final String token = Files.readString(file, StandardCharsets.UTF_8).strip();
+            if (token.isEmpty()) {
+                throw new Failure(
+                        Exit.CONFIG, "the project's registration_token_file " + file + " is empty");
+            }
+            return token;
+        } catch (final NoSuchFileException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the project's registration_token_file " + file + " is missing",
+                    ex);
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the project's registration_token_file "
+                            + file
+                            + " cannot be read: "
+                            + ex.getMessage(),
+                    ex);
+        }
+    }
+}

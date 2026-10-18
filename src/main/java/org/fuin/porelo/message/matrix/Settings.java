@@ -18,7 +18,11 @@ import org.jspecify.annotations.Nullable;
  * the verb rather than being ignored, since it would otherwise be a setting that silently does
  * nothing.
  */
-record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyTls) {
+record Settings(
+        @Nullable URI homeserver,
+        @Nullable Path caFile,
+        boolean verifyTls,
+        @Nullable Path registrationTokenFile) {
 
     /** Said on stderr whenever the project's settings switch the certificate check off. */
     static final String VERIFY_OFF_WARNING =
@@ -26,7 +30,8 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
                     + " not checked, and whoever answers in its place receives the admin token. For"
                     + " development only.";
 
-    static final Set<String> KEYS = Set.of("homeserver", "ca_file", "tls_verify");
+    static final Set<String> KEYS =
+            Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file");
 
     static final String CONTRADICTION =
             "the project's ca_file and tls_verify off contradict each other; set one";
@@ -46,7 +51,7 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
                     ex);
         }
         if (node == null || node.isNull()) {
-            return new Settings(null, null, true);
+            return new Settings(null, null, true, null);
         }
         if (!node.isObject()) {
             throw new Failure(Exit.CONFIG, "the project's settings on stdin are not a JSON object");
@@ -65,11 +70,21 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
                 new Settings(
                         homeserver(node.path("homeserver")),
                         caFile(node.path("ca_file")),
-                        verify(node.path("tls_verify")));
+                        verify(node.path("tls_verify")),
+                        absolutePath(
+                                node.path("registration_token_file"), "registration_token_file"));
         // Refused here, not first by the verb that reads the printed secrets: which was meant
         // cannot be told.
         if (settings.caFile() != null && !settings.verifyTls()) {
             throw new Failure(Exit.CONFIG, CONTRADICTION);
+        }
+        // The account's own homeserver has its token in the transport's own file; a second one
+        // here would silently do nothing.
+        if (settings.registrationTokenFile() != null && settings.homeserver() == null) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the project's registration_token_file is for a homeserver elsewhere; this"
+                            + " account's own needs none");
         }
         return settings;
     }
@@ -107,6 +122,11 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
     }
 
     static @Nullable Path caFile(final JsonNode value) throws Failure {
+        return absolutePath(value, "ca_file");
+    }
+
+    private static @Nullable Path absolutePath(final JsonNode value, final String key)
+            throws Failure {
         if (value.isMissingNode() || value.isNull()) {
             return null;
         }
@@ -115,13 +135,13 @@ record Settings(@Nullable URI homeserver, @Nullable Path caFile, boolean verifyT
             path = Path.of(value.asText(""));
         } catch (final InvalidPathException ex) {
             throw new Failure(
-                    Exit.CONFIG, "the project's ca_file is no path: " + ex.getReason(), ex);
+                    Exit.CONFIG, "the project's " + key + " is no path: " + ex.getReason(), ex);
         }
         // Relative to what is not the transport's to know: the project's checkout is Porelo's.
         if (!path.isAbsolute()) {
             throw new Failure(
                     Exit.CONFIG,
-                    "the project's ca_file must be an absolute path, not '" + path + "'");
+                    "the project's " + key + " must be an absolute path, not '" + path + "'");
         }
         return path;
     }
