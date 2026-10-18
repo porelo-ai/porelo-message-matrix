@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx26"></a>[MX26](MX26-Jackson-Without-Its-Known-Advisories.md) | XS | - | The JSON parsed with jackson 2.22.3, past the seven advisories published against 2.22.1 |
 | <a id="mx25"></a>[MX25](MX25-Publish-Without-A-Downloaded-Client.md) | S | - | The packages published with `curl` and both checksums, so no downloaded client runs beside the Artifactory token |
 
 ## Backlog

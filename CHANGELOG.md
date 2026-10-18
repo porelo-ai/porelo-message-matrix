@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The running transport is not dumpable, so no other process of the account reads its tokens from `/proc`
   while it runs; a machine that refuses that gets 78.
+- The transport reads JSON with jackson 2.22.3, which fixes the denial-of-service and deserialization advisories
+  published against 2.22.1 at the end of September 2026.
 
 ### Changed
 

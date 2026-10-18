@@ -33,7 +33,7 @@
     <properties>
         <jspecify.version>1.0.1</jspecify.version>
         <assertj.version>3.27.7</assertj.version>
-        <jackson.version>2.22.1</jackson.version>
+        <jackson.version>2.22.3</jackson.version>
         <main.class>org.fuin.porelo.message.matrix.Main</main.class>
         <transport.name>porelo-message-transport-matrix</transport.name>
         <!-- Named as porelo names its snapshots; CI sets the run and clears the local suffix. -->
