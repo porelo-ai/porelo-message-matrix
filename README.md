@@ -26,3 +26,8 @@ Java 25 (GraalVM for the native executable) and podman; `mvnw` brings the pinned
     ./mvnw -s settings.xml -Pnative verify   # also the executable, its tests, and the .deb and .rpm packages
 
 `-Pnative` also needs `zlib1g-dev` and `rpmbuild`.
+
+## Contributing
+
+How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md); a vulnerability is reported as [SECURITY.md](SECURITY.md)
+says.
