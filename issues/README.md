@@ -16,6 +16,12 @@ sequence.
 | <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | - | - | Clearing one project never cuts a person off from another project on the same homeserver |
 | <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | - | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 
+## Idea
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | - | - | The local homeserver's database copied into a directory and put back, so the conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans |
+
 ## Estimated
 
 | # | Size | Blocked by | What it covers |
