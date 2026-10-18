@@ -1,6 +1,6 @@
 # MX20 — The Local Homeserver Is Proven The Account's Own
 
-**Status:** Accepted; found in the code reading ([MX16](README.md#mx16)).
+**Status:** Accepted; found when the code was read against its skills.
 
 **What must be true.** A token for the account's own local homeserver reaches that homeserver and nothing else,
 even on a machine with several accounts: another account that listens on the same loopback port gets none of

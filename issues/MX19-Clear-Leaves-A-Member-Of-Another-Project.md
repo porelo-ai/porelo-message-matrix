@@ -1,6 +1,6 @@
 # MX19 — Clear Leaves A Member Of Another Project
 
-**Status:** Accepted; found in the code reading ([MX16](README.md#mx16)).
+**Status:** Accepted; found when the code was read against its skills.
 
 **What must be true.** Clearing one project's conversation never cuts a person off from another project on the
 same homeserver: a member who is also in another project's room stays active there, or `clear` says beforehand

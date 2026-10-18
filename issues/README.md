@@ -3,13 +3,6 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
-## Review
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx18"></a>[MX18](MX18-Reformatted-To-The-Shared-Style.md) | S | [PJ29](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj29)'s shared part | The shared `.editorconfig` and `spotless:check` switched on, the Java reformatted once in a commit `git blame` skips |
-| <a id="mx16"></a>[MX16](MX16-The-Code-Read-Against-Its-Skills.md) | L | [MX18](README.md#mx18) | All of the code read against the seven skills `AGENTS.md` names, each finding fixed with a test seen to fail first or declined with its reason |
-
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
@@ -27,4 +20,6 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx18"></a>[MX18](README.md#mx18) | Reformatted To The Shared Style | The shared `.editorconfig` and `spotless:check` in `validate`, the Java reformatted once in `2e795eb`, which `git blame` skips through `.git-blame-ignore-revs` |
+| <a id="mx16"></a>[MX16](README.md#mx16) | The Code Read Against Its Skills | All of the code read against seven skills, its findings fixed in `433cebe`, each with its test or why it has none |
 | <a id="mx17"></a>[MX17](README.md#mx17) | The Transport Is Renamed Porelo | The transport, its packages, program, settings, directories and accounts say Porelo, installed afresh; a documents test keeps the old name out of every tracked file |

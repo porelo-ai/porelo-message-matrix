@@ -160,7 +160,8 @@ final class Send {
     /**
      * The same message and signature always give the same id, so a send Porelo retries after a
      * temporary failure lands as the event the first attempt may already have made, not as a second
-     * one.
+     * one. The target is not part of it: Porelo never sends one message to two targets, since each
+     * queued message has one destination and a deferred one is sent again to the same.
      */
     static String transactionId(final byte[] message, final byte[] signature) {
         final MessageDigest sha256;
