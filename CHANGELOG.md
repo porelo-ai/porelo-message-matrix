@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- The running transport is not dumpable, so no other process of the account reads its tokens from `/proc`
+  while it runs; a machine that refuses that gets 78.
+
 ### Changed
 
 - The code follows the shared style of every Porelo repository: one `.editorconfig`, and `google-java-format`

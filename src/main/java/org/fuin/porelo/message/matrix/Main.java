@@ -14,6 +14,14 @@ public final class Main {
     private Main() {}
 
     public static void main(final String[] args) {
+        // First, before the environment's tokens are read: no other process of the account reads
+        // them.
+        try {
+            Hardening.notDumpable();
+        } catch (final IllegalStateException ex) {
+            System.err.println(NAME + ": " + ex.getMessage());
+            System.exit(Exit.CONFIG);
+        }
         System.exit(run(args, System.getenv(), System.in, System.out, System.err));
     }
 

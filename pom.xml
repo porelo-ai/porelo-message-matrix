@@ -133,6 +133,9 @@
                                 <!-- The baseline every x86-64 CPU has, as every Porelo executable: the default
                                      would ask for AVX2 and refuse to start on an older machine. -->
                                 <buildArg>-march=x86-64</buildArg>
+                                <!-- The one foreign call, prctl, that keeps the tokens from the account's other
+                                     processes. -->
+                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>

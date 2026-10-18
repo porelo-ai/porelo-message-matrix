@@ -1,6 +1,6 @@
 # MX21 — The Transport Keeps Its Tokens From The Account
 
-**Status:** Backlog; found while planning porelo's
+**Status:** Implementing; found while planning porelo's
 [B102](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b102) walk, the transport's side of
 [B23](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b23).
 **Size:** S - one module: a class that turns dumping off as `main` starts, its call from `Main`, the native image's
@@ -37,9 +37,12 @@ task.
 
 ## To be checked
 
-- The moment between `exec` and the `prctl` call, in which the environment is readable: measured on the VM, and
-  whether it is worth more than this issue (the other way, the tokens off the environment, changes Porelo's
-  contract and is L).
-- Whether the JVM side of the tests can run `Hardening` at all, or only the native integration test proves it.
-- Whether `homeserver-token`, run as the unit's `ExecStartPre`, needs it: it reads no token, only writes the
-  registration token's file.
+- **Measured:** the moment between `exec` and the `prctl` call is 15 to 40 ms under `strace`; a shell loop
+  reading `/proc/<pid>/environ` right after each start caught the token in 25 of 300 starts. So this narrows the
+  exposure from the whole run to that moment, and a process that watches `/proc` for the transport's starts can
+  still take a token. Closing it needs the tokens off the environment, which changes Porelo's contract (L). As the
+  operator decided, the moment is the accepted risk in `doc/decisions.md`, and the pipe is an issue of its own.
+- **Answered:** only the native executable proves it. The tests in a JVM call `Main.run`, never `main`, and a
+  JVM's `main` is not the process's first thread; `DumpableIT` runs under `-Pnative` only.
+- **Answered:** `homeserver-token` goes through `main` like every verb, so it is hardened too, though it reads
+  no token.

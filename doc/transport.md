@@ -101,6 +101,6 @@ tries again; every other code refuses it.
 | 75 | Temporary: the homeserver unreachable or busy, or another poll running |
 | 76 | An answer the transport does not understand, or a redirect |
 | 77 | Refused by the homeserver: the token, or a room the account is not in |
-| 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver |
+| 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver; or a machine that will not keep the tokens from the account's other processes |
 
 The reason goes to stderr, and never contains a token.

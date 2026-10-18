@@ -1,0 +1,11 @@
+{
+    "foreign": {
+        "downcalls": [
+            {
+                "returnType": "jint",
+                "parameterTypes": ["jint", "jlong", "jlong", "jlong", "jlong"],
+                "options": {"captureCallState": true}
+            }
+        ]
+    }
+}
