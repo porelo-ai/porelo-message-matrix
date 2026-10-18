@@ -31,6 +31,14 @@ max_line_length = 120
 [*.py]
 max_line_length = 100
 
+# Ansible's own convention, two spaces, where the host playbook's collection keeps its YAML; every other
+# YAML file keeps four.
+[{roles,playbooks,molecule,extensions}/**.{yml,yaml}]
+indent_size = 2
+
+[galaxy.yml]
+indent_size = 2
+
 # The Maven and Gradle wrappers' scripts stay exactly as their tools generate them, so updating a
 # wrapper stays a plain replacement of its files.
 [{mvnw,mvnw.cmd,gradlew,gradlew.bat}]
