@@ -1,6 +1,6 @@
 # MX26 — Jackson Without Its Known Advisories
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** XS - one version in the pom and a changelog line; the native executable's tests and a VM run prove it.
 
 **What must be true.** The transport that ships parses JSON with no jackson version that has a published advisory
@@ -24,3 +24,5 @@ against it: jackson-core and jackson-databind move from 2.22.1 to 2.22.3, which 
 
 - OSV lists no advisory against the jackson the build resolves.
 - The whole build with `-Pnative,dist` is green, and a VM run of the native executable's integration tests too.
+- Met: green on the host with `-Pnative,dist` and on the VM with `-Pnative`; the bill of the published
+  `0.5.1~snapshot.68` names jackson-core and jackson-databind 2.22.3, which OSV knows no advisory against.

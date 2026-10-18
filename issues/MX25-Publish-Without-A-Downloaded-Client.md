@@ -1,6 +1,6 @@
 # MX25 — Publish Without A Downloaded Client
 
-**Status:** Implementing; porelo's
+**Status:** Review; porelo's
 [B49](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b49) made `artifactory.sh`, proven there by
 its Artifactory smoke test and its first `Publish` through it.
 **Size:** S - one workflow and one sourced script, no contract other repositories read; its proof is the next
@@ -30,3 +30,5 @@ not match the checksums sent with them.
   "The packages are indexed, not merely stored" finds every one of them in the snapshots index.
 - No `jfrog/` action and no `jf` command is left in `.github/`.
 - A `set -x` trace of the publish step shows no token.
+- Met: Build 39150950075 on `d846413` put all four packages through `art_put`, the .deb with their three
+  properties, and its indexing step found them after about 10 s; its log holds no token.
