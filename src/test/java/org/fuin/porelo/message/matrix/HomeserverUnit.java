@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
 
 /**
  * Writes the homeserver's unit for the package, with the image taken from the FROM line of {@code
- * homeserver/Dockerfile}: the digest has one place, the one Dependabot moves, and the unit can
- * never run another. Run by the build before packaging; it is not part of the executable.
+ * homeserver/Dockerfile}: the digest has one place, the one that is moved, and the unit can never
+ * run another. Run by the build before packaging; it is not part of the executable.
  */
 public final class HomeserverUnit {
 

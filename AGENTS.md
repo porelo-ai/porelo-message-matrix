@@ -356,9 +356,10 @@ over a Matrix homeserver. Porelo's side of it - the peer table, a task's account
   documents are checked with `porelo-release`'s `check-citations`, `check-doc-site` and `check-readmes` on the
   host before every hand-over, and by the `shared-rules` workflow once a day; the build skips a change to
   documents alone.
-- **The homeserver image's pin is moved by review.** Dependabot proposes a new digest for the `FROM` line of
-  `homeserver/Dockerfile`; `ghcr.io` gives it no publication date, so the reviewer reads the image's
-  `org.opencontainers.image.created` and takes nothing younger than three days.
+- **The homeserver image's pin is moved by hand.** Dependabot moves only the actions; the agent moves the digest
+  in the `FROM` line of `homeserver/Dockerfile`, with its changelog line and a VM run. `ghcr.io` gives an image
+  no publication date, so the agent reads its `org.opencontainers.image.created` and takes nothing younger
+  than three days.
 - **Installed machine-wide, this transport is polled by every account's `porelod`** and answers 78 where it
   is not configured, so a machine-wide install is only for an announced test and is removed after it.
 
