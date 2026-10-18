@@ -21,7 +21,7 @@ jobs:
         # The only permission this needs, and it is the one that lets it delete.
         permissions:
             actions: write
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         timeout-minutes: 10
         steps:
             - name: What would go, and go if asked
