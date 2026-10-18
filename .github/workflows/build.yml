@@ -1,5 +1,4 @@
 name: Build
-run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.workflow }}"
 
 # A change to documents alone builds nothing: its checks run locally before every hand-over and in the
 # Shared rules check once a day; a tag's push is never filtered by path. A push that changes only the

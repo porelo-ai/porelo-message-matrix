@@ -1,6 +1,5 @@
 # Deletes this repository's workflow run history up to a date, to keep the Actions list readable.
 name: Delete old runs
-run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.workflow }}"
 
 on:
     workflow_dispatch:

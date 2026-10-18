@@ -1,5 +1,4 @@
 name: Shared rules check
-run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.workflow }}"
 
 # What every change needs, documents alone included, which the build skips: the shared rules block, the
 # citations of issues in any file, the documentation chapter, and the tests that read a document. On a
