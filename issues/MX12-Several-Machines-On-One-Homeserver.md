@@ -94,6 +94,10 @@ on another machine's accounts.
   - a `--machine` name another machine holds is refused with 78;
   - `join` on a central homeserver answers 77;
   - a machine not yet invited starts no task.
+- porelo's `vault clear` of a project on the homeserver elsewhere deactivates its accounts there - a person's
+  password login, taken before, is refused after it - and leaves Porelo's other accounts and every other project
+  there alone; a new vault and a start in the project then succeed. Walked on a rented machine. The token reaches
+  the transport through `registration_token_file`.
 
 ## To be checked
 
@@ -101,3 +105,4 @@ on another machine's accounts.
   password user-interactive auth, as the plan's `retire` needs. Measured against the pinned image; mine.
 - Whether a member given the power to invite, not an administrator, is enough to invite the relay and the
   tasks into a room a person made. Measured against Tuwunel; mine.
+- Whether the machines take the one `registration_token_file` each, or a token per machine.
