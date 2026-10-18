@@ -160,4 +160,42 @@ class SettingsCheckTest {
         assertThat(texts(answer.path("refused"))).isEmpty();
         assertThat(texts(answer.path("warnings"))).isEmpty();
     }
+
+    /**
+     * Harm guarded: an editor that accepts a registration_token_file setup then refuses lets a
+     * person commit a project that cannot start, and one whose token file other accounts can read
+     * hands them the right to register on that homeserver.
+     */
+    @Test
+    @DisplayName(
+            "registration_token_file: relative or without a homeserver refused, readable by others warned")
+    void registrationTokenFile() throws IOException {
+        assertThat(
+                        texts(
+                                check(
+                                                "{\"homeserver\":\"https://matrix.example.org\","
+                                                        + "\"registration_token_file\":\"token\"}")
+                                        .path("refused")))
+                .singleElement()
+                .asString()
+                .contains("absolute path");
+        assertThat(texts(check("{\"registration_token_file\":\"/home/a/token\"}").path("refused")))
+                .singleElement()
+                .asString()
+                .contains("homeserver elsewhere");
+        final Path open = Files.writeString(dir.resolve("open"), "t");
+        Files.setPosixFilePermissions(
+                open, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        final JsonNode answer =
+                check(
+                        "{\"homeserver\":\"https://matrix.example.org\","
+                                + "\"registration_token_file\":\""
+                                + open
+                                + "\"}");
+        assertThat(texts(answer.path("refused"))).isEmpty();
+        assertThat(texts(answer.path("warnings")))
+                .singleElement()
+                .asString()
+                .contains("readable by other accounts");
+    }
 }

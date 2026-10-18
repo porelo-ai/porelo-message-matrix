@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - A project on a homeserver elsewhere names its registration token's file as `registration_token_file`, so it
-  can be set up through Porelo, which hands a transport no variable of the person's choosing.
+  can be set up through Porelo, which hands a transport no variable of the person's choosing; `settings` checks
+  it while the project file is edited.
 
 ### Security
 

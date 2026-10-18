@@ -33,6 +33,10 @@ record Settings(
     static final Set<String> KEYS =
             Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file");
 
+    static final String TOKEN_FILE_WITHOUT_HOMESERVER =
+            "the project's registration_token_file is for a homeserver elsewhere; this account's"
+                    + " own needs none";
+
     static final String CONTRADICTION =
             "the project's ca_file and tls_verify off contradict each other; set one";
 
@@ -81,10 +85,7 @@ record Settings(
         // The account's own homeserver has its token in the transport's own file; a second one
         // here would silently do nothing.
         if (settings.registrationTokenFile() != null && settings.homeserver() == null) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the project's registration_token_file is for a homeserver elsewhere; this"
-                            + " account's own needs none");
+            throw new Failure(Exit.CONFIG, TOKEN_FILE_WITHOUT_HOMESERVER);
         }
         return settings;
     }
@@ -123,6 +124,10 @@ record Settings(
 
     static @Nullable Path caFile(final JsonNode value) throws Failure {
         return absolutePath(value, "ca_file");
+    }
+
+    static @Nullable Path registrationTokenFile(final JsonNode value) throws Failure {
+        return absolutePath(value, "registration_token_file");
     }
 
     private static @Nullable Path absolutePath(final JsonNode value, final String key)

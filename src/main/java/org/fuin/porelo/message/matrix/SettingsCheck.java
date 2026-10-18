@@ -8,9 +8,11 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -58,6 +60,30 @@ final class SettingsCheck {
         }
     }
 
+    /** What only this machine can say of the token's file: whether it is there, and whose. */
+    private static void tokenFileOnThisMachine(final Path file, final List<String> warnings) {
+        if (!Files.isReadable(file)) {
+            warnings.add(
+                    "the registration_token_file "
+                            + file
+                            + " is not there, or not readable, on this"
+                            + " machine");
+            return;
+        }
+        try {
+            final Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(file);
+            if (permissions.contains(PosixFilePermission.GROUP_READ)
+                    || permissions.contains(PosixFilePermission.OTHERS_READ)) {
+                warnings.add(
+                        "the registration_token_file "
+                                + file
+                                + " is readable by other accounts, so setup refuses it; chmod 600");
+            }
+        } catch (final IOException | UnsupportedOperationException ex) {
+            warnings.add("the registration_token_file " + file + " cannot be read: " + ex);
+        }
+    }
+
     /**
      * Every finding at once, in the order of the keys - an editor shows them all, not the first.
      */
@@ -82,6 +108,19 @@ final class SettingsCheck {
                         "the ca_file "
                                 + caFile
                                 + " is not there, or not readable, on this machine");
+            }
+        } catch (final Failure failure) {
+            refused.add(failure.getMessage());
+        }
+        try {
+            final Path tokenFile =
+                    Settings.registrationTokenFile(node.path("registration_token_file"));
+            if (tokenFile != null) {
+                if (node.path("homeserver").isMissingNode() || node.path("homeserver").isNull()) {
+                    refused.add(Settings.TOKEN_FILE_WITHOUT_HOMESERVER);
+                } else {
+                    tokenFileOnThisMachine(tokenFile, warnings);
+                }
             }
         } catch (final Failure failure) {
             refused.add(failure.getMessage());
