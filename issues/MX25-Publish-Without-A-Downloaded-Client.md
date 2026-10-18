@@ -1,8 +1,8 @@
 # MX25 — Publish Without A Downloaded Client
 
-**Status:** Estimated; blocked by porelo
-[B49](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b49), whose `artifactory.sh` this takes
-over once porelo's Artifactory smoke test and its next `Publish` are green with it.
+**Status:** Implementing; porelo's
+[B49](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b49) made `artifactory.sh`, proven there by
+its Artifactory smoke test and its first `Publish` through it.
 **Size:** S - one workflow and one sourced script, no contract other repositories read; its proof is the next
 publish on main.
 

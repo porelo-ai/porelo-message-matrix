@@ -3,6 +3,12 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx25"></a>[MX25](MX25-Publish-Without-A-Downloaded-Client.md) | S | - | The packages published with `curl` and both checksums, so no downloaded client runs beside the Artifactory token |
+
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
@@ -26,7 +32,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx25"></a>[MX25](MX25-Publish-Without-A-Downloaded-Client.md) | S | porelo's [B49](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b49) | The packages published with `curl` and both checksums, so no downloaded client runs beside the Artifactory token |
 | <a id="mx12"></a>[MX12](MX12-Several-Machines-On-One-Homeserver.md) | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation |
 
 ## Finished
