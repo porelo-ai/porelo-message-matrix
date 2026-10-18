@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `1b87b5ddd8799c95` · changed 2026-10-18T05:06Z
+> **BEGIN Shared Area** · sha256 `df1a9687073cea82` · changed 2026-10-18T13:00Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -51,7 +51,10 @@ and the UTC time that text last changed; change it in the channel first, never i
   repaired by a new commit on the remote's tip, never by a force push.
 - **A commit message is one line of at most 72 characters saying in words what changed**, never by a
   requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
-  what they share, not each of them.
+  what they share, not each of them. Trailers may follow below a blank line, and nothing else.
+- **An agent's commit names its help in an `Assisted-by: <tool>, <model>` trailer, and an agent never
+  writes a `Signed-off-by:`**: the operator vouches for the project's own commits by pushing them. A
+  pull request from outside carries its author's `Signed-off-by:`, the Developer Certificate of Origin.
 - **No commit message, changelog entry, issue or document says who asked for a change or who made it**
   - no "as the operator chose", no agent's name; it says what changed and why.
 - **A change to what ships or to what a build produces gets its changelog entry in the same commit**,
@@ -166,6 +169,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   machine reachable from here is restarted only by the operator.
 - **A rented machine's name says which agent and which run made it.** Every run deletes exactly what
   it created, after a failure too, and never sweeps by age or touches a machine it cannot attribute.
+- **The scheduled sweep of the CI's machines deletes one only past the `porelo-expires` time it was
+  made with, or one that carries none**; it is the one clean-up that is not a run's own.
 - **A script that changes a machine refuses to start over leftovers, removes only what it created -
   on interrupt too - and exits non-zero naming anything it left.**
 - **Before a run on a shared machine, check what it does to that machine and say so.**
@@ -330,7 +335,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `1b87b5ddd8799c95`
+> **END Shared Area** · sha256 `df1a9687073cea82`
 
 ## What this repository is
 
