@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `fef7d153a0bcb86d` · changed 2026-10-18T04:33Z
+> **BEGIN Shared Area** · sha256 `1b87b5ddd8799c95` · changed 2026-10-18T05:06Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -316,9 +316,8 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Everything a build runs is pinned**: actions by commit with the version beside it, the JDK (from
   `porelo-machines jdk --github`), the build tool's wrapper (Maven, Gradle) and images by version and
   digest. `porelo-release check-actions` enforces it. Dependabot moves only the actions, weekly, in one
-  group, after three days; a patch or minor move is merged on its own once the pull request's light
-  check (no rented machine) passes, a major one by the operator. Everything else is moved by the
-  repository's agent.
+  group, after three days; the operator merges each, as code owner of `.github/`, once the pull
+  request's light check (no rented machine) passes. Everything else is moved by the repository's agent.
 - **A push that changes only `.github/` starts no Build**; the next push with content builds with it.
 - **While it is developed, a repository may build against another Porelo repository's snapshot from
   Sonatype**, and its build may fail for a while when that snapshot moves; a release depends only on
@@ -331,7 +330,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `fef7d153a0bcb86d`
+> **END Shared Area** · sha256 `1b87b5ddd8799c95`
 
 ## What this repository is
 
