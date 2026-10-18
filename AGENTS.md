@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `01f9fdbdfaaa9c51` · changed 2026-10-17T17:31Z
+> **BEGIN Shared Area** · sha256 `fef7d153a0bcb86d` · changed 2026-10-18T04:33Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -54,9 +54,10 @@ and the UTC time that text last changed; change it in the channel first, never i
   what they share, not each of them.
 - **No commit message, changelog entry, issue or document says who asked for a change or who made it**
   - no "as the operator chose", no agent's name; it says what changed and why.
-- **A change to what ships or builds gets its changelog entry in the same commit**, under
-  `[Unreleased]` and the heading of its kind. A generated changelog is changed only through its
-  sources, never by hand.
+- **A change to what ships or to what a build produces gets its changelog entry in the same commit**,
+  under `[Unreleased]` and the heading of its kind. A change only to the CI's own workflows (an action's
+  pin, a schedule, a job's steps) gets none: the changelog is for the people who use what ships. A
+  generated changelog is changed only through its sources, never by hand.
 
 ### Issues
 
@@ -312,10 +313,13 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Java code carries brief Javadoc on every public type and method; a test method's name reads as a
   sentence (never `testXxx`) and an assertion states its reason (`.as(...)`).** Every build call in
   CI names its repositories in the repository itself (Maven: `-s settings.xml`).
-- **Everything a build runs is pinned and moved only by review**: actions by commit with the version
-  beside it, the JDK (from `porelo-machines jdk --github`), the build tool's wrapper (Maven, Gradle) and
-  images by version and digest, updated by Dependabot weekly, in one group, after three days.
-  `porelo-release check-actions` enforces it.
+- **Everything a build runs is pinned**: actions by commit with the version beside it, the JDK (from
+  `porelo-machines jdk --github`), the build tool's wrapper (Maven, Gradle) and images by version and
+  digest. `porelo-release check-actions` enforces it. Dependabot moves only the actions, weekly, in one
+  group, after three days; a patch or minor move is merged on its own once the pull request's light
+  check (no rented machine) passes, a major one by the operator. Everything else is moved by the
+  repository's agent.
+- **A push that changes only `.github/` starts no Build**; the next push with content builds with it.
 - **While it is developed, a repository may build against another Porelo repository's snapshot from
   Sonatype**, and its build may fail for a while when that snapshot moves; a release depends only on
   releases, which the release build checks.
@@ -327,7 +331,7 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `01f9fdbdfaaa9c51`
+> **END Shared Area** · sha256 `fef7d153a0bcb86d`
 
 ## What this repository is
 
