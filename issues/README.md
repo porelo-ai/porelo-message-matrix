@@ -3,6 +3,12 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
+## Backlog
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx21"></a>[MX21](MX21-The-Transport-Keeps-Its-Tokens-From-The-Account.md) | S | - | The running transport not dumpable, so no other process of the account reads its tokens from `/proc`, as porelo's [B23](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b23) did for the daemon |
+
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
