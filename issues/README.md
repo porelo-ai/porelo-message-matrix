@@ -3,17 +3,17 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
+
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
-
-## Analyzed
-
-| # | Size | Blocked by | Open questions | What it covers |
-|---|---|---|---|---|
-| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | 0 | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
 
 ## Accepted
 
