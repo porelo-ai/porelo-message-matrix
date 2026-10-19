@@ -46,3 +46,6 @@ waits for the answer and copies the new backup into `<dir>`; `restore <dir>`, wi
 - The order on a host: porelo's `vault clear --yes` removes the account's own homeserver with its database
   volume, so at `down` the copy is taken before it; at `up` the restore comes before the first task start, whose
   `setup` would otherwise make a fresh homeserver with a new `@porelo`.
+- The line `down` gives when the copy fails. A failed data copy keeps the host (the operator, 2026-10-19), so the
+  line says the room is kept back and how to go on: "the Matrix room's copy failed; the host is kept so its
+  conversation is not lost: run 'down' again, or 'down --give-back-anyway' to give it back knowingly".
