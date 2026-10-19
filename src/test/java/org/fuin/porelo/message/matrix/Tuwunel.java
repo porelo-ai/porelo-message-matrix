@@ -19,14 +19,22 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The homeserver of {@code homeserver/Dockerfile}, started in rootless podman on loopback for one
  * test class, with just enough of the client API to set up accounts and a room and to look at what
  * arrived. Every secret it makes is random, reaches podman through a file only its owner can read,
  * and is never printed.
+ *
+ * <p>Inside a Porelo task no container can start, so there {@code porelo.yml} copies the image's
+ * own binary in and names it by {@link #BINARY}; it then runs as a process of the test, with the
+ * same settings, its database and log in the test's own directory.
  */
 final class Tuwunel implements AutoCloseable {
+
+    /** The variable naming Tuwunel's binary, which then runs without a container. */
+    static final String BINARY = "MATRIX_TEST_TUWUNEL";
 
     static final String SERVER_NAME = "matrix.test";
 
@@ -55,6 +63,11 @@ final class Tuwunel implements AutoCloseable {
 
     private final String url;
 
+    /** The binary that runs it; {@code null} when the homeserver runs in podman. */
+    private @Nullable Path binary;
+
+    private @Nullable Process process;
+
     private final HttpClient http = HttpClient.newHttpClient();
 
     private Tuwunel(
@@ -66,6 +79,19 @@ final class Tuwunel implements AutoCloseable {
         this.dir = dir;
         this.registrationToken = registrationToken;
         this.url = url;
+    }
+
+    /** The binary {@link #BINARY} names, or {@code null} when it names none. */
+    private static @Nullable Path namedBinary() {
+        final String value = System.getenv(BINARY);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        final Path program = Path.of(value);
+        if (!Files.isExecutable(program)) {
+            throw new IllegalStateException(BINARY + " names " + program + ", which is no program");
+        }
+        return program;
     }
 
     static String image() throws IOException {
@@ -105,6 +131,22 @@ final class Tuwunel implements AutoCloseable {
         // Never "porelo-…": the build runs in a developer's own podman, where Porelo takes such a
         // name for a task.
         final String container = "tuwunel-it-" + random().substring(0, 8).toLowerCase();
+        final Path named = namedBinary();
+        if (named != null) {
+            final Tuwunel tuwunel =
+                    new Tuwunel(container, dir, token, "http://127.0.0.1:" + freePort());
+            try {
+                tuwunel.run(named);
+                return tuwunel;
+            } catch (final IOException | InterruptedException | RuntimeException ex) {
+                try {
+                    tuwunel.close();
+                } catch (final IOException | RuntimeException cleanup) {
+                    ex.addSuppressed(cleanup);
+                }
+                throw ex;
+            }
+        }
         // A start that fails half-way removes what it made - the container and the directory with
         // the token - before it says why.
         try {
@@ -149,6 +191,14 @@ final class Tuwunel implements AutoCloseable {
      * and room gone.
      */
     void reset() throws IOException, InterruptedException {
+        final Path program = binary;
+        final Process running = process;
+        if (program != null && running != null) {
+            stop(running);
+            delete(dir.resolve("data"));
+            run(program);
+            return;
+        }
         podman("rm", "-f", container);
         podman(
                 "run",
@@ -456,8 +506,75 @@ final class Tuwunel implements AutoCloseable {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    /**
+     * Starts the binary on this homeserver's address, with the container's settings read from the
+     * same file, its database and its output in this test's own directory.
+     */
+    private void run(final Path program) throws IOException, InterruptedException {
+        binary = program;
+        final Path data =
+                Files.createDirectories(
+                        dir.resolve("data"),
+                        PosixFilePermissions.asFileAttribute(
+                                PosixFilePermissions.fromString("rwx------")));
+        final ProcessBuilder builder =
+                new ProcessBuilder(program.toString())
+                        .directory(dir.toFile())
+                        .redirectErrorStream(true)
+                        .redirectOutput(
+                                ProcessBuilder.Redirect.appendTo(dir.resolve("log").toFile()));
+        final java.util.Map<String, String> environment = builder.environment();
+        environment.clear();
+        for (final String line : Files.readAllLines(dir.resolve("env"), StandardCharsets.UTF_8)) {
+            final int equals = line.indexOf('=');
+            if (equals > 0) {
+                environment.put(line.substring(0, equals), line.substring(equals + 1));
+            }
+        }
+        environment.put("TUWUNEL_ADDRESS", "127.0.0.1");
+        environment.put("TUWUNEL_PORT", String.valueOf(URI.create(url).getPort()));
+        environment.put("TUWUNEL_DATABASE_PATH", data.toString());
+        process = builder.start();
+        awaitUp();
+    }
+
+    private static void stop(final Process running) throws InterruptedException {
+        running.destroy();
+        if (!running.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+            running.destroyForcibly().waitFor();
+        }
+    }
+
+    private static int freePort() throws IOException {
+        try (java.net.ServerSocket socket =
+                new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+            return socket.getLocalPort();
+        }
+    }
+
+    private static void delete(final Path tree) throws IOException {
+        if (!Files.exists(tree)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(tree)) {
+            for (final Path file : files.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(file);
+            }
+        }
+    }
+
     @Override
     public void close() throws IOException, InterruptedException {
+        final Process running = process;
+        if (running != null) {
+            try {
+                stop(running);
+            } finally {
+                process = null;
+                delete(dir);
+            }
+            return;
+        }
         try {
             podman("rm", "-f", container);
         } finally {
