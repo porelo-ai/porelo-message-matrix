@@ -1,6 +1,6 @@
 # MX27 — The Homeserver Starts Without A Container
 
-**Status:** Implementing; this repository's part of porelo-project's
+**Status:** Review; this repository's part of porelo-project's
 [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49), which mends a test first where it
 is cheap and tags only what remains.
 **Size:** S - one test helper, the draft image's two lines and one test; no contract another repository reads.
@@ -42,6 +42,10 @@ goes on without it.
   green, with the process.
 - On the host and on the VM, with nothing named: all of them green with the container, as before.
 - The digest test seen red with the digests apart.
+- Met: inside the draft image as a task runs it, with `LANG=C.UTF-8`, all 54 integration tests green with the
+  binary (53 with no locale: `LifecycleIT.nickname`'s argument needs a UTF-8 locale, which every task image gets);
+  on the host, on the VM and in Build 39257077295 all of them green with the container; `TaskImageTest` seen red
+  before `porelo.yml` copied the binary and with one character of the digest changed.
 
 ## To be checked
 
