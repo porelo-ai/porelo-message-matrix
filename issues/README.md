@@ -3,13 +3,6 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
-## Review
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx26"></a>[MX26](MX26-Jackson-Without-Its-Known-Advisories.md) | XS | - | The JSON parsed with jackson 2.22.3, past the seven advisories published against 2.22.1 |
-| <a id="mx25"></a>[MX25](MX25-Publish-Without-A-Downloaded-Client.md) | S | - | The packages published with `curl` and both checksums, so no downloaded client runs beside the Artifactory token |
-
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
@@ -39,6 +32,8 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx26"></a>[MX26](README.md#mx26) | Jackson Without Its Known Advisories | jackson-core and jackson-databind 2.22.3 in the transport, past the seven advisories published against 2.22.1 |
+| <a id="mx25"></a>[MX25](README.md#mx25) | Publish Without A Downloaded Client | The packages published with `curl` through `.github/scripts/artifactory.sh`, both checksums sent; no JFrog client runs beside the token |
 | <a id="mx22"></a>[MX22](README.md#mx22) | A Homeserver Elsewhere Gets Its Registration Token | The setting `registration_token_file`, read by `setup`, `enroll` and `join` and checked by `settings`: absolute, only for a homeserver elsewhere, readable by the account alone |
 | <a id="mx21"></a>[MX21](README.md#mx21) | The Transport Keeps Its Tokens From The Account | The running transport not dumpable, so its environment and memory belong to root; the moment before it, measured, is the accepted risk in `doc/decisions.md` |
 | <a id="mx18"></a>[MX18](README.md#mx18) | Reformatted To The Shared Style | The shared `.editorconfig` and `spotless:check` in `validate`, the Java reformatted once in `2e795eb`, which `git blame` skips through `.git-blame-ignore-revs` |
