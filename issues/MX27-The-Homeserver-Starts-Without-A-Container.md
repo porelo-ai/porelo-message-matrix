@@ -1,6 +1,6 @@
 # MX27 — The Homeserver Starts Without A Container
 
-**Status:** Idea; this repository's part of porelo-project's
+**Status:** Accepted; this repository's part of porelo-project's
 [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49), which mends a test first where it
 is cheap and tags only what remains.
 
