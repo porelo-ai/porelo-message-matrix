@@ -20,6 +20,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | - | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | - | - | The local homeserver's database copied into a directory and put back, so the conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans |
 
 ## Estimated
