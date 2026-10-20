@@ -70,3 +70,29 @@ jobs:
 
             - name: The tests that read a document
               run: ./mvnw -B -ntp -s settings.xml -Pdocuments test
+
+            # A pull request's own commits held to the shared rule on commit messages. One from outside - from another
+            # repository, or opened by someone not a member - also carries its author's Signed-off-by: on each commit,
+            # the Developer Certificate of Origin; Dependabot's and GitHub's own commits are exempt by the author and
+            # committer they record.
+            - name: The pull request's commit messages
+              if: github.event_name == 'pull_request'
+              env:
+                  PR_BASE: ${{ github.event.pull_request.base.sha }}
+                  PR_HEAD: ${{ github.event.pull_request.head.sha }}
+                  PR_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+                  PR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+              run: |
+                  set -eu
+                  # The checkout holds the merge commit alone; the range needs the history of both its sides.
+                  if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+                      git fetch --no-tags --quiet --unshallow origin "$PR_BASE" "$PR_HEAD"
+                  else
+                      git fetch --no-tags --quiet origin "$PR_BASE" "$PR_HEAD"
+                  fi
+                  outside=--outside
+                  if [ "$PR_REPOSITORY" = "$GITHUB_REPOSITORY" ]; then
+                      case "$PR_ASSOCIATION" in OWNER | MEMBER) outside= ;; esac
+                  fi
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
+                      check-commits "$PR_BASE..$PR_HEAD" $outside
