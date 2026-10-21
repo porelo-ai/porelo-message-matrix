@@ -17,6 +17,7 @@ this account". With lingering on, the homeserver comes back after a reboot witho
 | Server name, part of every account id; fixed once the database exists | `PORELO_MATRIX_SERVER_NAME` in the same file | `localhost` |
 | Registration token, made on first start, readable by the account alone | `~/.config/porelo/matrix/registration-token`, under `$XDG_CONFIG_HOME` when it is set | - |
 | Database | the podman volume `porelo-matrix-homeserver` | - |
+| Backups, up to 48, made on `SIGUSR2`; the account's alone, since they hold every token and password hash | `~/.local/state/porelo/matrix/backups`, under `$XDG_STATE_HOME` when it is set | - |
 | Container | `matrix-homeserver`, acted on only by the id in `$XDG_RUNTIME_DIR/porelo-matrix-homeserver.cid` | - |
 
 The unit and `clear` stop and remove the container by the id podman gave the unit, never by its name. A
@@ -33,7 +34,7 @@ start.
 ## Resetting it
 
 `porelo clear` takes away everything here: the transport's `clear` stops and disables the unit and removes
-its container, its database, `homeserver.conf`, the registration token and the poll positions, and Porelo
+its container, its database, its backups, `homeserver.conf`, the registration token and the poll positions, and Porelo
 removes its own entries beside it. The package stays.
 
 By hand, starting from an empty database takes three things; while any old one is left, the transport
@@ -45,6 +46,12 @@ stops and says the homeserver "was reset":
 3. the transport's state: `rm -r ~/.local/state/porelo/transports/matrix`.
 
 `registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again.
+
+## Onto another machine
+
+`backup <dir>` and `restore <dir>` ([the contract](transport.md#keeping-the-conversation)) carry the
+conversation over: `backup` on the old machine while the homeserver runs, `restore` on the new one before the
+first task start, then that start's `setup` takes the room back. Media are not in a backup.
 
 ## On Fedora
 

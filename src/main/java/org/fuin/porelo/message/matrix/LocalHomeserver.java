@@ -39,6 +39,11 @@ final class LocalHomeserver {
 
     static final String PORT = "PORELO_MATRIX_PORT";
 
+    static final String SERVER_NAME = "PORELO_MATRIX_SERVER_NAME";
+
+    /** The server name the unit gives the homeserver when its file names none. */
+    private static final String DEFAULT_SERVER_NAME = "localhost";
+
     private static final int FIRST_PORT = 8008;
 
     private static final int LAST_PORT = 8099;
@@ -64,26 +69,18 @@ final class LocalHomeserver {
         return Path.of(home, ".config", "porelo", "matrix");
     }
 
-    static Running ensure(final Map<String, String> env) throws Failure {
+    static Running ensure(final Map<String, String> env, final Unit unit) throws Failure {
         final Path dir = directory(env);
         final int port = port(dir.resolve("homeserver.conf"));
-        systemctl("show", UNIT, "-p", "LoadState", "--value")
-                .filter(state -> state.strip().equals("loaded"))
-                .orElseThrow(
-                        () ->
-                                new Failure(
-                                        Exit.CONFIG,
-                                        "the unit "
-                                                + UNIT
-                                                + " is not installed for this account:"
-                                                + " install the package porelo-matrix-homeserver, or name the project's homeserver"));
-        // Enabled, not only started: it then comes back after a boot without anybody logging in.
-        systemctl("enable", "--now", UNIT)
-                .orElseThrow(
-                        () ->
-                                new Failure(
-                                        Exit.CONFIG,
-                                        "systemctl --user enable --now " + UNIT + " failed"));
+        if (!unit.installed()) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the unit "
+                            + UNIT
+                            + " is not installed for this account:"
+                            + " install the package porelo-matrix-homeserver, or name the project's homeserver");
+        }
+        unit.start();
         final URI url = URI.create("http://127.0.0.1:" + port);
         awaitUp(url);
         return new Running(url, port, registrationToken(env));
@@ -154,6 +151,26 @@ final class LocalHomeserver {
         return port;
     }
 
+    /** The value a line {@code key=value} of the file gives, or null when none does. */
+    static @Nullable String setting(final Path conf, final String key) throws IOException {
+        for (final String line : Files.readAllLines(conf, StandardCharsets.UTF_8)) {
+            if (line.strip().startsWith(key + "=")) {
+                return line.strip().substring(key.length() + 1).strip();
+            }
+        }
+        return null;
+    }
+
+    /** The server name the unit starts the homeserver with: the file's, else its default. */
+    static String serverName(final Path conf) throws Failure {
+        try {
+            final @Nullable String name = Files.exists(conf) ? setting(conf, SERVER_NAME) : null;
+            return name == null || name.isEmpty() ? DEFAULT_SERVER_NAME : name;
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read " + conf + ": " + ex.getMessage(), ex);
+        }
+    }
+
     private static int freePort() throws Failure {
         for (int port = FIRST_PORT; port <= LAST_PORT; port++) {
             try (ServerSocket socket = new ServerSocket()) {
@@ -167,7 +184,7 @@ final class LocalHomeserver {
                 Exit.CONFIG, "no free loopback port between " + FIRST_PORT + " and " + LAST_PORT);
     }
 
-    private static void awaitUp(final URI url) throws Failure {
+    static void awaitUp(final URI url) throws Failure {
         awaitUp(url, START_TIMEOUT);
     }
 
@@ -267,6 +284,17 @@ final class LocalHomeserver {
                     "the homeserver's container and database",
                     "cannot run podman: " + ex.getMessage());
         }
+        final Path backups = Keep.backups(env);
+        if (Files.isDirectory(backups)) {
+            try (var walk = Files.walk(backups)) {
+                for (final Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                    Files.delete(path);
+                }
+                report.removed("the homeserver's backups, " + backups);
+            } catch (final IOException ex) {
+                report.kept(backups.toString(), ex.getMessage());
+            }
+        }
         final Path dir = directory(env);
         for (final String file : List.of("homeserver.conf", "registration-token")) {
             delete(
@@ -324,7 +352,7 @@ final class LocalHomeserver {
     }
 
     /** Runs {@code systemctl --user}, answering its output when it succeeded. */
-    private static Optional<String> systemctl(final String... args) throws Failure {
+    static Optional<String> systemctl(final String... args) throws Failure {
         final List<String> command = new ArrayList<>(List.of("systemctl", "--user"));
         command.addAll(List.of(args));
         try {

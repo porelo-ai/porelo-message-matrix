@@ -65,7 +65,8 @@ public final class Main {
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "clear" ->
-                        Lifecycle.run(args[0], rest, env, in, out, err);
+                        Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
+                case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");
                     return Exit.USAGE;

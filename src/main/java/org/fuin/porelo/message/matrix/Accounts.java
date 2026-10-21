@@ -110,6 +110,18 @@ final class Accounts {
         return session(answer);
     }
 
+    /**
+     * Logged in with its password as its one session: every other one logged out first, so a token
+     * lost to Porelo, or restored with a copy, is valid no more.
+     */
+    static Session alone(final MatrixClient anybody, final String localpart, final String password)
+            throws Failure {
+        final Session first = login(anybody, localpart, password);
+        anybody.as(first.accessToken())
+                .post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
+        return login(anybody, localpart, password);
+    }
+
     /** The account's own id, or null when the homeserver does not know the token. */
     static String whoami(final MatrixClient account) throws Failure {
         return account.get("/_matrix/client/v3/account/whoami").path("user_id").asText("");

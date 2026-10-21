@@ -14,6 +14,7 @@ Environment=PORELO_MATRIX_PORT=8008
 Environment=PORELO_MATRIX_SERVER_NAME=localhost
 EnvironmentFile=-%E/porelo/matrix/homeserver.conf
 Environment=PODMAN_SYSTEMD_UNIT=%n
+# Makes the registration token once, and the backup directory, which must exist before the mount.
 ExecStartPre=/usr/libexec/porelo/transports/porelo-message-transport-matrix homeserver-token
 # The shape podman's own quadlet generator gives a container unit, so a stop is a clean one. The container
 # is named outside `porelo-`, which is Porelo's own: every container named so is a task to it. It is acted on
@@ -27,8 +28,11 @@ ExecStart=/usr/bin/podman run --rm -d --cidfile=%t/%N.cid --name matrix-homeserv
     -e TUWUNEL_ADDRESS=0.0.0.0 -e TUWUNEL_PORT=8008 -e TUWUNEL_DATABASE_PATH=/data \
     -e TUWUNEL_ALLOW_FEDERATION=false -e TUWUNEL_ALLOW_REGISTRATION=true \
     -e TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/registration-token \
+    -e TUWUNEL_DATABASE_BACKUP_PATH=/backup -e TUWUNEL_DATABASE_BACKUPS_TO_KEEP=48 \
+    -e 'TUWUNEL_ADMIN_SIGNAL_EXECUTE=["server backup-database"]' \
     -v %E/porelo/matrix/registration-token:/run/secrets/registration-token:ro,Z \
     -v porelo-matrix-homeserver:/data \
+    -v %S/porelo/matrix/backups:/backup:Z \
     -p 127.0.0.1:${PORELO_MATRIX_PORT}:8008 \
     @IMAGE@
 ExecStop=/usr/bin/podman rm -v -f -i --cidfile=%t/%N.cid

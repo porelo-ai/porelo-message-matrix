@@ -7,11 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `backup <dir>` and `restore <dir>`, for a host's playbook: the local homeserver's conversation copied into a
+  directory and put back on another machine, its rooms, messages and people's accounts as they were. The
+  homeserver package keeps up to 48 online backups in `~/.local/state/porelo/matrix/backups`, made on
+  `SIGUSR2`; a restored relay hands over only what it had not, and the first `setup` after a restore takes the
+  administrator back, though Porelo's vault did not come with the copy.
+
 - A project on a homeserver elsewhere names its registration token's file as `registration_token_file`, so it
   can be set up through Porelo, which hands a transport no variable of the person's choosing; `settings` checks
   it while the project file is edited.
 
 ### Security
+
+- An account the transport takes back with a new password - one whose token Porelo lost, or one restored
+  from a copy - has every other session logged out, so no token it had before stays valid.
 
 - The running transport is not dumpable, so no other process of the account reads its tokens from `/proc`
   while it runs; a machine that refuses that gets 78.

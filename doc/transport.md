@@ -53,9 +53,33 @@ its environment; each prints one JSON object.
 - **The project's room is taken only if it is Porelo's:** made by its administrator, invite-only, guests
   forbidden. A room under the alias that is anybody else's, or was opened since, is refused (78) by
   `setup`, `enroll` and `join`, and `clear` leaves it and its members alone.
-- **Never a second administrator:** an `@porelo` Porelo holds no token for is refused (78). If its token is
-  refused and no `@porelo` exists, the homeserver was reset (78, saying so).
+- **Never a second administrator:** an `@porelo` Porelo holds no token for is refused (78), except by the first
+  `setup` after a `restore`, which takes it back. If its token is refused and no `@porelo` exists, the homeserver
+  was reset (78, saying so).
 - Names are lower-case letters, digits and `. _ = -`; a person's may not begin with `porelo`.
+
+## Keeping the conversation
+
+For a host's playbook, so the account's own homeserver outlives the machine; Porelo never runs these, and
+`describe` does not list them. Each takes an absolute directory and prints one JSON object.
+
+| Command | What it does | What it prints |
+|---|---|---|
+| `backup <dir>` | Into an empty `<dir>`: the poll positions, then an online backup the running homeserver makes (asked by `SIGUSR2`), its backup directory as it stands, and `homeserver.conf`. A second `backup` waits for the first | `{"backup": <id>}` |
+| `restore <dir>` | Before the first `setup`, with the unit stopped: puts a copy back - `homeserver.conf`, the backups, the poll positions - and has the homeserver restore the newest backup in a run of its own. Where the homeserver has a database already, it restores nothing and leaves it as it is | `{"restore": <id>}`, or `{"restore": "present"}` |
+
+- **`backup`:** 0 done; 75 when the homeserver is not running or no backup appears within 60 s; 78 without the
+  installed unit, or when `<dir>` is missing or not empty. A `backup` that fails leaves `<dir>` empty again.
+- **`restore`:** 0 restored or present; 78 when the unit runs without its database, when `<dir>` holds no whole
+  backup, a link, or anything but positions among the positions, when this account's `homeserver.conf` names another port or server name, or when backups or
+  poll positions of another database are here. A restore that fails takes away what it made.
+- **No message is handed over twice:** the positions are copied before the backup and no poll moves while
+  `backup` runs, so a restored relay hands over exactly what came after its last poll. What was sent after the
+  backup is not in the copy.
+- **The first `setup` after a restore** finds `@porelo` with no token in Porelo's vault, which is not copied, and
+  takes it back: a new password set in a run of the homeserver's own, its other sessions logged out. Only behind
+  the mark `restore` leaves, and only on the account's own homeserver; anywhere else the refusal stays. The relay
+  and each task enrolled again are taken back the same way, so no token restored with the copy stays valid.
 
 ## Messages
 

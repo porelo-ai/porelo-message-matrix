@@ -35,6 +35,7 @@ final class HomeserverToken {
         if (!args.isEmpty()) {
             throw new Failure(Exit.USAGE, "usage: homeserver-token");
         }
+        backups(env);
         final Path file = file(env);
         try {
             if (Files.exists(file)) {
@@ -80,6 +81,25 @@ final class HomeserverToken {
             throw new Failure(
                     Exit.CONFIG,
                     "cannot make the registration token " + file + ": " + ex.getMessage(),
+                    ex);
+        }
+    }
+
+    /**
+     * The directory the unit mounts for the homeserver's backups, which must exist before it does:
+     * the account's alone, since a backup holds every token and password hash.
+     */
+    private static void backups(final Map<String, String> env) throws Failure {
+        final Path dir = Keep.backups(env);
+        try {
+            if (!Files.isDirectory(dir)) {
+                Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
+            }
+            Files.setPosixFilePermissions(dir, OWNER_ONLY_DIR);
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot make the homeserver's backup directory " + dir + ": " + ex.getMessage(),
                     ex);
         }
     }

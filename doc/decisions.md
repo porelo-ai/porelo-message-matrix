@@ -17,6 +17,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [The transport brings the filter](#the-transport-brings-the-filter) | The transport's package depends on `porelo-message-sluice-filter`. |
 | [A homeserver's certificate: public, the operator's own, or - for development - unchecked](#a-homeservers-certificate-public-the-operators-own-or-for-development-unchecked) | A public certificate, a CA file, or the check switched off loudly for development. |
 | [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
+| [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 
 ## The homeserver is Tuwunel
 
@@ -279,4 +280,26 @@ Only a token that is not in the environment at all closes it, which changes Pore
 **What would change the answer:** Tuwunel offering a way to set a password that is not a room event; it
 would then replace the command. Porelo handing the tokens over on a pipe instead of the environment; the
 transport then reads them there and the window is gone.
+
+## After a restore, setup takes the administrator back
+
+**Decided:** the first `setup` after a `restore` takes `@porelo` back instead of refusing it: the unit
+stopped, one run of the homeserver's own program that sets a new password, the unit started, a login, and
+every other session of the account logged out. Only where `restore` left its mark, and only on the account's
+own homeserver; anywhere else an `@porelo` Porelo holds no token for is refused, as before. The relay and each
+task enrolled again are taken back by the admin room as before, their other sessions logged out too.
+
+**Why:** Porelo's vault is not copied with the conversation, so on a new machine nothing holds `@porelo`'s
+token, while the restored database has `@porelo`. Refusing loses the room at every new machine. Logging the
+other sessions out makes every token the copy holds worthless once its account is taken back.
+
+**Risk accepted:** the new password reaches the run in its environment - `TUWUNEL_ADMIN_EXECUTE`, which podman
+takes from its own environment, so it is on no command line - and the run repeats it on its standard output,
+which is discarded, with `--log-driver=none` keeping it out of the journal. For the run's second or so it is
+readable in the environment of podman and of the container, by the account alone. Whoever can run `restore`
+and `setup` becomes the restored homeserver's administrator, which that account is already, owning the
+database.
+
+**What would change the answer:** Tuwunel setting a password from a file or standard input, which would then
+replace the environment; Porelo's vault coming with the copy, which would make the taking back unneeded.
 

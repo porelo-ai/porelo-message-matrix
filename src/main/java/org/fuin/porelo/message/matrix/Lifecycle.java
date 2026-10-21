@@ -57,7 +57,8 @@ final class Lifecycle {
             final Map<String, String> env,
             final InputStream in,
             final PrintStream out,
-            final PrintStream err)
+            final PrintStream err,
+            final Unit unit)
             throws Failure {
         if ("clear".equals(verb) && args.isEmpty()) {
             // The account's own homeserver and what the transport keeps: no project, so no settings
@@ -95,7 +96,7 @@ final class Lifecycle {
         }
         final ObjectNode answer =
                 switch (verb) {
-                    case "setup" -> setup(options, settings, env);
+                    case "setup" -> setup(options, settings, env, unit);
                     case "enroll" -> enroll(options, settings, env);
                     case "retire" -> retire(options, settings, env);
                     case "join" -> join(options, settings, env);
@@ -117,13 +118,16 @@ final class Lifecycle {
     // ------------------------------------------------------------------------------------------
 
     private static ObjectNode setup(
-            final Options options, final Settings settings, final Map<String, String> env)
+            final Options options,
+            final Settings settings,
+            final Map<String, String> env,
+            final Unit unit)
             throws Failure {
         final URI url;
         final String reaches;
         final String registrationToken;
         if (settings.homeserver() == null) {
-            final LocalHomeserver.Running local = LocalHomeserver.ensure(env);
+            final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
             url = local.url();
             reaches = "127.0.0.1:" + local.port();
             registrationToken = local.registrationToken();
@@ -140,7 +144,8 @@ final class Lifecycle {
         }
         final MatrixClient nobody = client(url, "", settings);
 
-        final Accounts.Session admin = admin(nobody, env, registrationToken);
+        final Accounts.Session admin =
+                admin(nobody, env, registrationToken, settings.homeserver() == null ? unit : null);
         final MatrixClient asAdmin = nobody.as(admin.accessToken());
         AdminRoom.of(asAdmin, admin.userId());
         final String server = AdminRoom.server(admin.userId());
@@ -165,19 +170,24 @@ final class Lifecycle {
     }
 
     /**
-     * The provisioning account: the one Porelo holds, or the first one registered now. Never a
-     * second.
+     * The provisioning account: the one Porelo holds, the first one registered now, or - on the
+     * account's own homeserver just restored from a copy, whose vault did not come with it - the
+     * restored one taken back. Never a second.
      */
     private static Accounts.Session admin(
             final MatrixClient nobody,
             final Map<String, String> env,
-            final String registrationToken)
+            final String registrationToken,
+            @Nullable final Unit local)
             throws Failure {
         final String token = env.get(Config.ADMIN_TOKEN);
         if (token != null && !token.isBlank()) {
             return new Accounts.Session(adminId(nobody, nobody.as(token)), token);
         }
         if (!Accounts.available(nobody, ADMIN)) {
+            if (local != null && Keep.restored(env)) {
+                return Keep.retake(nobody, nobody.config().homeserver(), env, local);
+            }
             // Which token was lost cannot be told from here, and a second administrator is not what
             // was meant.
             throw new Failure(
@@ -607,7 +617,9 @@ final class Lifecycle {
             return Accounts.register(nobody, localpart, password, registrationToken);
         }
         AdminRoom.of(admin, adminId).setPassword(id, password);
-        return Accounts.login(nobody, localpart, password);
+        // Whoever held its lost token - a copy restored here holds every token it had - holds
+        // nothing now.
+        return Accounts.alone(nobody, localpart, password);
     }
 
     /**
