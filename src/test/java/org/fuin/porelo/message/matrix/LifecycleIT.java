@@ -12,7 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -215,6 +217,104 @@ class LifecycleIT {
         assertThat(polled.exit())
                 .as("the relay's poll after setup anew: %s", polled.err())
                 .isEqualTo(Exit.OK);
+    }
+
+    /**
+     * Harm guarded: a person's account is one on the homeserver, not one per project, so clearing
+     * one project deactivated it and cut the person off from every other project too, with no way
+     * back.
+     */
+    @Test
+    @DisplayName(
+            "clear --project leaves active a member who is in another project's room too, and says so in kept")
+    void clearKeepsAMemberOfAnotherProject() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode other = run(kept, "setup", "--project", "other");
+        run(kept, "join", "--project", PROJECT, "--person", "ann");
+        final String password =
+                run(kept, "join", "--project", "other", "--person", "ann", "--reset")
+                        .path("login")
+                        .path("password")
+                        .asText();
+        final String carolPassword =
+                run(kept, "join", "--project", PROJECT, "--person", "carol")
+                        .path("login")
+                        .path("password")
+                        .asText();
+        final String server = Tuwunel.SERVER_NAME;
+
+        final JsonNode cleared = run(kept, "clear", "--project", PROJECT);
+
+        assertThat(cleared.path("removed"))
+                .extracting(JsonNode::asText)
+                .as("only the project's own accounts go")
+                .contains("the account @carol:" + server)
+                .doesNotContain("the account @ann:" + server);
+        assertThat(cleared.path("kept"))
+                .as("the member kept, with the room that keeps her")
+                .anySatisfy(
+                        entry -> {
+                            assertThat(entry.path("what").asText())
+                                    .isEqualTo("the account @ann:" + server);
+                            assertThat(entry.path("why").asText())
+                                    .contains("#porelo-other:" + server);
+                        });
+        assertThat(login("carol", carolPassword))
+                .as("carol, only in the cleared project, is deactivated")
+                .isEmpty();
+        final String token = login("ann", password);
+        assertThat(token).as("ann still logs in").isNotEmpty();
+        assertThat(joinedRooms(token))
+                .as("ann is still in the other project's room, and no longer in the cleared one")
+                .contains(other.path("conversation").asText())
+                .doesNotContain(setup.path("conversation").asText());
+    }
+
+    /** An access token for a person, as their Matrix client would log in; empty when refused. */
+    private String login(final String user, final String password)
+            throws IOException, InterruptedException {
+        final HttpResponse<String> response =
+                HttpClient.newHttpClient()
+                        .send(
+                                HttpRequest.newBuilder(
+                                                URI.create(
+                                                        tuwunel.url() + "/_matrix/client/v3/login"))
+                                        .header("Content-Type", "application/json")
+                                        .POST(
+                                                HttpRequest.BodyPublishers.ofString(
+                                                        MatrixClient.JSON
+                                                                .createObjectNode()
+                                                                .put("type", "m.login.password")
+                                                                .put("user", user)
+                                                                .put("password", password)
+                                                                .toString()))
+                                        .build(),
+                                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            return "";
+        }
+        return MatrixClient.JSON.readTree(response.body()).path("access_token").asText();
+    }
+
+    private List<String> joinedRooms(final String token) throws IOException, InterruptedException {
+        final HttpResponse<String> response =
+                HttpClient.newHttpClient()
+                        .send(
+                                HttpRequest.newBuilder(
+                                                URI.create(
+                                                        tuwunel.url()
+                                                                + "/_matrix/client/v3/joined_rooms"))
+                                        .header("Authorization", "Bearer " + token)
+                                        .build(),
+                                HttpResponse.BodyHandlers.ofString());
+        final List<String> rooms = new ArrayList<>();
+        MatrixClient.JSON
+                .readTree(response.body())
+                .path("joined_rooms")
+                .forEach(room -> rooms.add(room.asText()));
+        return rooms;
     }
 
     @Test

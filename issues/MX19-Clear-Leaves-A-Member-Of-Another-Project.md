@@ -1,6 +1,6 @@
 # MX19 — Clear Leaves A Member Of Another Project
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one loop in `Lifecycle.clear` and the sentence in `doc/transport.md` that says what it deactivates;
 the answer's shape (`removed`, `kept`) stays, and an integration test with the real homeserver.
 
@@ -42,8 +42,3 @@ who is in projects A and B is deactivated by `clear --project A` and loses B too
 - The person only in A is deactivated and named in `removed`; the guard is seen to fail when the check is
   broken on purpose so that it keeps every member.
 - `clear --project A` run twice still exits 0 and the second run finds nothing.
-
-## To be checked
-
-- Whether `deleteRoom` of A takes a kept person out of A's room on its own, read on the pinned Tuwunel in the
-  integration test, so nothing of A stays in that person's room list.

@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -360,6 +361,7 @@ final class Lifecycle {
                                 place.adminId(),
                                 alias(project, server),
                                 found.path("room_id").asText());
+                final Map<String, String> elsewhere = membersElsewhere(place.admin(), server, room);
                 for (final JsonNode member :
                         place.admin()
                                 .get(
@@ -373,6 +375,13 @@ final class Lifecycle {
                             || id.equals(place.adminId())
                             || !id.endsWith(":" + server)
                             || !("join".equals(membership) || "invite".equals(membership))) {
+                        continue;
+                    }
+                    // One account per person on the homeserver: deactivated, it would lose every
+                    // other project too.
+                    final String other = elsewhere.get(id);
+                    if (other != null) {
+                        report.kept("the account " + id, "a member of " + other + " too");
                         continue;
                     }
                     try {
@@ -398,6 +407,35 @@ final class Lifecycle {
         forgetPosition(
                 stateDir, Poll.key(place.nobody().config(), relay), relay, report, POLL_WAIT);
         return report.answer();
+    }
+
+    /**
+     * Who is joined or invited in another project's room than {@code room}, each with that room's
+     * alias: the rooms the administrator is in whose alias is a project's.
+     */
+    private static Map<String, String> membersElsewhere(
+            final MatrixClient admin, final String server, final String room) throws Failure {
+        final Map<String, String> members = new HashMap<>();
+        for (final JsonNode joined :
+                admin.get("/_matrix/client/v3/joined_rooms").path("joined_rooms")) {
+            final String id = joined.asText("");
+            if (id.isEmpty() || id.equals(room)) {
+                continue;
+            }
+            final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(id);
+            final JsonNode canonical = admin.find(path + "/state/m.room.canonical_alias");
+            final String alias = canonical == null ? "" : canonical.path("alias").asText("");
+            if (!alias.startsWith("#porelo-") || !alias.endsWith(":" + server)) {
+                continue;
+            }
+            for (final JsonNode member : admin.get(path + "/members").path("chunk")) {
+                final String membership = member.path("content").path("membership").asText("");
+                if ("join".equals(membership) || "invite".equals(membership)) {
+                    members.putIfAbsent(member.path("state_key").asText(""), alias);
+                }
+            }
+        }
+        return members;
     }
 
     /** How long {@code clear} waits for the relay's poll to end: its long sync and a margin. */

@@ -34,7 +34,7 @@ its environment; each prints one JSON object.
 | `enroll --project P --task T [--display N] [--loopback-only]` | The account `@<T>` in the room, shown as the nickname `N` (1 to 64 characters, no control characters, `@` or `:`) or else as `T`; enrolled again with another, renamed, its id kept | `secrets` (the task's environment), `address` (its user id) |
 | `retire --project P --task T` | Deactivates `@<T>` | `{}` |
 | `join --project P --person N [--reset] [--loopback-only]` | A person's account in the room, with a new password; a second join is refused (77) without `--reset` | `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once |
-| `clear --project P` | Deactivates every account in the project's room (its tasks', its relay's, its people's), deletes the room with its alias, and forgets the relay's poll position | `removed` (what went) and `kept` (each `what` and `why`) |
+| `clear --project P` | Deactivates every account in the project's room (its tasks', its relay's, its people's) that is in no other project's room, deletes the room with its alias, and forgets the relay's poll position. An account in another project's room too stays active there and is named in `kept` | `removed` (what went) and `kept` (each `what` and `why`) |
 | `clear` | The account's own homeserver once no project uses it: stops and disables it, removes its container and database, its port and registration token, and every poll position. Reads no settings | the same |
 | `settings` | Checks the settings as a draft, with no network and no environment | `{"refused": […], "warnings": […]}` |
 

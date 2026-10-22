@@ -40,6 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `clear --project` leaves active an account that is in another project's room too - a person in two projects, or
+  a task whose name both give - and names it in `kept`; before, it was deactivated and lost the other project.
 - A person's message with a mention link that is no valid escape no longer stops every later poll of the room.
 - `enroll`, `join`, `retire` and `clear` refuse the homeserver kept from `setup` in plain http on another host
   (78), and under `--loopback-only` one that is not loopback, before any request.
