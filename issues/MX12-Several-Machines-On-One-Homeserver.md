@@ -1,6 +1,6 @@
 # MX12 — Several Machines On One Homeserver
 
-**Status:** Backlog; waits for the operator's answers on its central mode, asked in the channel.
+**Status:** Backlog.
 **Size:** L - every lifecycle verb gets a second, central mode, `describe` and the settings change a contract
 Porelo reads, and its acceptance needs two machines on one homeserver.
 
@@ -87,9 +87,23 @@ on another machine's accounts.
   - `Listener` checks only plain `http` on loopback, so a central `https` homeserver passes it; the two-VM
     acceptance names the central homeserver's CA with `ca_file`.
   - `backup`, `restore` and `clear` without `--project` stay the account's own local homeserver's.
-- **The modes:** the account's own loopback homeserver and a homeserver elsewhere that one machine provisions
-  keep today's paths byte for byte. The central mode's choice of switch is under the operator's question in the
-  channel; `LifecycleIT` names a `homeserver` in every test today.
+- **The modes, decided:** a `homeserver` in the settings is always the central one; the mode where one machine
+  provisions a homeserver elsewhere as its administrator ends. The account's own loopback homeserver keeps today's
+  paths byte for byte. What follows:
+  - `Settings`, `SettingsCheck`: `homeserver` without `room` is refused (78), where `SettingsTest` and
+    `SettingsCheckTest` hold it valid today.
+  - `LifecycleIT` names a `homeserver` in every test: its loopback-mode tests move to a `Unit` that starts a test
+    homeserver as the account's own, and the central tests take `room` and `--machine`.
+  - `doc/transport.md`, `doc/homeserver.md` and `doc/decisions.md` drop the homeserver elsewhere with its
+    administrator; the changelog names the change under *Changed*, with what a project on such a homeserver does
+    now: name its room, invite each machine, and enroll its tasks again.
+  - `clear --project`, central: this machine's relay and tasks deactivate themselves; the room, other machines'
+    and people's accounts stay. People are managed at the homeserver.
+  - A room a person made is taken when it is invite-only with guests forbidden; the creator check goes.
+  - **One registration token per machine**, each in that machine's `registration_token_file`. Measured on the
+    pinned image: a token issued by the homeserver's administrator (`POST /_synapse/admin/v1/registration_tokens/new`)
+    registers, the configured one still does, a wrong or revoked one is `M_FORBIDDEN`. Issuing and revoking a
+    machine's token is the homeserver's administrator's, a person's, and `doc/homeserver.md` says how.
 - **Tests:** `LifecycleIT` against one Tuwunel named as `homeserver`, two `--machine` names standing for
   two machines: each refusal of the acceptance seen red first there. Then the two-machine acceptance on
   two local VMs, the test VM and a second one beside it, with the central homeserver on one of the two;
@@ -108,16 +122,18 @@ on another machine's accounts.
   - a `--machine` name another machine holds is refused with 78;
   - `join` on a central homeserver answers 77;
   - a machine not yet invited starts no task.
-- porelo's `vault clear` of a project on the homeserver elsewhere deactivates its accounts there - a person's
-  password login, taken before, is refused after it - and leaves Porelo's other accounts and every other project
-  there alone; a new vault and a start in the project then succeed. Walked on a rented machine. The token reaches
-  the transport through `registration_token_file`.
+- porelo's `vault clear` of a project on the central homeserver deactivates this machine's accounts there and
+  leaves the room, people's and other machines' accounts alone; a new vault and a start in the project then
+  succeed. Walked on a rented machine. The machine's own token reaches the transport through
+  `registration_token_file`.
 
-## To be checked
+## Measured
 
-- Whether Tuwunel lets an account deactivate itself and change its own password over the client API with
-  password user-interactive auth, as the plan's `retire` needs. Measured against the pinned image; mine.
-- Whether a member given the power to invite, not an administrator, is enough to invite the relay and the
-  tasks into a room a person made. Measured against Tuwunel; mine.
-- Whether Tuwunel takes several registration tokens, so each machine could have one of its own; the settings'
-  `registration_token_file` is read today, by `elsewhereToken`.
+Against the pinned Tuwunel, in a container of its own on the host:
+- An account changes its own password (`/account/password`) and deactivates itself (`/account/deactivate`), each
+  with password user-interactive auth and no administrator. Deactivated, its login is `M_USER_DEACTIVATED`, and it
+  has left the room.
+- In a room a person made with the preset `private_chat`, an invited and joined machine may invite its tasks at
+  once: the preset's invite level is 0. The person's steps in `doc/homeserver.md` include forbidding guests, which
+  the room check asks for; what the preset sets for guests is read when it is built.
+- Several registration tokens: see *The modes, decided*.
