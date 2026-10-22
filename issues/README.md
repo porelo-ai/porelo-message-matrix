@@ -18,11 +18,11 @@ sequence.
 | <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 
-## Accepted
+## Analyzed
 
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | - | - | Two projects' tasks never share one account when their names run together, `porelo-a-b-c` from `a-b`/`c` and `a`/`b-c` |
+| # | Size | Blocked by | Open questions | What it covers |
+|---|---|---|---|---|
+| <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | S | - | 0 | Two projects' tasks never share one account when their names run together; enroll and retire refuse a task account that is another project's |
 
 ## Idea
 
