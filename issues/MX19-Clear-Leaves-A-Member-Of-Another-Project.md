@@ -19,8 +19,9 @@ who is in projects A and B is deactivated by `clear --project A` and loses B too
 - **Read in today's code:** `Lifecycle.clear` (`Lifecycle.java:325`) walks the room's members and calls
   `AdminRoom.deactivate` (`AdminRoom.java:180`) on every joined or invited account of the server but `@porelo`,
   then deletes the room. Nothing asks whether a member is in another room. The relay is `@porelo-relay-<P>`, one
-  per project, so it is never in two; a person (`join`, `@<N>`) can be; a task (`enroll`, `@<T>`) only if Porelo
-  gives two projects' tasks the same name, which is asked under *To be checked*.
+  per project, so it is never in two. A person (`join`, `@<N>`) can be, and so can a task (`enroll`, `@<T>`):
+  Porelo passes the container's name `porelo-<project>-<task>` as `--task`, and project `a-b` with task `c` gives
+  the same name as project `a` with task `b-c`. So the check covers every member, not only people.
 - **Steps:**
   1. Before the loop, the other Porelo rooms: `@porelo`'s `/joined_rooms`, less this one, each taken only where
      `ours(...)` holds, as `clear` already judges its own room. Their members are read through
@@ -52,7 +53,5 @@ who is in projects A and B is deactivated by `clear --project A` and loses B too
 
 ## To be checked
 
-- With Agent Core: whether two projects' tasks can be enrolled under the same `--task` name, so that a task's
-  account can be in two rooms; if they can, the same check covers it.
 - Whether `deleteRoom` of A takes a kept person out of A's room on its own, read on the pinned Tuwunel in the
   integration test, so nothing of A stays in that person's room list.

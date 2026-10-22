@@ -28,6 +28,12 @@ sequence.
 | <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | 1 | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 | <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | S | - | 1 | Clearing one project never cuts a person off from another project on the same homeserver |
 
+## Idea
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | - | - | Two projects' tasks never share one account when their names run together, `porelo-a-b-c` from `a-b`/`c` and `a`/`b-c` |
+
 ## Estimated
 
 | # | Size | Blocked by | What it covers |
