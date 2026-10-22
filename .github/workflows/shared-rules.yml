@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
     check:
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         # GitHub's default is six hours, every minute of it paid; the checks and the tagged tests take a few.
         timeout-minutes: 10
         steps:
