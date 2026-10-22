@@ -1,6 +1,6 @@
 # MX12 — Several Machines On One Homeserver
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** L - every lifecycle verb gets a second, central mode, `describe` and the settings change a contract
 Porelo reads, and its acceptance needs two machines on one homeserver.
 

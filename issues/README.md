@@ -9,11 +9,6 @@ sequence.
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 | <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | S | - | Clearing one project never cuts a person off from another project on the same homeserver |
 | <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 | <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | S | - | Two projects' tasks never share one account when their names run together; enroll and retire refuse a task account that is another project's |

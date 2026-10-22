@@ -1,6 +1,6 @@
 # MX20 — The Local Homeserver Is Proven The Account's Own
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** M - a check before every request to a plain-`http` loopback homeserver, in the one place every verb
 reads its URL, with a measurement of who owns the listener of a rootless container on the VM; nothing another
 repository reads changes.

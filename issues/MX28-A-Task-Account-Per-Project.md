@@ -1,6 +1,6 @@
 # MX28 — A Task Account Per Project
 
-**Status:** Implementing; porelo's [B246](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b246)
+**Status:** Review; porelo's [B246](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b246)
 makes the names themselves unambiguous.
 **Size:** S - one check in `enroll` and one in `retire`, the refusal in `doc/transport.md`, an integration test with
 the real homeserver.

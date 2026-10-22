@@ -1,6 +1,6 @@
 # MX19 — Clear Leaves A Member Of Another Project
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one loop in `Lifecycle.clear` and the sentence in `doc/transport.md` that says what it deactivates;
 the answer's shape (`removed`, `kept`) stays, and an integration test with the real homeserver.
 
