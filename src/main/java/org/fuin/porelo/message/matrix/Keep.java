@@ -394,9 +394,23 @@ final class Keep {
                 StandardOpenOption.WRITE);
     }
 
-    /** For a poll: waits while a backup holds it, which takes seconds. */
-    static FileLock shared(final FileChannel channel) throws IOException {
-        return channel.lock(0, Long.MAX_VALUE, true);
+    /**
+     * For a poll: 75 while a backup holds it, never a wait, so a backup that hangs never hangs the
+     * polls with it; Porelo polls again.
+     */
+    static FileLock shared(final FileChannel channel) throws IOException, Failure {
+        @Nullable FileLock lock;
+        try {
+            lock = channel.tryLock(0, Long.MAX_VALUE, true);
+        } catch (final OverlappingFileLockException ex) {
+            lock = null;
+        }
+        if (lock == null) {
+            throw new Failure(
+                    Exit.TEMPORARY,
+                    "a backup is copying the poll positions; poll again once it has ended");
+        }
+        return lock;
     }
 
     private static FileLock exclusive(final FileChannel channel) throws IOException, Failure {

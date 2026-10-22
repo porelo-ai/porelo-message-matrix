@@ -108,7 +108,7 @@ final class Poll {
                     "cannot create the state directory " + stateDir + ": " + ex.getMessage(),
                     ex);
         }
-        // Shared with every other poll, and waited for while a backup copies the positions: none
+        // Shared with every other poll, and refused while a backup copies the positions: none
         // moves between that copy and the backup.
         try (FileChannel keep = Keep.lockFile(stateDir);
                 FileLock kept = Keep.shared(keep);

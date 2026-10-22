@@ -111,7 +111,8 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
   could never read it. nheko and Element encrypt a chat they open by default, so the person opens it
   again with encryption off. An encrypted message in any room is named on stderr, never lost silently.
 - **`poll` saves its position only after the files are written**: a crash delivers a message twice,
-  never skips one. One poll per account at a time (75 for a second).
+  never skips one. One poll per account at a time (75 for a second), and none while `backup` copies the
+  positions (75, never a wait).
 - **A position from an earlier database is refused** (78): `poll` keeps the rooms beside its position
   and stops when the account is in none of them.
 
@@ -125,7 +126,7 @@ tries again; every other code refuses it.
 | 0 | Done |
 | 64 | Arguments not in the contract's shape |
 | 65 | The message cannot be carried: not UTF-8, or too large |
-| 75 | Temporary: the homeserver unreachable or busy, or another poll running |
+| 75 | Temporary: the homeserver unreachable or busy, another poll running, or a backup copying the positions |
 | 76 | An answer the transport does not understand, or a redirect |
 | 77 | Refused by the homeserver: the token, or a room the account is not in |
 | 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver; or a machine that will not keep the tokens from the account's other processes |

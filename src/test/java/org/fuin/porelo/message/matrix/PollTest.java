@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -148,7 +150,7 @@ class PollTest {
         assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
         final Path lockFile;
         try (Stream<Path> files = Files.list(dir.resolve("state/porelo/transports/matrix"))) {
-            lockFile = files.filter(f -> f.toString().endsWith(".lock")).findFirst().orElseThrow();
+            lockFile = files.filter(PollTest::accountLock).findFirst().orElseThrow();
         }
         homeserver.answer(200, WHOAMI);
 
@@ -171,7 +173,7 @@ class PollTest {
         assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
         final Path lockFile;
         try (Stream<Path> files = Files.list(dir.resolve("state/porelo/transports/matrix"))) {
-            lockFile = files.filter(f -> f.toString().endsWith(".lock")).findFirst().orElseThrow();
+            lockFile = files.filter(PollTest::accountLock).findFirst().orElseThrow();
         }
         homeserver.answer(200, WHOAMI);
         final Process holder =
@@ -196,6 +198,50 @@ class PollTest {
             holder.waitFor();
         }
         assertThat(stderr()).contains("another poll for this account is running");
+    }
+
+    /**
+     * Harm guarded: a backup that hangs while it holds the positions would hang every poll of the
+     * account, and Porelo would wait on each without end. The backup's lock is held by another
+     * process here, as a running backup would hold it.
+     */
+    @Test
+    @DisplayName("While a backup holds the positions, the poll is 75 at once rather than waiting")
+    void aBackupHoldsThePositions() throws Exception {
+        homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, "{\"next_batch\":\"s1\"}");
+        assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
+        final Path keepLock = dir.resolve("state/porelo/transports/matrix").resolve(Keep.LOCK);
+        assertThat(keepLock).as("the lock every poll shares with a backup").exists();
+        homeserver.answer(200, WHOAMI);
+        final Process holder =
+                new ProcessBuilder(
+                                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                                "-cp",
+                                System.getProperty("java.class.path"),
+                                LockHolder.class.getName(),
+                                keepLock.toString())
+                        .redirectError(ProcessBuilder.Redirect.INHERIT)
+                        .start();
+        try {
+            final java.io.BufferedReader said =
+                    new java.io.BufferedReader(
+                            new java.io.InputStreamReader(
+                                    holder.getInputStream(), StandardCharsets.UTF_8));
+            assertThat(said.readLine()).as("the other process").isEqualTo("held");
+
+            final int exit = assertTimeoutPreemptively(Duration.ofSeconds(20), () -> poll());
+            assertThat(exit).as(stderr()).isEqualTo(Exit.TEMPORARY);
+        } finally {
+            holder.getOutputStream().close();
+            holder.waitFor();
+        }
+        assertThat(stderr()).contains("a backup is copying the poll positions");
+    }
+
+    /** The account's own lock, never the one every poll shares with a backup. */
+    private static boolean accountLock(final Path file) {
+        final String name = file.getFileName().toString();
+        return name.endsWith(".lock") && !name.equals(Keep.LOCK);
     }
 
     @Test
