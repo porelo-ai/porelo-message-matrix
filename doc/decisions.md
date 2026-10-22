@@ -16,7 +16,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [The local homeserver is chosen, never pulled in](#the-local-homeserver-is-chosen-never-pulled-in) | `Provides: porelo-homeserver`; the transport neither depends on it nor recommends it. |
 | [The transport brings the filter](#the-transport-brings-the-filter) | The transport's package depends on `porelo-message-sluice-filter`. |
 | [A homeserver's certificate: public, the operator's own, or - for development - unchecked](#a-homeservers-certificate-public-the-operators-own-or-for-development-unchecked) | A public certificate, a CA file, or the check switched off loudly for development. |
-| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
+| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 
 ## The homeserver is Tuwunel
@@ -256,6 +256,12 @@ goes, and the CA file is the only way to trust an unusual certificate.
 - **A homeserver over plain `http` is taken only on this machine's loopback.** Elsewhere every request
   would carry an account's token readable to anyone on the way, so it is refused (78), in the settings and
   in the environment.
+- **A token goes to a plain-`http` loopback port only when the account itself listens there.** Before every
+  request, the kernel's tables of listening sockets (`/proc/net/tcp`, `/proc/net/tcp6`) name the
+  owner of the port, on its own address or a wildcard. Another uid is refused (78) before any request: while
+  the account's own homeserver is down, another account of the machine can take its port. Measured: the
+  local homeserver's published port belongs to the account itself (rootless podman's `pasta`), and a
+  listener in a user namespace of its own shows a sub-uid, as another account's would.
 - **A password reset is redacted from the admin room at once.** Tuwunel sets a password only through an
   admin-room command, and the command and the server's reply both hold it. Both are redacted right after,
   so no event the homeserver serves still holds the password.
@@ -276,6 +282,11 @@ homeserver's database is a podman volume of the account itself, readable by no o
 under `strace`; a shell loop reading `/proc/<pid>/environ` right after each start caught the token in 25 of
 300 starts. A process of the account that watches `/proc` for the transport's starts can still take a token.
 Only a token that is not in the environment at all closes it, which changes Porelo's contract.
+
+**Risk accepted:** between the check of the port's owner and the connection there is a window of
+milliseconds. Another account cannot bind a port this account holds, so only a homeserver that dies in that
+window lets another account take the port before the request. A socket the account alone can open would
+close it, which changes porelo's and porelo-frontend's side too.
 
 **What would change the answer:** Tuwunel offering a way to set a password that is not a room event; it
 would then replace the command. Porelo handing the tokens over on a pipe instead of the environment; the

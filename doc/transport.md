@@ -18,6 +18,8 @@ From the environment, never from an argument:
 | `XDG_STATE_HOME`, else `HOME` | Where `poll` keeps its position: `…/porelo/transports/matrix/` |
 
 - **No redirect is followed** (76), so the token reaches no other server.
+- **A plain-`http` loopback port another uid listens on is 78**, before any request, so no other account of the
+  machine receives a token while the account's own homeserver is down.
 - **A certificate that is not trusted is 78**, before any request. The built-in authorities are fixed
   when the executable is built: a CA added to the machine's store changes nothing, `PORELO_MATRIX_CA_FILE`
   does. A CA file together with `off` is refused.
@@ -129,6 +131,6 @@ tries again; every other code refuses it.
 | 75 | Temporary: the homeserver unreachable or busy, another poll running, or a backup copying the positions |
 | 76 | An answer the transport does not understand, or a redirect |
 | 77 | Refused by the homeserver: the token, or a room the account is not in |
-| 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver; or a machine that will not keep the tokens from the account's other processes |
+| 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver, a loopback port another uid listens on; or a machine that will not keep the tokens from the account's other processes |
 
 The reason goes to stderr, and never contains a token.

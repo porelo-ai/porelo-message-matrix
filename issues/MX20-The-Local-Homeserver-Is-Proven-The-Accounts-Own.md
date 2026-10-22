@@ -1,6 +1,6 @@
 # MX20 — The Local Homeserver Is Proven The Account's Own
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - a check before every request to a plain-`http` loopback homeserver, in the one place every verb
 reads its URL, with a measurement of who owns the listener of a rootless container on the VM; nothing another
 repository reads changes.
@@ -33,28 +33,30 @@ loopback against anyone on the way; another account on the same machine is not o
   account's own at the request, but for a window of milliseconds while this account's homeserver dies between
   the two: the accepted risk. Nothing another repository reads changes.
 - **Steps:**
-  1. A small class `Listener` that reads the table from a path it is given, so a test can hand it a file, and
-     answers the owner of a listening socket on an address and port, or none.
-  2. `Config.homeserver` and `LocalHomeserver.ensure` (after `awaitUp`, before the registration token) call it
-     for plain `http` on loopback; `https` keeps its certificate check as today.
-  3. `doc/transport.md` names the 78, and `doc/decisions.md`'s row on plain `http` on loopback says another
-     account's listener is refused, with the window left as the accepted risk.
-- **The test that goes red first:** `ListenerTest`, on a table copied from a real one read on the VM, with the
-  port's listener owned by another uid: today `Config.homeserver` lets the URL through; after, 78. Then on the VM,
-  in the test account: a listener on the homeserver's port in a container with its own user namespace (owned by a
-  sub-uid, as another account's would be), the unit stopped - `enroll` refuses before any request, seen by the
-  listener receiving nothing.
+  1. `Listener` reads the tables from paths it is given, so a test can hand it files, and refuses (78) a
+     listener of the port, on its address or a wildcard, whose uid is not the process's own. Nothing listening
+     is left to the connection, which fails as unreachable (75), as before.
+  2. `MatrixClient`'s constructor calls it, the one place every verb's requests start from; `setup`'s client
+     is made after the local homeserver answers. `https` keeps its certificate check as today.
+  3. `doc/transport.md` names the 78, and `doc/decisions.md` says another account's listener is refused, with
+     the window left as the accepted risk.
+- **The test that goes red first:** `LoopbackOwnerIT`: a listener on a free loopback port in a container with
+  a user namespace of its own (a sub-uid, as another account's would be), and `poll` with a token against it.
+  Today the listener receives the request with the token; after, 78 and nothing received.
 
 ## Acceptance
 
-- `ListenerTest` red on today's code, green after; a table without the port, and one where the port is only
-  connected, not listening, are each refused, so the check cannot pass on a missing row.
-- On the VM, in the test account: with the homeserver up, `setup`, `enroll`, `poll` and `send` work as before; with another
-  uid's listener on the port, each exits 78 and that listener logs no request.
-- The guard is seen to fail when the owner comparison is broken on purpose.
+- `LoopbackOwnerIT` red on today's code, green after; it runs where podman does, and is skipped, with its
+  reason, where the homeserver runs as the test's own binary.
+- `ListenerTest` on tables in the kernel's format: another uid on `127.0.0.1`, on `0.0.0.0`, on `::` or mapped
+  into IPv6 is 78; the account's own listener, another port, and a socket only connected to the port pass.
+- Every integration test against the native executable reaches its homeserver through the check.
+- Both are seen to fail when the owner comparison is broken on purpose.
 
-## To be checked
+## Measured
 
-- On the VM, whose uid the kernel shows for the listener of the homeserver's rootless container (pasta or
-  rootlessport): it must be the account's own, or the check needs the container's process instead.
-- Whether the native image reads `/proc/net/tcp` as the JVM does, measured with the built executable.
+- On the VM in rootless podman: the local homeserver's published loopback port is listened on by `pasta` under
+  the account's own uid; a listener in a user namespace of its own, on the host's network, shows a sub-uid
+  (166536 for uid 1009), so the check tells it from the account itself.
+- The native executable reads the tables and its own uid as the JVM does: every integration test against it
+  reaches its homeserver on plain-`http` loopback through the check.

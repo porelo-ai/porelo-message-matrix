@@ -15,7 +15,9 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import org.jspecify.annotations.Nullable;
@@ -36,8 +38,16 @@ final class MatrixClient {
 
     private final HttpClient http;
 
+    private final List<Path> tables;
+
     MatrixClient(final Config config) throws Failure {
+        this(config, Listener.TABLES);
+    }
+
+    /** With the kernel's socket tables read from {@code tables}, so a test can give its own. */
+    MatrixClient(final Config config, final List<Path> tables) throws Failure {
         this.config = config;
+        this.tables = tables;
         // A redirect would carry the token to wherever the homeserver points, so none is followed.
         final HttpClient.Builder builder =
                 HttpClient.newBuilder()
@@ -70,7 +80,8 @@ final class MatrixClient {
      */
     MatrixClient as(final String accessToken) throws Failure {
         return new MatrixClient(
-                new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()));
+                new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()),
+                tables);
     }
 
     /**
@@ -156,6 +167,9 @@ final class MatrixClient {
     }
 
     private HttpResponse<byte[]> send(final HttpRequest request) throws Failure {
+        // Asked at every request: a homeserver that restarted since the last one may have left its
+        // port to another account.
+        Listener.ensureOwn(config.homeserver(), tables);
         try {
             return http.send(request, HttpResponse.BodyHandlers.ofByteArray());
         } catch (final SSLHandshakeException ex) {

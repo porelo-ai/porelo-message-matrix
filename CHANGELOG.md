@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- A token goes to a plain-`http` loopback homeserver only when the port is the account's own: another uid listening
+  there - another account, while the account's own homeserver is down - gets 78 before any request.
 - An account the transport takes back with a new password - one whose token Porelo lost, or one restored
   from a copy - has every other session logged out, so no token it had before stays valid.
 
