@@ -1,6 +1,6 @@
 # MX24 — The Room Outlives The Machine
 
-**Status:** Implementing; the transport's part of porelo-project's
+**Status:** Review; the transport's part of porelo-project's
 [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45), which keeps chosen data when a
 rented host goes.
 **Size:** M - two new verbs and a change to `setup`, the unit's mounts, a contract porelo-host reads, and an

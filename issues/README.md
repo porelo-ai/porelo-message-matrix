@@ -7,13 +7,8 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
+| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
 
 ## Backlog
 
