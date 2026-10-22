@@ -1,6 +1,6 @@
 # MX28 — A Task Account Per Project
 
-**Status:** Idea.
+**Status:** Accepted.
 
 **What must be true.** Two tasks of two projects never share one Matrix account, even when their names run
 together: a task's account is the project's and the task's, so retiring one never cuts off the other, and a
