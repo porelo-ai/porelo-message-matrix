@@ -25,14 +25,15 @@ sequence.
 
 | # | Size | Blocked by | Open questions | What it covers |
 |---|---|---|---|---|
-| <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | 1 | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
-| <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | S | - | 1 | Clearing one project never cuts a person off from another project on the same homeserver |
+| <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | 0 | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
+| <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | S | - | 0 | Clearing one project never cuts a person off from another project on the same homeserver |
 
 ## Idea
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | - | - | Two projects' tasks never share one account when their names run together, `porelo-a-b-c` from `a-b`/`c` and `a`/`b-c` |
+| <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window [MX20](README.md#mx20) leaves |
 
 ## Estimated
 

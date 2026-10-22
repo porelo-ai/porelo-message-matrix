@@ -24,18 +24,14 @@ loopback against anyone on the way; another account on the same machine is not o
   plain `http` through when `Lifecycle.loopback` holds (`Config.java:94`); `setup` builds its own
   `http://127.0.0.1:<port>` in `LocalHomeserver.ensure` (`LocalHomeserver.java:84`) and trusts the first 200 of
   `awaitUp`. Nothing asks whose the listener is.
-- **The shape, of the two the issue named:**
-  - **A unix socket of the account's own** changes `PORELO_MATRIX_HOMESERVER`, `reaches`, porelo's
-    `HelperEnvironment`, `TaskConversations` and `MessagesJoined`, and porelo-frontend's *Join* forwarding; and
-    Java's `HttpClient` reaches no unix socket, so the transport would need a relay of its own. L, across three
-    repositories.
-  - **The listener proven the account's own** (proposed): before a token goes to a plain-`http` loopback
-    address, the transport reads the kernel's table of listening sockets (`/proc/net/tcp`, `/proc/net/tcp6`)
-    and finds the one bound to that address and port. Its owner must be the transport's own uid, else 78 naming
-    the port and the owner's uid, before any request. Another account cannot bind a port while this one holds
-    it, so a listener that is the account's own at the check is the account's own at the request, but for a
-    window of milliseconds while this account's homeserver dies between the two. Nothing another repository
-    reads changes.
+- **The shape:** the listener proven the account's own. The other the issue named, a unix socket of the
+  account's own across three repositories, is [MX29](README.md#mx29).
+  Before a token goes to a plain-`http` loopback address, the transport reads the kernel's table of listening
+  sockets (`/proc/net/tcp`, `/proc/net/tcp6`) and finds the one bound to that address and port. Its owner must
+  be the transport's own uid, else 78 naming the port and the owner's uid, before any request. Another account
+  cannot bind a port while this one holds it, so a listener that is the account's own at the check is the
+  account's own at the request, but for a window of milliseconds while this account's homeserver dies between
+  the two: the accepted risk. Nothing another repository reads changes.
 - **Steps:**
   1. A small class `Listener` that reads the table from a path it is given, so a test can hand it a file, and
      answers the owner of a listening socket on an address and port, or none.
@@ -56,12 +52,6 @@ loopback against anyone on the way; another account on the same machine is not o
 - On the VM, in the test account: with the homeserver up, `setup`, `enroll`, `poll` and `send` work as before; with another
   uid's listener on the port, each exits 78 and that listener logs no request.
 - The guard is seen to fail when the owner comparison is broken on purpose.
-
-## Open questions
-
-- **Which shape:** (a) the listener proven the account's own, M, in this repository alone, with the window of a
-  dying homeserver as accepted risk; or (b) a unix socket of the account's own, L, across porelo and
-  porelo-frontend, with no window. I recommend (a).
 
 ## To be checked
 

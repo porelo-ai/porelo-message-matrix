@@ -26,9 +26,9 @@ who is in projects A and B is deactivated by `clear --project A` and loses B too
   1. Before the loop, the other Porelo rooms: `@porelo`'s `/joined_rooms`, less this one, each taken only where
      `ours(...)` holds, as `clear` already judges its own room. Their members are read through
      `/rooms/<id>/members` - the client API the code uses today, no admin command whose text could change.
-  2. A member joined or invited in one of them is not deactivated. Under the answer to the open question, it is
-     either said in `kept` (`what`: the account, `why`: the other project's room alias) while the rest goes, or
-     `clear` stops before anything goes and names every such account.
+  2. A member joined or invited in one of them is not deactivated: `clear` goes on with the rest and says it in
+     `kept` (`what`: the account, `why`: the other project's room alias). It never refuses for such a member, so a
+     project can always be cleared.
   3. `doc/transport.md`'s row for `clear --project P` says "every account in the project's room that is in no
      other project's room", and what happens to the others.
 - **The test that goes red first:** `LifecycleIT`, with the real homeserver: `setup` A and B, `join --person ann`
@@ -42,14 +42,6 @@ who is in projects A and B is deactivated by `clear --project A` and loses B too
 - The person only in A is deactivated and named in `removed`; the guard is seen to fail when the check is
   broken on purpose so that it keeps every member.
 - `clear --project A` run twice still exits 0 and the second run finds nothing.
-
-## Open questions
-
-- **A member in another project:** (a) `clear` goes on, leaves that account active, and names it in `kept` with
-  the other project's room; or (b) `clear` changes nothing and refuses, naming each such account, until they
-  are taken out of the other project first. I recommend (a): `clear` already keeps what it must not take and says
-  why, Porelo reads the answer without parsing it, and (b) would leave a project that cannot be cleared while a
-  person is in two.
 
 ## To be checked
 
