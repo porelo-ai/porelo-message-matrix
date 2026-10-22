@@ -61,7 +61,7 @@ class SettingsCheckTest {
                 List.of(
                         "",
                         "{}",
-                        "{\"homeserver\":\"https://matrix.example.org\",\"ca_file\":\""
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#p:matrix.example.org\",\"ca_file\":\""
                                 + pem
                                 + "\",\"tls_verify\":\"on\"}",
                         "{\"tls_verify\":true}")) {
@@ -174,6 +174,7 @@ class SettingsCheckTest {
                         texts(
                                 check(
                                                 "{\"homeserver\":\"https://matrix.example.org\","
+                                                        + "\"room\":\"#p:matrix.example.org\","
                                                         + "\"registration_token_file\":\"token\"}")
                                         .path("refused")))
                 .singleElement()
@@ -189,6 +190,7 @@ class SettingsCheckTest {
         final JsonNode answer =
                 check(
                         "{\"homeserver\":\"https://matrix.example.org\","
+                                + "\"room\":\"#p:matrix.example.org\","
                                 + "\"registration_token_file\":\""
                                 + open
                                 + "\"}");
@@ -197,5 +199,44 @@ class SettingsCheckTest {
                 .singleElement()
                 .asString()
                 .contains("readable by other accounts");
+    }
+
+    /**
+     * Harm guarded: an editor that accepts a central homeserver without its room, a room without a
+     * homeserver, or a room that is neither an alias nor an id lets a person commit a project file
+     * that setup then refuses with 78.
+     */
+    @Test
+    @DisplayName(
+            "room: alias or id taken with a homeserver; missing on either side or malformed refused")
+    void room() throws IOException {
+        for (final String valid : List.of("#p:matrix.example.org", "!r:matrix.example.org")) {
+            final JsonNode answer =
+                    check(
+                            "{\"homeserver\":\"https://matrix.example.org\",\"room\":\""
+                                    + valid
+                                    + "\"}");
+            assertThat(texts(answer.path("refused"))).as(valid).isEmpty();
+            assertThat(texts(answer.path("warnings"))).as(valid).isEmpty();
+        }
+        assertThat(texts(check("{\"homeserver\":\"https://matrix.example.org\"}").path("refused")))
+                .as("homeserver without room")
+                .hasSize(1);
+        assertThat(texts(check("{\"room\":\"#p:matrix.example.org\"}").path("refused")))
+                .as("room without homeserver")
+                .singleElement()
+                .asString()
+                .contains("room")
+                .contains("homeserver");
+        assertThat(
+                        texts(
+                                check(
+                                                "{\"homeserver\":\"https://matrix.example.org\","
+                                                        + "\"room\":\"not-a-room\"}")
+                                        .path("refused")))
+                .as("malformed room")
+                .singleElement()
+                .asString()
+                .contains("room");
     }
 }

@@ -1,7 +1,14 @@
 package org.fuin.porelo.message.matrix;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.HexFormat;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Making and finding accounts on a homeserver. A password is made here, used once to log in or
@@ -35,6 +42,31 @@ final class Accounts {
             password.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
         }
         return password.toString();
+    }
+
+    /**
+     * 32 random bytes, 256 bits, as base64url without padding: the secret a machine keeps on a
+     * central homeserver to derive its accounts' passwords.
+     */
+    static String secret() {
+        final byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /**
+     * Derives the password of {@code localpart} from the machine's {@code secret}, so every
+     * lifecycle verb on that machine can act as its own accounts without keeping each password.
+     */
+    static String password(final String secret, final String localpart) {
+        try {
+            final Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of()
+                    .formatHex(mac.doFinal(localpart.getBytes(StandardCharsets.UTF_8)));
+        } catch (final NoSuchAlgorithmException | InvalidKeyException ex) {
+            throw new IllegalStateException("HmacSHA256 could not be initialized", ex);
+        }
     }
 
     /** Whether nobody has this name yet. */
@@ -120,6 +152,30 @@ final class Accounts {
         anybody.as(first.accessToken())
                 .post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
         return login(anybody, localpart, password);
+    }
+
+    /**
+     * Logs in as {@code localpart} with {@code password}, leaves {@code room}, and logs out every
+     * session so earlier tokens are refused while the name can be used again.
+     */
+    static void retire(
+            final MatrixClient anybody,
+            final String localpart,
+            final String password,
+            final String room)
+            throws Failure {
+        final Session session = login(anybody, localpart, password);
+        final MatrixClient asAccount = anybody.as(session.accessToken());
+        final MatrixClient.Answer leave =
+                asAccount.exchange(
+                        "POST",
+                        "/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/leave",
+                        MatrixClient.JSON.createObjectNode());
+        // Already out of the room on a second retire is done, not a failure.
+        if (leave.status() != 200 && leave.status() != 403 && leave.status() != 404) {
+            throw refused("leaving " + room + " as " + localpart, leave);
+        }
+        asAccount.post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
     }
 
     /** The account's own id, or null when the homeserver does not know the token. */

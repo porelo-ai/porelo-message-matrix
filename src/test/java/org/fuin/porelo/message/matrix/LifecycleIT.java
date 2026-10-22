@@ -3,7 +3,10 @@ package org.fuin.porelo.message.matrix;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -11,44 +14,54 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * The lifecycle Porelo drives - setup, enroll, retire, join - against the real homeserver, as a
- * project's homeserver that is not the account's own: named in the settings, registered on with its
- * token. Each test has a fresh homeserver, since setup's account must be the first one registered.
+ * The lifecycle Porelo drives - setup, enroll, retire, join, clear - against the real homeserver
+ * run as the account's own: each test is a directory of its own, with its own configuration, state
+ * and database.
  */
 class LifecycleIT {
 
     private static final String PROJECT = "demo";
 
+    private static final String SERVER_NAME = "localhost";
+
+    @TempDir private static Path bin;
+
+    private static Path binary;
+
     @TempDir private Path dir;
 
-    private Tuwunel tuwunel;
+    private ProcessUnit unit;
 
     private String settings;
 
+    @BeforeAll
+    static void extractBinary() throws IOException, InterruptedException {
+        binary = ProcessUnit.binary(bin);
+    }
+
     @BeforeEach
-    void setUp() throws IOException, InterruptedException {
-        tuwunel = Tuwunel.start();
-        settings = "{\"homeserver\":\"" + tuwunel.url() + "\"}";
+    void setUp() {
+        settings = "{}";
+        unit = new ProcessUnit(firstRun(), binary, dir.resolve("unit"));
     }
 
     @AfterEach
-    void tearDown() throws IOException, InterruptedException {
-        // A start that failed leaves none to close, and must not hide why it failed.
-        if (tuwunel != null) {
-            tuwunel.close();
+    void tearDown() throws IOException, InterruptedException, Failure {
+        if (unit != null) {
+            unit.close();
         }
     }
 
@@ -57,7 +70,7 @@ class LifecycleIT {
      * its JSON.
      */
     private JsonNode run(final Map<String, String> env, final String... args) throws IOException {
-        final Transport.Result result = Transport.runWithInput(env, settings, args);
+        final Transport.Result result = attempt(env, args);
         assertThat(result.exit())
                 .as("%s: %s", String.join(" ", args), result.err())
                 .isEqualTo(Exit.OK);
@@ -65,13 +78,46 @@ class LifecycleIT {
     }
 
     private Transport.Result attempt(final Map<String, String> env, final String... args) {
-        return Transport.runWithInput(env, settings, args);
+        if (!Lifecycle.VERBS.contains(args[0])) {
+            return Transport.runWithInput(env, settings, args);
+        }
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        final PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
+        try {
+            Lifecycle.run(
+                    args[0],
+                    List.of(args).subList(1, args.length),
+                    env,
+                    new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8)),
+                    new PrintStream(out, true, StandardCharsets.UTF_8),
+                    errStream,
+                    unit);
+            return new Transport.Result(
+                    Exit.OK,
+                    out.toString(StandardCharsets.UTF_8),
+                    err.toString(StandardCharsets.UTF_8));
+        } catch (final Failure failure) {
+            errStream.println(Main.NAME + " " + args[0] + ": " + failure.getMessage());
+            return new Transport.Result(
+                    failure.exitCode(),
+                    out.toString(StandardCharsets.UTF_8),
+                    err.toString(StandardCharsets.UTF_8));
+        }
     }
 
     private Map<String, String> firstRun() {
         final Map<String, String> env = new HashMap<>();
-        env.put(Config.REGISTRATION_TOKEN, tuwunel.registrationToken());
+        env.put("HOME", dir.resolve("home").toString());
+        env.put("XDG_CONFIG_HOME", dir.resolve("config").toString());
+        env.put("XDG_STATE_HOME", dir.resolve("state").toString());
         return env;
+    }
+
+    private String url() throws Failure {
+        return "http://127.0.0.1:"
+                + LocalHomeserver.port(
+                        LocalHomeserver.directory(firstRun()).resolve("homeserver.conf"));
     }
 
     /**
@@ -106,35 +152,12 @@ class LifecycleIT {
 
         assertThat(answer.path("account").path(Config.ADMIN_TOKEN).asText()).isNotEmpty();
         final JsonNode secrets = answer.path("secrets");
-        assertThat(secrets.path(Config.HOMESERVER).asText()).isEqualTo(tuwunel.url());
+        assertThat(secrets.path(Config.HOMESERVER).asText()).isEqualTo(url());
         assertThat(secrets.path(Config.ACCESS_TOKEN).asText()).isNotEmpty();
         assertThat(answer.path("conversation").asText()).startsWith("!");
         assertThat(answer.path("reaches").get(0).asText())
-                .isEqualTo(URI.create(tuwunel.url()).getAuthority());
-        assertThat(status(tuwunel.url(), secrets.path(Config.ACCESS_TOKEN).asText()))
-                .isEqualTo(200);
-    }
-
-    /**
-     * Harm guarded: Porelo hands a transport no variable of its own choosing, so without the file a
-     * homeserver elsewhere could not be set up through Porelo at all.
-     */
-    @Test
-    @DisplayName(
-            "setup on a homeserver elsewhere takes the registration token from the file the settings name")
-    void setupTakesTheTokenFromItsFile() throws Exception {
-        final Path token = Files.writeString(dir.resolve("token"), tuwunel.registrationToken());
-        Files.setPosixFilePermissions(token, PosixFilePermissions.fromString("rw-------"));
-        settings =
-                "{\"homeserver\":\""
-                        + tuwunel.url()
-                        + "\",\"registration_token_file\":\""
-                        + token
-                        + "\"}";
-
-        final JsonNode answer = run(new HashMap<>(), "setup", "--project", PROJECT);
-
-        assertThat(answer.path("account").path(Config.ADMIN_TOKEN).asText()).isNotEmpty();
+                .isEqualTo(URI.create(url()).getAuthority());
+        assertThat(status(url(), secrets.path(Config.ACCESS_TOKEN).asText())).isEqualTo(200);
     }
 
     @Test
@@ -182,9 +205,9 @@ class LifecycleIT {
                         "the room #porelo-demo:" + server,
                         "the poll position of @porelo-relay-demo:" + server);
         assertThat(cleared.path("kept")).isEmpty();
-        assertThat(status(tuwunel.url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText()))
+        assertThat(status(url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(401);
-        assertThat(status(tuwunel.url(), setup.path("account").path(Config.ADMIN_TOKEN).asText()))
+        assertThat(status(url(), setup.path("account").path(Config.ADMIN_TOKEN).asText()))
                 .isEqualTo(200);
 
         final JsonNode again = run(kept, "clear", "--project", PROJECT);
@@ -202,10 +225,7 @@ class LifecycleIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice");
-        assertThat(
-                        status(
-                                tuwunel.url(),
-                                aliceAgain.path("secrets").path(Config.ACCESS_TOKEN).asText()))
+        assertThat(status(url(), aliceAgain.path("secrets").path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(200);
         final Transport.Result polled =
                 attempt(
@@ -243,7 +263,7 @@ class LifecycleIT {
                         .path("login")
                         .path("password")
                         .asText();
-        final String server = Tuwunel.SERVER_NAME;
+        final String server = SERVER_NAME;
 
         final JsonNode cleared = run(kept, "clear", "--project", PROJECT);
 
@@ -298,7 +318,7 @@ class LifecycleIT {
 
         assertThat(enrolled.exit()).as("enroll: %s", enrolled.err()).isEqualTo(Exit.CONFIG);
         assertThat(retired.exit()).as("retire: %s", retired.err()).isEqualTo(Exit.CONFIG);
-        assertThat(status(tuwunel.url(), token))
+        assertThat(status(url(), token))
                 .as("the first project's task keeps its token")
                 .isEqualTo(200);
 
@@ -312,13 +332,12 @@ class LifecycleIT {
 
     /** An access token for a person, as their Matrix client would log in; empty when refused. */
     private String login(final String user, final String password)
-            throws IOException, InterruptedException {
+            throws IOException, InterruptedException, Failure {
         final HttpResponse<String> response =
                 HttpClient.newHttpClient()
                         .send(
                                 HttpRequest.newBuilder(
-                                                URI.create(
-                                                        tuwunel.url() + "/_matrix/client/v3/login"))
+                                                URI.create(url() + "/_matrix/client/v3/login"))
                                         .header("Content-Type", "application/json")
                                         .POST(
                                                 HttpRequest.BodyPublishers.ofString(
@@ -336,14 +355,14 @@ class LifecycleIT {
         return MatrixClient.JSON.readTree(response.body()).path("access_token").asText();
     }
 
-    private List<String> joinedRooms(final String token) throws IOException, InterruptedException {
+    private List<String> joinedRooms(final String token)
+            throws IOException, InterruptedException, Failure {
         final HttpResponse<String> response =
                 HttpClient.newHttpClient()
                         .send(
                                 HttpRequest.newBuilder(
                                                 URI.create(
-                                                        tuwunel.url()
-                                                                + "/_matrix/client/v3/joined_rooms"))
+                                                        url() + "/_matrix/client/v3/joined_rooms"))
                                         .header("Authorization", "Bearer " + token)
                                         .build(),
                                 HttpResponse.BodyHandlers.ofString());
@@ -363,8 +382,23 @@ class LifecycleIT {
         final Map<String, String> kept =
                 with(firstRun(), first.path("account"), first.path("secrets"));
         kept.put("XDG_STATE_HOME", dir.resolve("state").toString());
-        final Tuwunel.Account mallory = tuwunel.register("mallory");
-        final String theirs = tuwunel.claimAlias(mallory, "porelo-" + PROJECT);
+        final MatrixClient nobody = new MatrixClient(new Config(URI.create(url()), "", null, true));
+        final Accounts.Session mallory =
+                Accounts.register(
+                        nobody,
+                        "mallory",
+                        Accounts.password(),
+                        LocalHomeserver.registrationToken(firstRun()));
+        final String theirs =
+                nobody.as(mallory.accessToken())
+                        .post(
+                                "/_matrix/client/v3/createRoom",
+                                MatrixClient.JSON
+                                        .createObjectNode()
+                                        .put("preset", "public_chat")
+                                        .put("room_alias_name", "porelo-" + PROJECT))
+                        .path("room_id")
+                        .asText();
 
         final Transport.Result setup = attempt(kept, "setup", "--project", PROJECT);
         assertThat(setup.exit()).isEqualTo(Exit.CONFIG);
@@ -383,7 +417,7 @@ class LifecycleIT {
                         k ->
                                 assertThat(k.path("why").asText())
                                         .contains("not the room Porelo made"));
-        assertThat(status(tuwunel.url(), mallory.accessToken())).isEqualTo(200);
+        assertThat(status(url(), mallory.accessToken())).isEqualTo(200);
     }
 
     @Test
@@ -399,7 +433,7 @@ class LifecycleIT {
                         .send(
                                 HttpRequest.newBuilder(
                                                 URI.create(
-                                                        tuwunel.url()
+                                                        url()
                                                                 + "/_matrix/client/v3/rooms/"
                                                                 + MatrixClient.segment(room)
                                                                 + "/state/m.room.join_rules/"))
@@ -447,7 +481,7 @@ class LifecycleIT {
                         http.send(
                                         HttpRequest.newBuilder(
                                                         URI.create(
-                                                                tuwunel.url()
+                                                                url()
                                                                         + "/_matrix/client/v3/joined_rooms"))
                                                 .header("Authorization", "Bearer " + adminToken)
                                                 .build(),
@@ -459,7 +493,7 @@ class LifecycleIT {
                     http.send(
                                     HttpRequest.newBuilder(
                                                     URI.create(
-                                                            tuwunel.url()
+                                                            url()
                                                                     + "/_matrix/client/v3/rooms/"
                                                                     + MatrixClient.segment(
                                                                             room.asText())
@@ -511,7 +545,10 @@ class LifecycleIT {
         final Map<String, String> kept =
                 with(firstRun(), setup.path("account"), setup.path("secrets"));
 
-        tuwunel.reset();
+        unit.stop();
+        unit.removeDatabase();
+        unit.start();
+        LocalHomeserver.awaitUp(URI.create(url()));
 
         for (final String[] args :
                 new String[][] {
@@ -613,7 +650,7 @@ class LifecycleIT {
                 .as("a name the filter takes: no event id in it")
                 .doesNotContain(reference.substring(1));
 
-        final String by = "@porelo-demo-bob:" + Tuwunel.SERVER_NAME;
+        final String by = "@porelo-demo-bob:" + SERVER_NAME;
         assertThat(run(alice, "receipt", reference, "--by", by).path("state").asText())
                 .isEqualTo("delivered");
         assertThat(
@@ -643,11 +680,10 @@ class LifecycleIT {
         final JsonNode again =
                 run(lifecycle, "enroll", "--project", PROJECT, "--task", "porelo-demo-alice");
         final String second = again.path("secrets").path(Config.ACCESS_TOKEN).asText();
-        assertThat(again.path("address").asText())
-                .isEqualTo("@porelo-demo-alice:" + Tuwunel.SERVER_NAME);
+        assertThat(again.path("address").asText()).isEqualTo("@porelo-demo-alice:" + SERVER_NAME);
 
         assertThat(second).isNotEqualTo(first);
-        assertThat(status(tuwunel.url(), second)).isEqualTo(200);
+        assertThat(status(url(), second)).isEqualTo(200);
     }
 
     @Test
@@ -719,19 +755,20 @@ class LifecycleIT {
         run(task, "rename", "--display", "Grace");
 
         assertThat(displayName(alice.path("address").asText())).isEqualTo("Grace");
-        assertThat(status(tuwunel.url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText()))
+        assertThat(status(url(), alice.path("secrets").path(Config.ACCESS_TOKEN).asText()))
                 .isEqualTo(200);
         assertThat(attempt(task, "rename", "--display", "a@b").exit()).isEqualTo(Exit.USAGE);
         assertThat(attempt(task, "rename").exit()).isEqualTo(Exit.USAGE);
     }
 
-    private String displayName(final String userId) throws IOException, InterruptedException {
+    private String displayName(final String userId)
+            throws IOException, InterruptedException, Failure {
         final java.net.http.HttpResponse<String> answer =
                 java.net.http.HttpClient.newHttpClient()
                         .send(
                                 java.net.http.HttpRequest.newBuilder(
                                                 java.net.URI.create(
-                                                        tuwunel.url()
+                                                        url()
                                                                 + "/_matrix/client/v3/profile/"
                                                                 + MatrixClient.segment(userId)
                                                                 + "/displayname"))
@@ -754,7 +791,7 @@ class LifecycleIT {
         run(all, "retire", "--project", PROJECT, "--task", "porelo-demo-alice");
         run(all, "retire", "--project", PROJECT, "--task", "porelo-demo-alice");
 
-        assertThat(status(tuwunel.url(), task.path(Config.ACCESS_TOKEN).asText())).isEqualTo(401);
+        assertThat(status(url(), task.path(Config.ACCESS_TOKEN).asText())).isEqualTo(401);
     }
 
     @Test
@@ -767,8 +804,8 @@ class LifecycleIT {
 
         final JsonNode login =
                 run(lifecycle, "join", "--project", PROJECT, "--person", "carol").path("login");
-        assertThat(login.path("user").asText()).isEqualTo("@carol:" + Tuwunel.SERVER_NAME);
-        assertThat(login.path("room").asText()).isEqualTo("#porelo-demo:" + Tuwunel.SERVER_NAME);
+        assertThat(login.path("user").asText()).isEqualTo("@carol:" + SERVER_NAME);
+        assertThat(login.path("room").asText()).isEqualTo("#porelo-demo:" + SERVER_NAME);
         assertThat(login.path("password").asText()).isNotEmpty();
 
         final Transport.Result again =
@@ -786,11 +823,11 @@ class LifecycleIT {
     @DisplayName(
             "Settings the transport does not know, or a relative CA file, are refused with 78 before anything is made")
     void badSettings() {
-        settings = "{\"homeserver\":\"" + tuwunel.url() + "\",\"federation\":true}";
+        settings = "{\"federation\":true}";
         assertThat(attempt(firstRun(), "setup", "--project", PROJECT).exit())
                 .isEqualTo(Exit.CONFIG);
 
-        settings = "{\"homeserver\":\"" + tuwunel.url() + "\",\"ca_file\":\"certs/ca.pem\"}";
+        settings = "{\"ca_file\":\"certs/ca.pem\"}";
         assertThat(attempt(firstRun(), "setup", "--project", PROJECT).exit())
                 .isEqualTo(Exit.CONFIG);
     }

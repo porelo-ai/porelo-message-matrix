@@ -57,3 +57,32 @@ first task start, then that start's `setup` takes the room back. Media are not i
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration token for the
 container, and the account still reads it.
+
+## A central homeserver
+
+When a project's tasks run across several machines, or share one Tuwunel server over `https`, the project's
+settings name `homeserver` and `room` (an alias `#local:server` or a room id). Each machine provisions only its
+own accounts there (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`), and people
+manage their own accounts on the homeserver (`join` is refused with 77).
+
+What a person does on the central homeserver:
+
+- **Make the project's room** from a Matrix client as invite-only (`join_rule: invite`, such as the
+  `private_chat` preset, whose invite power level is 0) with guests forbidden (`m.room.guest_access` set to
+  `forbidden`), and set its alias or room id as `room` in the project's settings.
+- **Issue each machine its own registration token** as the homeserver's administrator:
+  `POST /_synapse/admin/v1/registration_tokens/new` with an administrator Bearer token, and revoke a machine's
+  token when that machine leaves with `DELETE /_synapse/admin/v1/registration_tokens/<token>`. Put each
+  machine's token in the file named by `registration_token_file` on that machine, readable by that account
+  alone (`chmod 600`).
+- **Invite each machine's `@porelo.<machine>` into the room.** A machine's first `setup` registers
+  `@porelo.<machine>` and prints `"admitted": false` while it is not yet invited; once a person in the room
+  invites `@porelo.<machine>` (with the power to invite), the next `setup` joins the room, admits
+  `@porelo-relay-<project>.<machine>`, and prints `"admitted": true`.
+
+### Moving a project from a homeserver elsewhere
+
+A project whose settings named `homeserver` without `room` is refused (78) by `setup` and `settings` until
+`room` is set. Once `room` is set and a person invites `@porelo.<machine>` into it, the machine makes its new
+accounts (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`); the old accounts stay
+on the homeserver until a person removes them.

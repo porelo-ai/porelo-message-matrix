@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Several machines of one project share one conversation on a central homeserver (`homeserver` and `room` in the
+  project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`,
+  and each machine registers only its own accounts (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`,
+  `@<task>.<machine>`) with passwords derived from a secret of its own (`PORELO_MATRIX_MACHINE_SECRET` in
+  `account`), so no machine holds an administrator token or acts on another machine's accounts.
+- On a central homeserver, `setup` prints `"admitted": false` until a person in `room` invites `@porelo.<machine>`,
+  then joins the room (checking that it is invite-only and forbids guests) and admits the machine's relay; `retire`
+  and `clear --project` have only this machine's accounts leave the room and log out every session, as themselves,
+  so their names can be set up or enrolled again, and `join` answers 77 because people are managed at the
+  homeserver itself.
+
 - `backup <dir>` and `restore <dir>`, for a host's playbook: the local homeserver's conversation copied into a
   directory and put back on another machine, its rooms, messages and people's accounts as they were. The
   homeserver package keeps up to 48 online backups in `~/.local/state/porelo/matrix/backups`, made on
@@ -32,6 +43,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- A `homeserver` in the project's settings is now always a central homeserver and needs `room` (a room alias or a
+  room id; `room` without `homeserver` is refused too). A project on a homeserver elsewhere names its room as
+  `room`, invites each machine's `@porelo.<machine>` into it, and enrolls its tasks again; the earlier accounts stay
+  until a person removes them.
 - The code follows the shared style of every Porelo repository: one `.editorconfig`, and `google-java-format`
   in its AOSP style checked by the build, which refuses code that does not match it. The build takes
   `porelo-parent` 0.2.1 and the shared tools 0.5.1, and its checkouts keep no token for later steps.

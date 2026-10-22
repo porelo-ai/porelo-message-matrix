@@ -70,8 +70,11 @@ class LoopbackOnlyTest {
                 };
         final String remote = "https://matrix.example.org";
 
-        assertThat(run("{\"homeserver\":\"" + remote + "\"}", args)).isEqualTo(Exit.CONFIG);
+        assertThat(run("{\"homeserver\":\"" + remote + "\",\"room\":\"#p:example.org\"}", args))
+                .as(verb)
+                .isEqualTo(Exit.CONFIG);
         assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as(verb)
                 .contains("only this machine's loopback");
     }
 
@@ -82,7 +85,12 @@ class LoopbackOnlyTest {
         // The fake's port, so nothing outside the test is reached, whatever the name resolves to.
         final String url = homeserver.url().replace("127.0.0.1", host);
 
-        run("{\"homeserver\":\"" + url + "\"}", "setup", "--project", "p", "--loopback-only");
+        run(
+                "{\"homeserver\":\"" + url + "\",\"room\":\"#p:example.org\"}",
+                "setup",
+                "--project",
+                "p",
+                "--loopback-only");
 
         assertThat(errBytes.toString(StandardCharsets.UTF_8))
                 .as("what stderr says")
@@ -190,7 +198,7 @@ class LoopbackOnlyTest {
 
         run(
                 Map.of(Config.HOMESERVER, "https://127.0.0.1:1", Config.ADMIN_TOKEN, "a"),
-                "{\"homeserver\":\"https://127.0.0.1:1\",\"tls_verify\":\"off\"}",
+                "{\"homeserver\":\"https://127.0.0.1:1\",\"room\":\"#p:example.org\",\"tls_verify\":\"off\"}",
                 args);
 
         assertThat(errBytes.toString(StandardCharsets.UTF_8))

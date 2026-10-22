@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
@@ -80,11 +81,72 @@ class SettingsTest {
             })
     @DisplayName("http on this machine's loopback, and https anywhere, are taken")
     void loopbackHttpAndHttpsTaken(final String url) throws Failure {
-        assertThat(settings("{\"homeserver\":\"" + url + "\"}").homeserver()).hasToString(url);
+        assertThat(
+                        settings("{\"homeserver\":\"" + url + "\",\"room\":\"#p:example.org\"}")
+                                .homeserver())
+                .as(url)
+                .hasToString(url);
         assertThat(
                         Config.from(Map.of(Config.HOMESERVER, url, Config.ACCESS_TOKEN, "t"))
                                 .homeserver())
+                .as(url)
                 .hasToString(url);
+    }
+
+    /**
+     * Harm guarded: on a central homeserver a person makes the project's room and invites each
+     * machine into it; without its alias or id in the settings, or with one on the account's own
+     * homeserver where setup makes the room itself, setup cannot know which room is the project's.
+     */
+    @Test
+    @DisplayName(
+            "A central homeserver and its room (#local:server or !opaque:server) go together, else 78")
+    void roomForCentralHomeserver() throws Failure {
+        assertThat(settings("{}").room()).as("no room on the own homeserver").isNull();
+        for (final String valid :
+                List.of(
+                        "#project:matrix.example.org",
+                        "!abc123:matrix.example.org",
+                        "!8SMTIDnU1F0VdJ9SQHbXixFEhujitnU5ctcH1nt_mrI")) {
+            assertThat(
+                            settings(
+                                            "{\"homeserver\":\"https://matrix.example.org\",\"room\":\""
+                                                    + valid
+                                                    + "\"}")
+                                    .room())
+                    .as(valid)
+                    .isEqualTo(valid);
+        }
+        assertThatThrownBy(() -> settings("{\"homeserver\":\"https://matrix.example.org\"}"))
+                .as("homeserver without room")
+                .isInstanceOf(Failure.class)
+                .satisfies(
+                        f ->
+                                assertThat(((Failure) f).exitCode())
+                                        .as("exit code")
+                                        .isEqualTo(Exit.CONFIG));
+        for (final String bad :
+                List.of(
+                        "{\"room\":\"#project:matrix.example.org\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"project\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#no-server\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"!\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"!has space\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#empty:\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#:empty\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"@user:matrix.example.org\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#has space:matrix.example.org\"}",
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"\"}")) {
+            assertThatThrownBy(() -> settings(bad))
+                    .as(bad)
+                    .isInstanceOf(Failure.class)
+                    .hasMessageContaining("room")
+                    .satisfies(
+                            f ->
+                                    assertThat(((Failure) f).exitCode())
+                                            .as("exit code")
+                                            .isEqualTo(Exit.CONFIG));
+        }
     }
 
     /**
@@ -113,12 +175,15 @@ class SettingsTest {
         assertThat(
                         settings(
                                         "{\"homeserver\":\"https://matrix.example.org\","
+                                                + "\"room\":\"#p:example.org\","
                                                 + "\"registration_token_file\":\"/home/a/token\"}")
                                 .registrationTokenFile())
+                .as("registration_token_file")
                 .hasToString("/home/a/token");
         for (final String json :
                 List.of(
                         "{\"homeserver\":\"https://matrix.example.org\","
+                                + "\"room\":\"#p:example.org\","
                                 + "\"registration_token_file\":\"token\"}",
                         "{\"registration_token_file\":\"/home/a/token\"}")) {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> settings(json))

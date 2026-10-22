@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,7 +23,8 @@ record Settings(
         @Nullable URI homeserver,
         @Nullable Path caFile,
         boolean verifyTls,
-        @Nullable Path registrationTokenFile) {
+        @Nullable Path registrationTokenFile,
+        @Nullable String room) {
 
     /** Said on stderr whenever the project's settings switch the certificate check off. */
     static final String VERIFY_OFF_WARNING =
@@ -31,14 +33,29 @@ record Settings(
                     + " development only.";
 
     static final Set<String> KEYS =
-            Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file");
+            Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file", "room");
 
     static final String TOKEN_FILE_WITHOUT_HOMESERVER =
             "the project's registration_token_file is for a homeserver elsewhere; this account's"
                     + " own needs none";
 
+    static final String HOMESERVER_WITHOUT_ROOM =
+            "a homeserver in the settings is a central one and needs the project's room as `room`";
+
+    static final String ROOM_WITHOUT_HOMESERVER =
+            "the project's room is for a central homeserver; this account's own makes its room"
+                    + " itself";
+
     static final String CONTRADICTION =
             "the project's ca_file and tls_verify off contradict each other; set one";
+
+    /**
+     * A room alias ({@code #local:server}) or a room id ({@code !opaque}, which from room version
+     * 12 on carries no server name).
+     */
+    private static final Pattern ROOM =
+            Pattern.compile(
+                    "(#[^:\\s\\p{Cntrl}]+:([A-Za-z0-9.-]+|\\[[0-9a-fA-F:]+\\])(:[0-9]{1,5})?|![^\\s\\p{Cntrl}]+)");
 
     static Settings read(final InputStream in) throws Failure {
         final JsonNode node;
@@ -55,7 +72,7 @@ record Settings(
                     ex);
         }
         if (node == null || node.isNull()) {
-            return new Settings(null, null, true, null);
+            return new Settings(null, null, true, null, null);
         }
         if (!node.isObject()) {
             throw new Failure(Exit.CONFIG, "the project's settings on stdin are not a JSON object");
@@ -76,7 +93,8 @@ record Settings(
                         caFile(node.path("ca_file")),
                         verify(node.path("tls_verify")),
                         absolutePath(
-                                node.path("registration_token_file"), "registration_token_file"));
+                                node.path("registration_token_file"), "registration_token_file"),
+                        room(node.path("room")));
         // Refused here, not first by the verb that reads the printed secrets: which was meant
         // cannot be told.
         if (settings.caFile() != null && !settings.verifyTls()) {
@@ -86,6 +104,14 @@ record Settings(
         // here would silently do nothing.
         if (settings.registrationTokenFile() != null && settings.homeserver() == null) {
             throw new Failure(Exit.CONFIG, TOKEN_FILE_WITHOUT_HOMESERVER);
+        }
+        // A central homeserver's room is made by a person there; without it, setup has none to
+        // join.
+        if (settings.homeserver() != null && settings.room() == null) {
+            throw new Failure(Exit.CONFIG, HOMESERVER_WITHOUT_ROOM);
+        }
+        if (settings.room() != null && settings.homeserver() == null) {
+            throw new Failure(Exit.CONFIG, ROOM_WITHOUT_HOMESERVER);
         }
         return settings;
     }
@@ -128,6 +154,22 @@ record Settings(
 
     static @Nullable Path registrationTokenFile(final JsonNode value) throws Failure {
         return absolutePath(value, "registration_token_file");
+    }
+
+    static @Nullable String room(final JsonNode value) throws Failure {
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        final String text = value.isTextual() ? value.asText() : value.toString();
+        if (!value.isTextual() || !ROOM.matcher(text).matches()) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the project's room must be a room alias (#local:server) or a room id"
+                            + " (!opaque:server), not '"
+                            + text
+                            + "'");
+        }
+        return text;
     }
 
     private static @Nullable Path absolutePath(final JsonNode value, final String key)

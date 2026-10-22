@@ -97,7 +97,19 @@ final class SettingsCheck {
             }
         }
         try {
-            Settings.homeserver(node.path("homeserver"));
+            if (Settings.homeserver(node.path("homeserver")) != null
+                    && (node.path("room").isMissingNode() || node.path("room").isNull())) {
+                refused.add(Settings.HOMESERVER_WITHOUT_ROOM);
+            }
+        } catch (final Failure failure) {
+            refused.add(failure.getMessage());
+        }
+        try {
+            if (Settings.room(node.path("room")) != null
+                    && (node.path("homeserver").isMissingNode()
+                            || node.path("homeserver").isNull())) {
+                refused.add(Settings.ROOM_WITHOUT_HOMESERVER);
+            }
         } catch (final Failure failure) {
             refused.add(failure.getMessage());
         }

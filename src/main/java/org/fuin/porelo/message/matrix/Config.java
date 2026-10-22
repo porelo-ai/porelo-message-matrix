@@ -19,6 +19,15 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
     /** The provisioning account's token: handed only to the lifecycle verbs, never to poll. */
     static final String ADMIN_TOKEN = "PORELO_MATRIX_ADMIN_TOKEN";
 
+    /**
+     * The machine's secret on a central homeserver, from which every account's password there is
+     * derived.
+     */
+    static final String MACHINE_SECRET = "PORELO_MATRIX_MACHINE_SECRET";
+
+    /** The machine's name on a central homeserver, kept by setup for the verbs that follow. */
+    static final String MACHINE = "PORELO_MATRIX_MACHINE";
+
     /** A homeserver's registration token, for one that is not the account's own. */
     static final String REGISTRATION_TOKEN = "PORELO_MATRIX_REGISTRATION_TOKEN";
 

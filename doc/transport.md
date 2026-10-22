@@ -32,16 +32,17 @@ its environment; each prints one JSON object.
 
 | Verb | What it does | What it prints |
 |---|---|---|
-| `setup --project P [--loopback-only]` | Starts the local homeserver if no `homeserver` is set; registers `@porelo`, the administrator; makes the room `#porelo-<P>` (invite-only, unlisted) and the relay `@porelo-relay-<P>` | `account` (the administrator's token), `secrets` (the relay's environment, for `poll`), `conversation` (the room id), `reaches` (a JSON array of `"host:port"`, e.g. `["127.0.0.1:8008"]`) |
-| `enroll --project P --task T [--display N] [--loopback-only]` | The account `@<T>` in the room, shown as the nickname `N` (1 to 64 characters, no control characters, `@` or `:`) or else as `T`; enrolled again with another, renamed, its id kept. An `@<T>` in another project's room is refused (78) and left as it is | `secrets` (the task's environment), `address` (its user id) |
-| `retire --project P --task T` | Deactivates `@<T>`; one in another project's room is refused (78) and left active | `{}` |
-| `join --project P --person N [--reset] [--loopback-only]` | A person's account in the room, with a new password; a second join is refused (77) without `--reset` | `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once |
-| `clear --project P` | Deactivates every account in the project's room (its tasks', its relay's, its people's) that is in no other project's room, deletes the room with its alias, and forgets the relay's poll position. An account in another project's room too stays active there and is named in `kept` | `removed` (what went) and `kept` (each `what` and `why`) |
+| `setup --project P [--machine M] [--loopback-only]` | On the account's own homeserver: starts the local homeserver; registers `@porelo`, the administrator; makes the room `#porelo-<P>` (invite-only, unlisted) and the relay `@porelo-relay-<P>`. On a central homeserver (`--machine M` required): registers `@porelo.<M>`; once a person has invited `@porelo.<M>` into `room`, joins it and admits the relay `@porelo-relay-<P>.<M>` | `account` (on the account's own homeserver: the administrator's token; on a central one: `@porelo.<M>`'s token, the machine's secret as `PORELO_MATRIX_MACHINE_SECRET`, and `PORELO_MATRIX_MACHINE`), `secrets` (the relay's environment, for `poll`), `conversation` (the room id), `reaches` (a JSON array of `"host:port"`, e.g. `["127.0.0.1:8008"]`); on a central homeserver also `machine` (`"M"`) and `admitted` (`false`, with no `secrets`, `conversation` or `reaches`, until a person invites `@porelo.<M>`) |
+| `enroll --project P --task T [--display N] [--machine M] [--loopback-only]` | On the account's own homeserver, the account `@<T>` in the room; on a central homeserver, `@<T>.<M>`, invited by `@porelo.<M>`. Shown as the nickname `N` (1 to 64 characters, no control characters, `@` or `:`) or else as `T`; enrolled again with another, renamed, its id kept. A task account in another project's room is refused (78) and left as it is | `secrets` (the task's environment), `address` (its user id) |
+| `retire --project P --task T [--machine M]` | On the account's own homeserver, deactivates `@<T>`; on a central homeserver, `@<T>.<M>` leaves the room and logs out every session, so the name can be used again. One in another project's room is refused (78) and left active | `{}` |
+| `join --project P --person N [--reset] [--machine M] [--loopback-only]` | On the account's own homeserver: a person's account in the room, with a new password; a second join is refused (77) without `--reset`. On a central homeserver: refused (77); people are managed at the homeserver itself | `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once |
+| `clear --project P [--machine M]` | On the account's own homeserver: deactivates every account in the project's room (its tasks', its relay's, its people's) that is in no other project's room, deletes the room with its alias, and forgets the relay's poll position. On a central homeserver: this machine's relay `@porelo-relay-<P>.<M>` and its tasks `@<T>.<M>` in the room leave the room and log out every session, so their names can be used again, and the relay's poll position is forgotten; `@porelo.<M>`, the room, people and other machines' accounts stay. An account in another project's room too stays active there and is named in `kept` | `removed` (what went) and `kept` (each `what` and `why`) |
 | `clear` | The account's own homeserver once no project uses it: stops and disables it, removes its container and database, its port and registration token, and every poll position. Reads no settings | the same |
 | `settings` | Checks the settings as a draft, with no network and no environment | `{"refused": […], "warnings": […]}` |
 
-- **Settings:** `homeserver`, `ca_file` (absolute), `tls_verify` (`on`/`off`), `registration_token_file`
-  (absolute, only with `homeserver`). Anything else is refused (78).
+- **Settings:** `homeserver` (a central homeserver; requires `room`), `room` (an alias `#local:server` or a room id,
+  required with `homeserver` and refused without it), `ca_file` (absolute), `tls_verify` (`on`/`off`),
+  `registration_token_file` (absolute, only with `homeserver`). Anything else is refused (78).
 - **The printed `secrets` always name `PORELO_MATRIX_CA_FILE` and `PORELO_MATRIX_TLS_VERIFY`**, so an
   inherited value never outweighs what the project configured.
 - **Run again, each keeps what exists.** `retire` twice is harmless, and so is `clear`: it says what it
@@ -49,16 +50,21 @@ its environment; each prints one JSON object.
   own entries for the transport beside it. A project cleared can be set up again.
 - **`--loopback-only`**, for an offline project: a `homeserver` that is not loopback is refused (78)
   before any request.
-- **A homeserver that is not this machine's own** needs its registration token: read from
+- **A central homeserver** (`homeserver` set) needs its registration token: read from
   `registration_token_file`, which another account must not be able to read (78 otherwise), else from
-  `PORELO_MATRIX_REGISTRATION_TOKEN`.
-- **The project's room is taken only if it is Porelo's:** made by its administrator, invite-only, guests
-  forbidden. A room under the alias that is anybody else's, or was opened since, is refused (78) by
-  `setup`, `enroll` and `join`, and `clear` leaves it and its members alone.
-- **Never a second administrator:** an `@porelo` Porelo holds no token for is refused (78), except by the first
-  `setup` after a `restore`, which takes it back. If its token is refused and no `@porelo` exists, the homeserver
-  was reset (78, saying so).
-- Names are lower-case letters, digits and `. _ = -`; a person's may not begin with `porelo`.
+  `PORELO_MATRIX_REGISTRATION_TOKEN`. It also requires `--machine M` (or `PORELO_MATRIX_MACHINE` kept from
+  `setup`; a `--machine` that differs from `PORELO_MATRIX_MACHINE` is refused with 78).
+- **The project's room is checked:** on the account's own homeserver it is taken only if it is Porelo's —
+  made by its administrator, invite-only, guests forbidden — and a room under the alias that is anybody
+  else's, or was opened since, is refused (78) by `setup`, `enroll` and `join`, while `clear` leaves it and
+  its members alone. On a central homeserver the room named by `room` must be invite-only with guests
+  forbidden; otherwise `setup` leaves it and refuses (78), and `enroll` refuses (78).
+- **Never a second administrator or a taken machine name:** on the account's own homeserver, an `@porelo`
+  Porelo holds no token for is refused (78), except by the first `setup` after a `restore`, which takes it
+  back. If its token is refused and no `@porelo` exists, the homeserver was reset (78, saying so). On a
+  central homeserver, a `--machine` name another machine holds is refused (78).
+- Names — a project's, a task's, a machine's or a person's — are lower-case letters, digits and `. _ = -`;
+  a person's may not begin with `porelo`.
 
 ## Keeping the conversation
 
@@ -87,7 +93,7 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
 
 | Verb | What it does |
 |---|---|
-| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, its credential and its lifecycle verbs |
+| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, `takes: ["machine"]`, its credential and its lifecycle verbs |
 | `check` | Whether it could work now: the configuration complete, the homeserver answering, the token accepted. 0 usable, 2 not |
 | `send <file> <sig> --to <room id \| @user:server> [--shown <line>] [--mention @user:server]...` | To a person's user id: into the acting account's direct chat with them, opened (invite-only, marked direct) if there is none. One `m.text` event: the message in `org.fuin.porelo.message`, the signature in `org.fuin.porelo.signature`, and as its `body`, what a client shows, the line `--shown` names. In a room, each `--mention` is named in `m.mentions` and shown as a pill, by the name that person's or task's account shows, before the line, so that person's client highlights it; without one, `m.mentions` is empty and the message notifies nobody. In a direct chat nobody is mentioned. Prints `{"reference":"<event id>"}`. A retry is the same event |
 | `rename --display <nickname>` | Run with a task's token: the name its account shows in the room and its direct chats becomes the nickname. Its id, its token and every address stay. Prints nothing |
