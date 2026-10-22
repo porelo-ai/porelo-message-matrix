@@ -65,16 +65,22 @@ on another machine's accounts.
   78. If that account is invited to `room`, it joins and prints `"admitted": true` and the room as
   `conversation`; if not, `"admitted": false` and no `conversation`. The relay is
   `@porelo-relay-<project>.<machine>`, invited by the machine's account.
-- **`enroll`, central**: registers `@<task>.<machine>`, invites it with the machine's account, and prints
-  its password in `secrets` beside its token, so the task's own account can be deactivated later. Porelo keeps
-  `enroll`'s `secrets` in the vault per task and hands them back to `retire` as environment variables,
-  forgetting them only once `retire` succeeds; a task with no kept secrets gets no `retire` call, so a
-  central `enroll` always prints them.
-- **`retire`, central**: as the task's own account, `POST /_matrix/client/v3/account/deactivate` with the
-  password under user-interactive auth (`MatrixClient`); no `AdminRoom`. Enrolled again, the task's
-  password changes through `/account/password`, also as itself.
-- **`join`, central**: 77, "people are managed at the homeserver itself". **`clear`, central**: deactivates
-  this machine's accounts only and leaves the room and other machines' accounts alone.
+- **The machine's secret:** `setup` makes a random secret for the machine once and prints it in `account`
+  (`PORELO_MATRIX_MACHINE_SECRET`), which Porelo hands to every lifecycle verb. Every account the machine makes -
+  its relay and each task - has as password an HMAC-SHA256 of that secret over the account's localpart. Read in
+  porelo's `TransportLifecycle`: `enroll` never gets a task's earlier map, and `clear` gets no task's map at all, so
+  a password printed once would be lost to both; one derived from the machine's secret is not. Another machine
+  holds another secret and reaches none of these accounts.
+- **`enroll`, central**: registers `@<task>.<machine>` with the derived password, or, the account there already,
+  logs in with it - a token lost is a token taken again, and every other session is logged out; invites it with
+  the machine's account. `@<task>.<machine>` in another project's room is refused (78), as on the own homeserver.
+- **`retire`, central**: logs in as the task with the derived password and deactivates itself
+  (`/account/deactivate` with password user-interactive auth); no `AdminRoom`. Run again, the login is
+  `M_USER_DEACTIVATED`, which is done, not a failure.
+- **`join`, central**: 77, "people are managed at the homeserver itself". **`clear --project`, central**:
+  deactivates the relay and every `@<…>.<machine>` in the room that is in no other project's room, each as
+  itself with its derived password; leaves `@porelo.<machine>`, the room, people and other machines' accounts.
+  So a task Porelo forgot without a `retire` is still taken away.
 - **Read against today's code, the central mode must also answer** what was built since its estimate:
   - `enroll` and `retire` refuse a task account in another project's room through `membersElsewhere`, which reads
     `@porelo`'s joined rooms and keeps those named `#porelo-*`. Centrally there is no `@porelo`, a person's room may
