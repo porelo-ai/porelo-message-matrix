@@ -42,6 +42,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `enroll` and `retire` refuse (78) a task account another project's room has, as two projects whose names run
+  together give one task name; before, the second project's `enroll` took that task's account over and its token
+  stopped working.
 - `clear --project` leaves active an account that is in another project's room too - a person in two projects, or
   a task whose name both give - and names it in `kept`; before, it was deactivated and lost the other project.
 - A person's message with a mention link that is no valid escape no longer stops every later poll of the room.

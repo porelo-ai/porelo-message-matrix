@@ -1,6 +1,6 @@
 # MX28 — A Task Account Per Project
 
-**Status:** Analyzed; porelo's [B246](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b246)
+**Status:** Implementing; porelo's [B246](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b246)
 makes the names themselves unambiguous.
 **Size:** S - one check in `enroll` and one in `retire`, the refusal in `doc/transport.md`, an integration test with
 the real homeserver.
@@ -33,7 +33,8 @@ first task's account into its room, and `retire` of either deactivates both. Por
      (`membersElsewhere`, as `clear` asks since [MX19](README.md#mx19)), refuse with 78 before any password is set, naming the
      other room. `@<T>` in P's own room, or in none, is taken back as today.
   2. `retire --project P --task T`: the same check, so a retire through P never deactivates a task of another
-     project.
+     project. A project cleared already has no room of its own; then every project's room counts as another's,
+     so retiring a task of a cleared project stays harmless.
   3. `doc/transport.md`: both refusals in the rows of `enroll` and `retire`.
 - **The test that goes red first:** `LifecycleIT`: `setup` A and B, `enroll --project A --task porelo-a-b-c`,
   then `enroll --project B --task porelo-a-b-c`. Today the second succeeds and A's token answers 401. After:

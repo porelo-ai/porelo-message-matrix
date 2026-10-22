@@ -209,6 +209,7 @@ final class Lifecycle {
             throws Failure {
         final String task = required(options.task(), "--task");
         final Place place = place(settings, env);
+        refuseAnotherProjects(place, options.project(), task);
         final Accounts.Session account =
                 account(
                         place.nobody(),
@@ -244,10 +245,45 @@ final class Lifecycle {
             throws Failure {
         final String task = required(options.task(), "--task");
         final Place place = place(settings, env);
+        refuseAnotherProjects(place, options.project(), task);
         // Asked twice, the homeserver answers the same: retiring again after a failure is harmless.
         AdminRoom.of(place.admin(), place.adminId())
                 .deactivate("@" + task + ":" + AdminRoom.server(place.adminId()));
         return MatrixClient.JSON.createObjectNode();
+    }
+
+    /**
+     * Refuses a task account another project's room has: two projects whose names run together give
+     * two tasks one name, and enrolling or retiring it here would take that task's account from it.
+     */
+    private static void refuseAnotherProjects(
+            final Place place, final String project, final String task) throws Failure {
+        final String server = AdminRoom.server(place.adminId());
+        // A project cleared already has no room; then every project's room is another's.
+        final JsonNode own =
+                place.admin()
+                        .find(
+                                "/_matrix/client/v3/directory/room/"
+                                        + MatrixClient.segment(alias(project, server)));
+        final String other =
+                membersElsewhere(
+                                place.admin(),
+                                server,
+                                own == null ? "" : own.path("room_id").asText(""))
+                        .get("@" + task + ":" + server);
+        if (other != null) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "@"
+                            + task
+                            + ":"
+                            + server
+                            + " is a task of "
+                            + other
+                            + ", not of project "
+                            + project
+                            + ": two projects give one task name, and it is left as it is");
+        }
     }
 
     private static ObjectNode join(

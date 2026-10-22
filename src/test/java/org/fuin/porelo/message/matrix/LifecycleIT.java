@@ -272,6 +272,44 @@ class LifecycleIT {
                 .doesNotContain(setup.path("conversation").asText());
     }
 
+    /**
+     * Harm guarded: two projects whose names run together give two tasks one name, and the second
+     * project's enroll took the first task's account over - a new password, every other session
+     * logged out - or its retire deactivated it.
+     */
+    @Test
+    @DisplayName(
+            "enroll and retire through another project refuse a task account that is in a project's room, and change nothing")
+    void anotherProjectsTaskIsLeftAlone() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", "a");
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        run(kept, "setup", "--project", "a-b");
+        final String token =
+                run(kept, "enroll", "--project", "a", "--task", "porelo-a-b-c")
+                        .path("secrets")
+                        .path(Config.ACCESS_TOKEN)
+                        .asText();
+
+        final Transport.Result enrolled =
+                attempt(kept, "enroll", "--project", "a-b", "--task", "porelo-a-b-c");
+        final Transport.Result retired =
+                attempt(kept, "retire", "--project", "a-b", "--task", "porelo-a-b-c");
+
+        assertThat(enrolled.exit()).as("enroll: %s", enrolled.err()).isEqualTo(Exit.CONFIG);
+        assertThat(retired.exit()).as("retire: %s", retired.err()).isEqualTo(Exit.CONFIG);
+        assertThat(status(tuwunel.url(), token))
+                .as("the first project's task keeps its token")
+                .isEqualTo(200);
+
+        run(kept, "clear", "--project", "a");
+        final Transport.Result afterClear =
+                attempt(kept, "retire", "--project", "a", "--task", "porelo-a-b-c");
+        assertThat(afterClear.exit())
+                .as("retire of a cleared project's task stays harmless: %s", afterClear.err())
+                .isEqualTo(Exit.OK);
+    }
+
     /** An access token for a person, as their Matrix client would log in; empty when refused. */
     private String login(final String user, final String password)
             throws IOException, InterruptedException {
