@@ -28,6 +28,8 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx34"></a>[MX34](MX34-The-Homeserver-Starts-On-A-Large-Machine.md) | - | - | The local homeserver starts, and `backup` and `restore` run, on a machine of any size: a bug, first: on 32 cores Tuwunel's database pool reached podman's default pids limit and the start failed |
+| <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | - | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 
 ## Finished
