@@ -1,6 +1,6 @@
 # MX33 — A Person Is Shown By Their Name
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** XS - one setting of the homeserver's unit.
 
 **What must be true.** A person who joins the conversation is shown, in the room and in every mention of them, by
