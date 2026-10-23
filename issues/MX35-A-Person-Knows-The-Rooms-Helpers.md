@@ -5,7 +5,8 @@
 **What must be true.** A person in the project's room sees no helper account, or needs none at all: the room shows
 the person and the tasks. Only if a helper must stay visible, it carries a name a person reads, and it answers a
 mention with a standard line, such as "This is a technical account for delivering the room's messages; it does not
-read along." porelo's half, a word to a helper waking no task, is built only in that case.
+read along." porelo's half, [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264), a word to a
+helper waking no task, is built only in that case.
 
 ## To be checked
 
