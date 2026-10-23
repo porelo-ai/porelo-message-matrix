@@ -25,5 +25,4 @@ image:
         JAVA_HOME: /opt/graalvm
         GRAALVM_HOME: /opt/graalvm
         MATRIX_TEST_TUWUNEL: /usr/local/bin/tuwunel
-        # Java encodes a program's arguments by the locale: without UTF-8, a nickname loses what is not ASCII.
-        LANG: C.UTF-8
+        # No LANG: Porelo sets LANG=C.UTF-8 in every task and refuses a repository that sets it.
