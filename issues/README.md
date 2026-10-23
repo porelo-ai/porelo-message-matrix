@@ -19,6 +19,7 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx31"></a>[MX31](MX31-A-Host-Named-In-Upper-Case-Joins-Its-Conversation.md) | XS | - | A host named in upper case joins its project's conversation: `--machine` is taken without regard to case |
+| <a id="mx32"></a>[MX32](MX32-The-Account-Is-Cleared-With-Its-Machine-Named.md) | XS | - | `porelo vault clear` takes the account's homeserver away also when the transport is told the machine's name |
 
 ## Backlog
 

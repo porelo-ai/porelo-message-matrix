@@ -57,6 +57,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `clear` for the account takes `--machine`, as Porelo passes it, so `porelo vault clear` takes the account's
+  homeserver away instead of failing with 64.
 - `enroll` and `retire` refuse (78) a task account another project's room has, as two projects whose names run
   together give one task name; before, the second project's `enroll` took that task's account over and its token
   stopped working.

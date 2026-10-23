@@ -65,9 +65,14 @@ final class Lifecycle {
             final PrintStream err,
             final Unit unit)
             throws Failure {
-        if ("clear".equals(verb) && args.isEmpty()) {
-            // The account's own homeserver and what the transport keeps: no project, so no settings
-            // to read.
+        if ("clear".equals(verb) && !args.contains("--project")) {
+            if (!args.isEmpty()) {
+                if (args.size() != 2 || !"--machine".equals(args.getFirst())) {
+                    throw usage(verb);
+                }
+                machine(args.get(1));
+            }
+            // Porelo names the machine, but the account's own homeserver has no machine name.
             print(out, LocalHomeserver.clear(env).answer());
             return;
         }

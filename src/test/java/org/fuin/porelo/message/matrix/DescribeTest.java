@@ -112,15 +112,6 @@ class DescribeTest {
                             new PrintStream(OutputStream.nullOutputStream()));
             assertThat(exit).as(bad).isEqualTo(Exit.USAGE);
         }
-        assertThat(
-                        Main.run(
-                                new String[] {"clear", "--machine", "node-1"},
-                                Map.of(),
-                                new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)),
-                                new PrintStream(OutputStream.nullOutputStream()),
-                                new PrintStream(OutputStream.nullOutputStream())))
-                .as("clear without --project takes no --machine")
-                .isEqualTo(Exit.USAGE);
     }
 
     @Test
