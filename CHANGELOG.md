@@ -8,10 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Several machines of one project share one conversation on a central homeserver (`homeserver` and `room` in the
-  project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`,
-  and each machine registers only its own accounts (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`,
-  `@<task>.<machine>`) with passwords derived from a secret of its own (`PORELO_MATRIX_MACHINE_SECRET` in
-  `account`), so no machine holds an administrator token or acts on another machine's accounts.
+  project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`
+  (without regard to case, as a host name), and each machine registers only its own accounts (`@porelo.<machine>`,
+  `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`) with passwords derived from a secret of its own
+  (`PORELO_MATRIX_MACHINE_SECRET` in `account`), so no machine holds an administrator token or acts on another machine's accounts.
 - On a central homeserver, `setup` prints `"admitted": false` until a person in `room` invites `@porelo.<machine>`,
   then joins the room (checking that it is invite-only and forbids guests) and admits the machine's relay; `retire`
   and `clear --project` have only this machine's accounts leave the room and log out every session, as themselves,

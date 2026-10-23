@@ -64,7 +64,8 @@ its environment; each prints one JSON object.
   back. If its token is refused and no `@porelo` exists, the homeserver was reset (78, saying so). On a
   central homeserver, a `--machine` name another machine holds is refused (78).
 - Names — a project's, a task's, a machine's or a person's — are lower-case letters, digits and `. _ = -`;
-  a person's may not begin with `porelo`.
+  a person's may not begin with `porelo`. A machine's is a host name, so `--machine` is taken without regard to
+  case: its ASCII letters are folded to lower case.
 
 ## Keeping the conversation
 

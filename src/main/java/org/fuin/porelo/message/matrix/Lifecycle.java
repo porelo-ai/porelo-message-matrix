@@ -1358,7 +1358,7 @@ final class Lifecycle {
                 case "--project" -> project = name(value, "--project");
                 case "--task" -> task = name(value, "--task");
                 case "--person" -> person = name(value, "--person");
-                case "--machine" -> machine = name(value, "--machine");
+                case "--machine" -> machine = machine(value);
                 case "--display" -> {
                     if (!"enroll".equals(verb) || display != null) {
                         throw usage(verb);
@@ -1405,6 +1405,23 @@ final class Lifecycle {
                             + "'");
         }
         return value;
+    }
+
+    // A host name is case-insensitive and a Matrix localpart is lower case. Only ASCII is folded,
+    // so
+    // no other character can become one a name allows.
+    private static String machine(final String value) throws Failure {
+        final StringBuilder folded = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            final char c = value.charAt(i);
+            folded.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
+        }
+        if (!NAME.matcher(folded).matches()) {
+            throw new Failure(
+                    Exit.USAGE,
+                    "--machine must be letters, digits and . _ = - , not '" + value + "'");
+        }
+        return folded.toString();
     }
 
     private static Failure usage(final String verb) {

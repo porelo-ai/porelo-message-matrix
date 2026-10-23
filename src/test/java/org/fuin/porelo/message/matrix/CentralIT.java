@@ -273,6 +273,63 @@ class CentralIT {
     }
 
     /**
+     * Harm guarded: upper-case host names must not prevent a machine and its tasks from joining
+     * their project's conversation or disagree with the machine name kept in the account.
+     */
+    @Test
+    @DisplayName("A machine named in upper case is taken in lower case for setup and enroll")
+    void aMachineNamedInUpperCaseIsTakenInLowerCase() throws Exception {
+        final JsonNode before =
+                run(baseEnv(), "setup", "--project", PROJECT, "--machine", "Host-A");
+
+        assertThat(before.path("machine").asText())
+                .as("setup reports the host name in lower case")
+                .isEqualTo("host-a");
+        assertThat(before.path("account").path(Config.MACHINE).asText())
+                .as("the kept machine name agrees with the normalized host name")
+                .isEqualTo("host-a");
+
+        final String machineUserId = "@porelo.host-a:" + Tuwunel.SERVER_NAME;
+        final String adminToken = before.path("account").path(Config.ADMIN_TOKEN).asText();
+        final HttpResponse<String> identity =
+                http.send(
+                        HttpRequest.newBuilder(
+                                        URI.create(
+                                                tuwunel.url()
+                                                        + "/_matrix/client/v3/account/whoami"))
+                                .header("Authorization", "Bearer " + adminToken)
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+        assertThat(identity.statusCode())
+                .as("the homeserver accepts the registered machine account's token")
+                .isEqualTo(200);
+        assertThat(MatrixClient.JSON.readTree(identity.body()).path("user_id").asText())
+                .as("the homeserver registered the machine with a lower-case localpart")
+                .isEqualTo(machineUserId);
+
+        invite(person, room, machineUserId);
+        final Map<String, String> account = with(baseEnv(), before.path("account"));
+        final JsonNode setup = run(account, "setup", "--project", PROJECT, "--machine", "Host-A");
+        assertThat(setup.path("admitted").asBoolean(false))
+                .as("the machine invited as @porelo.host-a is admitted to the project's room")
+                .isTrue();
+        final JsonNode enrolled =
+                run(
+                        with(account, setup.path("account"), setup.path("secrets")),
+                        "enroll",
+                        "--project",
+                        PROJECT,
+                        "--task",
+                        "porelo-demo-alice",
+                        "--machine",
+                        "HOST-A");
+
+        assertThat(enrolled.path("address").asText())
+                .as("enroll accepts the same host in upper case with the kept account secrets")
+                .endsWith(".host-a:" + Tuwunel.SERVER_NAME);
+    }
+
+    /**
      * Harm guarded: a second machine given the same machine name holds a different secret and must
      * be refused with 78 rather than acting on or overwriting the first machine's account.
      */

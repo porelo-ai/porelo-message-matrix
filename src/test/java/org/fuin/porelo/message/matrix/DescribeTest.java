@@ -80,15 +80,15 @@ class DescribeTest {
      */
     @Test
     @DisplayName(
-            "Every lifecycle verb takes --machine <name> in the localpart alphabet, and refuses any other with 64")
+            "Every lifecycle verb takes --machine without regard to case, and refuses invalid characters with 64")
     void lifecycleVerbsTakeMachine() {
         for (final String[] args :
                 new String[][] {
-                    {"setup", "--project", "p", "--machine", "node-1"},
-                    {"enroll", "--project", "p", "--task", "t", "--machine", "node-1"},
-                    {"retire", "--project", "p", "--task", "t", "--machine", "node-1"},
-                    {"join", "--project", "p", "--person", "n", "--machine", "node-1"},
-                    {"clear", "--project", "p", "--machine", "node-1"}
+                    {"setup", "--project", "p", "--machine", "Node-1"},
+                    {"enroll", "--project", "p", "--task", "t", "--machine", "Node-1"},
+                    {"retire", "--project", "p", "--task", "t", "--machine", "Node-1"},
+                    {"join", "--project", "p", "--person", "n", "--machine", "Node-1"},
+                    {"clear", "--project", "p", "--machine", "Node-1"}
                 }) {
             final ByteArrayOutputStream err = new ByteArrayOutputStream();
             final int exit =
@@ -102,7 +102,7 @@ class DescribeTest {
                     .as("%s: %s", String.join(" ", args), err.toString(StandardCharsets.UTF_8))
                     .isEqualTo(Exit.CONFIG);
         }
-        for (final String bad : new String[] {"", "Has Spaces", "Upper", "-dash", "a:b", "a@b"}) {
+        for (final String bad : new String[] {"", "Has Spaces", "-dash", "a:b", "a@b", "\u212A"}) {
             final int exit =
                     Main.run(
                             new String[] {"setup", "--project", "p", "--machine", bad},
