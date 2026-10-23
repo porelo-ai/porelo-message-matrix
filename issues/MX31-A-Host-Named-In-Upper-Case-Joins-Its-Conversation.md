@@ -1,6 +1,6 @@
 # MX31 — A Host Named In Upper Case Joins Its Conversation
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** XS - one option of the lifecycle verbs, its integration test and a line of the contract.
 
 **What must be true.** A host whose name carries upper-case letters takes part in its project's conversation like

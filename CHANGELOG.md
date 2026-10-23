@@ -57,6 +57,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A person in the conversation is shown by the name they joined with: the local homeserver no longer adds its
+  default suffix, an emoji, to every new account's display name.
 - `clear` for the account takes `--machine`, as Porelo passes it, so `porelo vault clear` takes the account's
   homeserver away instead of failing with 64.
 - `enroll` and `retire` refuse (78) a task account another project's room has, as two projects whose names run

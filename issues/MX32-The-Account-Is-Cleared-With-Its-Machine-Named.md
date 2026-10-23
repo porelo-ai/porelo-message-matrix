@@ -1,6 +1,6 @@
 # MX32 — The Account Is Cleared With Its Machine Named
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** XS - the shape of one verb, its tests and a line of the contract.
 
 **What must be true.** `porelo vault clear` takes away what the transport keeps for the account - the local

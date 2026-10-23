@@ -13,13 +13,14 @@ sequence.
 | <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
 | <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | S | - | Two projects' tasks never share one account when their names run together; enroll and retire refuse a task account that is another project's |
 | <a id="mx12"></a>[MX12](MX12-Several-Machines-On-One-Homeserver.md) | L | - | Several machines provision on one central homeserver, each with no more than its own rights, and their tasks share one conversation |
+| <a id="mx31"></a>[MX31](MX31-A-Host-Named-In-Upper-Case-Joins-Its-Conversation.md) | XS | - | A host named in upper case joins its project's conversation: `--machine` is taken without regard to case |
+| <a id="mx32"></a>[MX32](MX32-The-Account-Is-Cleared-With-Its-Machine-Named.md) | XS | - | `porelo vault clear` takes the account's homeserver away also when the transport is told the machine's name |
 
 ## Implementing
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx31"></a>[MX31](MX31-A-Host-Named-In-Upper-Case-Joins-Its-Conversation.md) | XS | - | A host named in upper case joins its project's conversation: `--machine` is taken without regard to case |
-| <a id="mx32"></a>[MX32](MX32-The-Account-Is-Cleared-With-Its-Machine-Named.md) | XS | - | `porelo vault clear` takes the account's homeserver away also when the transport is told the machine's name |
+| <a id="mx33"></a>[MX33](MX33-A-Person-Is-Shown-By-Their-Name.md) | XS | - | A person is shown by the name they joined with, without the homeserver's emoji suffix |
 
 ## Backlog
 
