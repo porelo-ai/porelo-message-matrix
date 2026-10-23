@@ -138,6 +138,12 @@ final class PodmanUnit implements Unit {
                                 "TUWUNEL_ALLOW_FEDERATION=false",
                                 "-e",
                                 "TUWUNEL_ALLOW_REGISTRATION=false"));
+        command.addAll(HomeserverBounds.PODMAN_FLAGS);
+        HomeserverBounds.SETTINGS.forEach(
+                (key, value) -> {
+                    command.add("-e");
+                    command.add(key + "=" + value);
+                });
         for (final String name : new TreeSet<>(secretNames)) {
             command.add("-e");
             command.add(name);

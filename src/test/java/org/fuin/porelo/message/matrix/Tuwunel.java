@@ -115,19 +115,21 @@ final class Tuwunel implements AutoCloseable {
                         dir.resolve("env"),
                         PosixFilePermissions.asFileAttribute(
                                 PosixFilePermissions.fromString("rw-------")));
-        Files.writeString(
-                env,
-                String.join(
-                        "\n",
-                        "TUWUNEL_SERVER_NAME=" + SERVER_NAME,
-                        "TUWUNEL_ADDRESS=0.0.0.0",
-                        "TUWUNEL_PORT=8008",
-                        "TUWUNEL_DATABASE_PATH=/data",
-                        "TUWUNEL_ALLOW_FEDERATION=false",
-                        "TUWUNEL_ALLOW_REGISTRATION=true",
-                        "TUWUNEL_REGISTRATION_TOKEN=" + token,
-                        ""),
-                StandardCharsets.UTF_8);
+        final List<String> settings =
+                new java.util.ArrayList<>(
+                        List.of(
+                                "TUWUNEL_SERVER_NAME=" + SERVER_NAME,
+                                "TUWUNEL_ADDRESS=0.0.0.0",
+                                "TUWUNEL_PORT=8008",
+                                "TUWUNEL_DATABASE_PATH=/data",
+                                "TUWUNEL_ALLOW_FEDERATION=false",
+                                "TUWUNEL_ALLOW_REGISTRATION=true",
+                                "TUWUNEL_REGISTRATION_TOKEN=" + token));
+        // The bounds the unit runs with, so a large build machine does not fail where the unit
+        // would not.
+        HomeserverBounds.SETTINGS.forEach((key, value) -> settings.add(key + "=" + value));
+        settings.add("");
+        Files.writeString(env, String.join("\n", settings), StandardCharsets.UTF_8);
         // Never "porelo-…": the build runs in a developer's own podman, where Porelo takes such a
         // name for a task.
         final String container = "tuwunel-it-" + random().substring(0, 8).toLowerCase();
@@ -150,17 +152,7 @@ final class Tuwunel implements AutoCloseable {
         // A start that fails half-way removes what it made - the container and the directory with
         // the token - before it says why.
         try {
-            podman(
-                    "run",
-                    "-d",
-                    "--rm",
-                    "--name",
-                    container,
-                    "--env-file",
-                    env.toString(),
-                    "-p",
-                    "127.0.0.1::8008",
-                    image());
+            podman(run(container, env, "127.0.0.1::8008"));
             final String port = podman("port", container, "8008/tcp").strip().replaceAll(".*:", "");
             final Tuwunel tuwunel = new Tuwunel(container, dir, token, "http://127.0.0.1:" + port);
             tuwunel.awaitUp();
@@ -201,16 +193,10 @@ final class Tuwunel implements AutoCloseable {
         }
         podman("rm", "-f", container);
         podman(
-                "run",
-                "-d",
-                "--rm",
-                "--name",
-                container,
-                "--env-file",
-                dir.resolve("env").toString(),
-                "-p",
-                "127.0.0.1:" + URI.create(url).getPort() + ":8008",
-                image());
+                run(
+                        container,
+                        dir.resolve("env"),
+                        "127.0.0.1:" + URI.create(url).getPort() + ":8008"));
         awaitUp();
     }
 
@@ -486,6 +472,16 @@ final class Tuwunel implements AutoCloseable {
         }
         throw new IllegalStateException(
                 "Tuwunel did not answer on " + url + " within " + START_TIMEOUT);
+    }
+
+    /** The container's run, under the unit's own limits. */
+    private static String[] run(final String container, final Path env, final String publish)
+            throws IOException {
+        final List<String> args =
+                new java.util.ArrayList<>(List.of("run", "-d", "--rm", "--name", container));
+        args.addAll(HomeserverBounds.PODMAN_FLAGS);
+        args.addAll(List.of("--env-file", env.toString(), "-p", publish, image()));
+        return args.toArray(String[]::new);
     }
 
     private static String podman(final String... args) throws IOException, InterruptedException {

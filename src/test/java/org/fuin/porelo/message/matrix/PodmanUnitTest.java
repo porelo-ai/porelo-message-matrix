@@ -13,6 +13,31 @@ class PodmanUnitTest {
 
     private static final String IMAGE = "ghcr.io/example/tuwunel@sha256:" + "0".repeat(64);
 
+    /** Harm guarded: backup and restore must not fail from core-scaled resource use. */
+    @Test
+    void boundsEveryTuwunelSettingBeforeTheImage() {
+        final List<String> command =
+                PodmanUnit.command("localhost", Path.of("/b"), IMAGE, List.of(), Set.of());
+        final List<String> options = command.subList(0, command.indexOf(IMAGE));
+
+        HomeserverBounds.SETTINGS.forEach(
+                (key, value) ->
+                        assertThat(options)
+                                .as("the one-shot run passes %s before the image", key)
+                                .containsSequence("-e", key + "=" + value));
+    }
+
+    /** Harm guarded: backup and restore must not exhaust the host's resources. */
+    @Test
+    void boundsTheContainerBeforeTheImage() {
+        final List<String> command =
+                PodmanUnit.command("localhost", Path.of("/b"), IMAGE, List.of(), Set.of());
+
+        assertThat(command.subList(0, command.indexOf(IMAGE)))
+                .as("the one-shot run bounds the container before its image")
+                .containsAll(HomeserverBounds.PODMAN_FLAGS);
+    }
+
     @Test
     @DisplayName(
             "a secret for the run is named on podman's command line, never given there, and the run's output stays out of the journal")

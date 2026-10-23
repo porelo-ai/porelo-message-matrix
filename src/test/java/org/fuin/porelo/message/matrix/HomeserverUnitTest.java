@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,69 @@ class HomeserverUnitTest {
     private static final Path TEMPLATE = Path.of("homeserver", "porelo-matrix-homeserver.service");
 
     private static final Path DOCKERFILE = Path.of("homeserver", "Dockerfile");
+
+    /** Harm guarded: core-scaled pools and caches can prevent the homeserver from starting. */
+    @Test
+    void boundsEveryTuwunelSettingInTheRun() throws IOException {
+        final String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+        final List<String> run =
+                List.of(
+                        template.substring(
+                                        template.indexOf("ExecStart="), template.indexOf("@IMAGE@"))
+                                .replace("\\\n", " ")
+                                .strip()
+                                .split("\\s+"));
+
+        HomeserverBounds.SETTINGS.forEach(
+                (key, value) ->
+                        assertThat(run)
+                                .as("the unit passes %s to Tuwunel", key)
+                                .containsSequence("-e", key + "=" + value));
+    }
+
+    /** Harm guarded: an unbounded container can exhaust the host's resources. */
+    @Test
+    void boundsTheContainerBeforeTheImage() throws IOException {
+        final String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+        final List<String> run =
+                List.of(
+                        template.substring(
+                                        template.indexOf("ExecStart="), template.indexOf("@IMAGE@"))
+                                .replace("\\\n", " ")
+                                .strip()
+                                .split("\\s+"));
+
+        assertThat(run)
+                .as("the unit bounds the container before its image")
+                .containsAll(HomeserverBounds.PODMAN_FLAGS);
+    }
+
+    /** Harm guarded: the database pool alone must never exhaust the container's PIDs. */
+    @Test
+    void leavesPidsForTheServersOtherThreads() {
+        assertThat(HomeserverBounds.SETTINGS.keySet())
+                .as("the settings guarded by both launch paths")
+                .containsExactly(
+                        "TUWUNEL_DB_POOL_MAX_WORKERS",
+                        "TUWUNEL_DB_CACHE_CAPACITY_MB",
+                        "TUWUNEL_CACHE_CAPACITY_MODIFIER",
+                        "TUWUNEL_ROCKSDB_PARALLELISM_THREADS");
+        assertThat(HomeserverBounds.PODMAN_FLAGS)
+                .as("the container budgets guarded by both launch paths")
+                .containsExactly("--pids-limit=512", "--memory=1g", "--cpus=2");
+        final int pids =
+                Integer.parseInt(
+                        HomeserverBounds.PODMAN_FLAGS.stream()
+                                .filter(flag -> flag.startsWith("--pids-limit="))
+                                .findFirst()
+                                .orElseThrow()
+                                .substring("--pids-limit=".length()));
+
+        assertThat(Integer.parseInt(HomeserverBounds.SETTINGS.get("TUWUNEL_DB_POOL_MAX_WORKERS")))
+                .as("the pool cap leaves PIDs for Tuwunel's other threads at any core count")
+                .isPositive()
+                .isLessThan(pids);
+    }
 
     @Test
     @DisplayName("The unit runs exactly the image the Dockerfile pins, and names no other")

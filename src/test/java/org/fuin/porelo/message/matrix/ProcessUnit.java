@@ -183,6 +183,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
         final Map<String, String> environment = builder.environment();
         environment.clear();
         final Map<String, String> settings = new HashMap<>();
+        settings.putAll(HomeserverBounds.SETTINGS);
         settings.put("TUWUNEL_SERVER_NAME", LocalHomeserver.serverName(conf));
         settings.put("TUWUNEL_ADDRESS", "127.0.0.1");
         settings.put("TUWUNEL_PORT", Integer.toString(port));

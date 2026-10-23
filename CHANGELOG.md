@@ -57,6 +57,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The local homeserver no longer sizes itself from the machine's cores: its database pool is capped at 64
+  workers, its read cache at 256 MB and RocksDB at 2 threads, and its container runs with `--pids-limit=512`,
+  `--memory=1g` and `--cpus=2`, for backup and restore too. On 32 cores the pool had reached podman's pids limit and
+  the homeserver did not start.
 - A person in the conversation is shown by the name they joined with: the local homeserver no longer adds its
   default suffix, an emoji, to every new account's display name.
 - `clear` for the account takes `--machine`, as Porelo passes it, so `porelo vault clear` takes the account's
