@@ -1,6 +1,6 @@
 # MX38 — A Room Shows No Helper
 
-**Status:** Idea.
+**Status:** Accepted.
 **Size:** XL - every lifecycle verb, both polls, a registration and a migration; splits into the parts below.
 
 **What must be true.** A person in the project's room sees only the people and the tasks among its members, never
