@@ -1,28 +1,78 @@
 # MX35 — A Person Knows The Room's Helpers
 
-**Status:** Accepted.
+**Status:** Analyzed.
+**Size:** M - one contract field another repository reads, docs, two classes.
 
-**What must be true.** A person in the project's room sees no helper account, or needs none at all: the room shows
-the person and the tasks. Only if a helper must stay visible, it carries a name a person reads, and it answers a
-mention with a standard line, such as "This is a technical account for delivering the room's messages; it does not
-read along." porelo's half, [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264), a word to a
-helper waking no task, is built only in that case.
+**What must be true.** A person in the project's room knows what the room's helper accounts are, or sees none at
+all: while the helpers stay visible in the room, each carries a display name a person reads, and a mention of only
+helpers wakes no task and is answered with a standard line, such as "This is a technical account for delivering the
+room's messages; it does not read along.", through porelo's half,
+[B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264).
+
+## Why
+
+- **What a client shows:** in Element, the room's members are the person, the task, `porelo` and
+  `porelo-relay-<project>`. Tasks get a display name at `enroll` (`/displayname`), while the administrator and the
+  relay get none, so a client shows their bare names and the operator cannot tell what the last two are.
+- **What they are:** `@porelo` is the homeserver's administrator, which makes the room and registers and invites
+  every account. `@porelo-relay-<project>` is the account Porelo's `poll` reads the room with. Neither writes in it.
+- **Why a task wakes:** `Person.java` strikes the poller (the relay) from a person's `to`, but keeps `@porelo`.
+  Porelo then drops it as neither a task nor a person, leaving `to` empty, and a line meant for nobody is meant for
+  every agent, so a line mentioning only `porelo` wakes the task.
+
+## Measured
+
+On a test VM, against the pinned Tuwunel:
+
+- **Administrator leaves:** once out of the room it cannot invite (`403 M_FORBIDDEN`). With invite power `50` given
+  to the relay first, the relay invites a new account, it joins, and the relay still reads every new message with
+  `/sync`.
+- **Admin command without membership:** `!admin users force-join-room <user> <room>` is refused:
+  "Auth check failed: cannot join a room that is not `public`". The admin API does not put an account into the
+  invite-only room for an administrator who left it.
+- **Application service:** `!admin appservices register` accepts a registration whose room namespace names the room;
+  the homeserver pushes the room's events to the service's HTTP endpoint without the service being a member, and it
+  is not shown among the members. But the service cannot read the room with `/messages` (`403 M_FORBIDDEN`): it gets
+  the room only as pushes to a listening server.
+
+## Plan
+
+- **Read in today's code (`Lifecycle.java`, `Person.java`):** the administrator's membership carries every room
+  operation: `room` and `ours` (finds the room by alias and proves Porelo made it by reading its first events and
+  state), `admit` (invites tasks and people), `clear` and `membersElsewhere` (reads every project room it is in, so
+  clearing one project never cuts a person off from another), and the central-homeserver verbs of
+  [MX12](README.md#mx12). `Person.java` strikes the poller from a person's `to` but keeps the administrator.
+- **The helpers stay in the room, named in words:** `setup` sets the administrator's display name to
+  "Porelo (administrator)" and the relay's to "Porelo (delivery)" (the words pending the second open question), also
+  on an existing room, so a room made before shows them after the next `setup`.
+- **Mentions of helpers marked for Porelo:** `Person.java` strikes both helpers from `to`, and a person's line whose
+  `to` named only helpers is handed over marked with `helpers: true` in the person file (`doc/transport.md`, the
+  contract with `porelo`), so porelo's half
+  [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264) wakes no task and answers with
+  the standard line through `send`. The transport itself never answers: it decides nothing.
+- **Not chosen:** the administrator leaving the room moves every room operation and the cross-project checks to the
+  relay and back (size L, the central homeserver too); the relay as an application service needs a listening service
+  in place of `poll` and a new contract with `porelo` (size L, and a service where today a program runs).
+- **Files and tests:** `Lifecycle.java` (`setup`, the display names), `Person.java` (the strike and the mark),
+  `doc/transport.md` (the field), and `CHANGELOG.md`; tests in `PersonTest` (a line naming only the administrator:
+  red today, `to` empty and no mark) and a `Lifecycle` integration test reading both display names after `setup`.
+
+## Acceptance
+
+- After `setup`, a client reads both helpers by the words chosen, on a new and an existing room.
+- A person's line mentioning only a helper reaches Porelo with `to` empty and the mark, and is seen to fail without
+  the fix.
+- A line naming a task and a helper names only the task, unmarked.
+
+## Open questions
+
+- Whether helpers named in words are enough, or the room must show no helper at all: then the relay as an
+  application service is the only measured way (the administrator leaving still leaves the relay visible), an L of
+  its own across this transport and `porelo`, and this plan is replaced.
+- The display names' words, and the standard line `porelo` answers with (proposed: "This is a technical account for
+  delivering the room's messages; it does not read along.").
 
 ## To be checked
 
-- **Seen on 2026-10-23 by the operator, in Element:** the room's members were the person, the task, `porelo` and
-  `porelo-relay-<project>`, shown by those bare names. The operator could not tell what the last two were. A line
-  mentioning only `porelo` woke the task, which answered.
-- **What they are:** `@porelo` is the homeserver's administrator, which makes the room and registers and invites
-  every account. `@porelo-relay-<project>` is the account Porelo's `poll` reads the room with. Neither writes in it.
-- **Why the task woke:** the transport strikes the poller, the relay, from a person's `to` (`Person.java`), but
-  keeps `@porelo`. porelo then drops it as neither a task nor a person, so `to` was empty, and a line meant for nobody
-  is meant for every agent.
-- **On the VM, against the pinned Tuwunel:**
-  - whether the administrator can leave the room after handing the right to invite on, and the transport still
-    enrolls tasks and joins people;
-  - whether it can invite through the homeserver's admin API without being a member;
-  - whether the relay can be an application service that receives the room's events without being a visible member,
-    if Tuwunel supports it.
-- Only if a helper must stay visible: its display name, and how it answers a mention when today neither account
-  reads the room for that.
+- On a test VM, against the pinned Tuwunel with a client: whether Element shows the display name in the member list
+  and in mention completion.

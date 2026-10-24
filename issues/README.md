@@ -25,11 +25,16 @@ sequence.
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window [MX20](README.md#mx20) leaves |
 
+## Analyzed
+
+| # | Size | Open questions | Blocked by | What it covers |
+|---|---|---|---|---|
+| <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | M | 2 | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
+
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | - | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | - | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 
