@@ -74,8 +74,13 @@ public final class Main {
             }
             return Exit.OK;
         } catch (final Failure failure) {
-            err.println(NAME + " " + args[0] + ": " + failure.getMessage());
-            return failure.exitCode();
+            return reportFailure(args[0], failure, err);
         }
+    }
+
+    /** The failure on stderr as a run ends with it, so a test reads the very lines Porelo reads. */
+    static int reportFailure(final String verb, final Failure failure, final PrintStream err) {
+        err.println(NAME + " " + verb + ": " + failure.getMessage());
+        return failure.exitCode();
     }
 }

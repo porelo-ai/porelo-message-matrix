@@ -347,6 +347,17 @@ final class Keep {
             final Map<String, String> env,
             final Unit unit)
             throws Failure {
+        return retake(nobody, url, env, unit, LocalHomeserver.START_TIMEOUT);
+    }
+
+    /** Retakes with a bounded restart wait, including when the unit never answers. */
+    static Accounts.Session retake(
+            final MatrixClient nobody,
+            final URI url,
+            final Map<String, String> env,
+            final Unit unit,
+            final Duration within)
+            throws Failure {
         final String password = Accounts.password();
         unit.stop();
         final int exit;
@@ -364,7 +375,7 @@ final class Keep {
         } finally {
             unit.start();
         }
-        LocalHomeserver.awaitUp(url);
+        LocalHomeserver.awaitUp(url, within, env, unit, password);
         if (exit != 0) {
             throw new Failure(
                     Exit.CONFIG,

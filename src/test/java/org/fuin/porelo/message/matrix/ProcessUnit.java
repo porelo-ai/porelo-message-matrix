@@ -77,6 +77,21 @@ final class ProcessUnit implements Unit, AutoCloseable {
     }
 
     @Override
+    public String state() {
+        return active() ? "active" : "inactive";
+    }
+
+    @Override
+    public List<String> recentLog() {
+        try {
+            final List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+            return lines.subList(Math.max(0, lines.size() - 200), lines.size());
+        } catch (final IOException ex) {
+            return List.of();
+        }
+    }
+
+    @Override
     public void start() throws Failure {
         if (active()) {
             return;

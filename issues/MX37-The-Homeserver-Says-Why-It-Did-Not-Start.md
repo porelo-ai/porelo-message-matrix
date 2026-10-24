@@ -1,7 +1,7 @@
 # MX37 — The Homeserver Says Why It Did Not Start
 
-**Status:** Backlog.
-**Size:** XS - one class and its test, and one optional field in `describe`.
+**Status:** Implementing.
+**Size:** XS - the start's failure path, the unit's log and state, and one optional field in `describe`.
 
 **What must be true.** When `setup` gives up waiting for the local homeserver, a person reads why in Porelo's
 start, from the homeserver's own words, never a secret; and Porelo can say what a start waits on. This
@@ -24,16 +24,18 @@ repository's part of porelo's [B268](https://github.com/porelo-ai/porelo/blob/ma
 
 ## Plan
 
-- On the timeout, `setup` reads the unit's container log (the journal of `porelo-matrix-homeserver.service`, or
-  `podman logs` of its container) and prints last on stderr: the last `Error: ` line, else the last `ERROR` line,
-  else the unit's state ("exited 1"); ANSI codes and control characters stripped; at most 300 characters. A line
-  holding a secret the transport knows (the registration token, the administrator's password) is never printed;
-  then it says the cause was withheld.
+- On the timeout after a start of the unit, `LocalHomeserver.awaitUp` reads the last 200 lines of the unit's journal
+  (`Unit.recentLog`; a read that fails answers none) and prints last on stderr, alone on its line: the last `Error: `
+  line, else the last `ERROR` line, else `the homeserver's unit is <state>` (`Unit.state`); ANSI codes and control
+  characters stripped; at most 300 characters. A line holding a secret the transport knows (the registration token,
+  a `PORELO_MATRIX_*` token, password or secret, the password `Keep.retake` makes), raw or stripped, is never printed;
+  the line then says `the homeserver's last error was withheld: it held a secret`. The timeout sentence stays first.
 - `describe` gains `"waitsOn": "the room's homeserver"`, optional, one line, at most 80 characters, in
   `doc/transport.md`.
 - Red first: a test where the unit's log ends with the `CreateIOUring` line after an `Error: ` line, and one where
   a line holds the registration token: today neither cause reaches stderr.
-- Files: `LocalHomeserver.java`, `Describe.java`, `doc/transport.md`, `CHANGELOG.md`, their tests.
+- Files: `LocalHomeserver.java`, `Unit.java`, `PodmanUnit.java`, `Keep.java`, `Main.java`, `Describe.java`, their tests
+  and the fake units, `doc/transport.md`, `CHANGELOG.md`.
 
 ## Acceptance
 

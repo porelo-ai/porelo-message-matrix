@@ -31,6 +31,7 @@ final class Describe {
                 MatrixClient.JSON
                         .createObjectNode()
                         .put("scheme", "matrix")
+                        .put("waitsOn", "the room's homeserver")
                         .put("poll", true)
                         // receipt answers from the room's read receipts.
                         .put("confirms", "read")

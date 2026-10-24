@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -16,12 +18,17 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * The local homeserver's port: chosen once, kept in homeserver.conf. Starting the unit is measured
@@ -30,6 +37,468 @@ import org.junit.jupiter.api.io.TempDir;
 class LocalHomeserverTest {
 
     @TempDir private Path dir;
+
+    /** Harm guarded: Porelo must receive the startup cause rather than shutdown noise. */
+    @Test
+    void theLastErrorPrecedesShutdownNoise() throws Exception {
+        final String error = "Error: database directory cannot be created";
+        final String stderr =
+                startupError(
+                        List.of(
+                                "Error: an earlier failure",
+                                error,
+                                "2026-01-01 ERROR tuwunel: Critical error starting server: later logged error",
+                                "CreateIOUring failed: Function not implemented (errno=38)"),
+                        "failed",
+                        Map.of());
+
+        assertThat(stderr.lines().toList())
+                .as("the timeout stays before the cause alone on the last stderr line")
+                .containsExactly(
+                        Main.NAME
+                                + " setup: the homeserver at http://127.0.0.1:1 did not answer within 0 s",
+                        error);
+    }
+
+    /** Harm guarded: an ERROR level must remain diagnosable without the plain error summary. */
+    @Test
+    void theLastErrorLevelIsTheFallback() throws Exception {
+        final String error =
+                "2026-01-01 ERROR tuwunel: Critical error starting server: bad setting";
+        final String stderr =
+                startupError(
+                        List.of(
+                                "ERROR tuwunel: earlier failure",
+                                error,
+                                "INFO an ERROR_CODE is not an error level"),
+                        "failed",
+                        Map.of());
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("the last ERROR level is used when no Error summary exists")
+                .isEqualTo(error);
+    }
+
+    static Stream<String> secretLines() {
+        return Stream.of(
+                "Error: registration token %s was rejected",
+                "\u001b[31mError: registration token %s was rejected\u001b[0m",
+                "2026-01-01 \u001b[31mERROR\u001b[0m tuwunel: Critical error starting server: %s",
+                "Error: %s" + "a".repeat(400),
+                "Error: " + "a".repeat(400) + "%s",
+                "Error: \u001b]0;%s\u0007invalid setting");
+    }
+
+    /** Harm guarded: raw, colored, short, and truncated log errors must never leak a token. */
+    @ParameterizedTest
+    @MethodSource("secretLines")
+    void aRegistrationTokenInTheChosenLineIsWithheld(final String format) throws Exception {
+        final String token = "Q7";
+        final String stderr = startupError(List.of(format.formatted(token)), "failed", Map.of());
+
+        assertThat(stderr).as("the registration token never reaches stderr").doesNotContain(token);
+        assertThat(stderr.lines().toList().getLast())
+                .as("a secret-bearing error is explicitly withheld")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: stripping ANSI or control characters must not assemble a printable secret. */
+    @ParameterizedTest
+    @ValueSource(strings = {"Q\u001b[31m7", "Q\u00007", "Q\r7"})
+    void aRegistrationTokenRevealedByStrippingIsWithheld(final String colored) throws Exception {
+        final String stderr = startupError(List.of("Error: " + colored), "failed", Map.of());
+
+        assertThat(stderr)
+                .as("a reconstructed registration token never reaches stderr")
+                .doesNotContain("Q7");
+        assertThat(stderr.lines().toList().getLast())
+                .as("stripping cannot bypass the secret filter")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: every credential already held by the transport must stay off stderr. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                Config.ACCESS_TOKEN,
+                Config.ADMIN_TOKEN,
+                Config.REGISTRATION_TOKEN,
+                Config.MACHINE_SECRET,
+                "PORELO_MATRIX_ADMIN_PASSWORD"
+            })
+    void anEnvironmentSecretIsWithheldEvenWhenItIsOneCharacter(final String key) throws Exception {
+        final String stderr =
+                startupError(List.of("Error: credential Q is invalid"), "failed", Map.of(key, "Q"));
+
+        assertThat(stderr).as("an environment credential never reaches stderr").doesNotContain("Q");
+        assertThat(stderr.lines().toList().getLast())
+                .as("short environment secrets are withheld too")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: unknown credentials and encoded disclosures must stay off stderr. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "ToKeN=unrecognized",
+                "PASSWORD=unrecognized",
+                "passwd=unrecognized",
+                "secret=unrecognized",
+                "Authorization: Basic abc",
+                "Bearer abc",
+                "Cookie: abc",
+                "session=abc",
+                "access_token=abc",
+                "api_key=abc",
+                "apikey=abc",
+                "https://person:abc@example.org/path",
+                "%41",
+                "\\u0041",
+                "\\x41",
+                "to ken=abc",
+                "auth\u001b[31morization=abc",
+                "https://person@example.org"
+            })
+    void credentialLikeContentIsWithheldWithoutAKnownSecret(final String content) throws Exception {
+        final String stderr = startupError(List.of("Error: " + content), "failed", Map.of());
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("credential-like content is withheld even without a known secret")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: lookalikes must not bypass a filter that only recognizes ASCII credentials. */
+    @ParameterizedTest
+    @ValueSource(strings = {"ｔｏｋｅｎ=abc", "pаssword=abc", "a\u00a0b", "café", "🔒", "Ｑ７"})
+    void nonAsciiContentIsWithheld(final String content) throws Exception {
+        final String stderr = startupError(List.of("Error: " + content), "failed", Map.of());
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("non-ASCII printable content cannot be proved safe")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: alternate encodings and credential assignments must never leave on stderr. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "UTc=",
+                "&#81;&#55;",
+                "API-KEY=x",
+                "Q+7",
+                "a=b",
+                "a%b",
+                "a&b",
+                "a#b",
+                "a\\b",
+                "a+b",
+                "a@b",
+                "a<b",
+                "a>b",
+                "a*b",
+                "a$b",
+                "a|b",
+                "a^b",
+                "a~b",
+                "abcDEF012345",
+                "01234567890z",
+                "abc_def-1234",
+                "0123456789abcdef",
+                "u9M4r2K8",
+                "abcde_1-"
+            })
+    void contentOutsideTheAllowlistIsWithheld(final String content) throws Exception {
+        final String stderr = startupError(List.of("Error: " + content), "failed", Map.of());
+        assertThat(stderr.lines().toList().getLast())
+                .as("the allowlist withholds the complete unsafe message")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: the grammar must preserve ordinary errors while rejecting token shapes. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "abcdefghijklmnopqrstuvwxyz",
+                "12345678901234567890",
+                "abcDE01",
+                ".,:;()[]{} ` '\" _-/!?",
+                "API-KEY: x",
+                "api_key: x",
+                "apikey: x",
+                "token: x",
+                "password: x",
+                "passwd: x",
+                "secret: x",
+                "authorization: x",
+                "bearer: x",
+                "cookie: x",
+                "session: x",
+                "access_token: x"
+            })
+    void allowedTextAndCredentialWordsAreDistinguished(final String content) throws Exception {
+        final boolean credential = content.endsWith(": x");
+        final String stderr = startupError(List.of("Error: " + content), "failed", Map.of());
+        assertThat(stderr.lines().toList().getLast())
+                .as("allowed characters and short runs survive unless they name credentials")
+                .isEqualTo(
+                        credential
+                                ? "the homeserver's last error was withheld: it held a secret"
+                                : "Error: " + content);
+    }
+
+    /** Harm guarded: a secret hidden in stripped ANSI still needs composed decoding checks. */
+    @ParameterizedTest
+    @ValueSource(strings = {"Q+7", "%2551%2537", "\\u0025" + "51%37", "Ｑ ７"})
+    void composedDecodingsOfRawContentStillProtectKnownSecrets(final String content)
+            throws Exception {
+        final String stderr =
+                startupError(
+                        List.of("\u001b]0;" + content + "\u0007Error: invalid setting"),
+                        "failed",
+                        Map.of());
+        assertThat(stderr.lines().toList().getLast())
+                .as("decoding compositions of the original message cannot disclose a known secret")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: even a fragment of a known password must never reach stderr. */
+    @ParameterizedTest
+    @ValueSource(strings = {"u9M4r2K8", "u9M4r2K8.z6P3b7V5.d1H0n8F6.c4X2w9Y7"})
+    void fragmentsOfAKnownPasswordAreWithheld(final String content) throws Exception {
+        final String stderr =
+                startupError(
+                        List.of("Error: " + content),
+                        "failed",
+                        Map.of(),
+                        "u9M4r2K8z6P3b7V5d1H0n8F6c4X2w9Y7");
+        assertThat(stderr.lines().toList().getLast())
+                .as("eight-character password fragments are withheld")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    static Stream<org.junit.jupiter.params.provider.Arguments> secretWindows() {
+        final String secret = "abcdefgh.ijklmnop qrstuvwxyzABCDE";
+        return java.util.stream.IntStream.rangeClosed(0, secret.length() - 8)
+                .boxed()
+                .flatMap(
+                        start -> {
+                            final String window = secret.substring(start, start + 8);
+                            final String escaped =
+                                    window.chars()
+                                            .mapToObj(point -> "\\u%04x".formatted(point))
+                                            .collect(java.util.stream.Collectors.joining());
+                            return Stream.of(
+                                            "Error: " + window,
+                                            "\u001b]0;"
+                                                    + escaped.replace("\\", "%255c")
+                                                    + "\u0007Error: invalid setting")
+                                    .map(
+                                            line ->
+                                                    org.junit.jupiter.params.provider.Arguments.of(
+                                                            secret, line));
+                        });
+    }
+
+    /** Harm guarded: punctuation, spaces, and composed decoding must not hide secret windows. */
+    @ParameterizedTest
+    @MethodSource("secretWindows")
+    void everyKnownSecretWindowIsWithheld(final String secret, final String line) throws Exception {
+        final String stderr =
+                startupError(List.of(line), "failed", Map.of(Config.ADMIN_TOKEN, secret));
+        assertThat(stderr.lines().toList().getLast())
+                .as(
+                        "every eight-character window is withheld, including decoded and composed forms")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    static Stream<org.junit.jupiter.params.provider.Arguments> disguisedSecrets() {
+        return Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of("Q 7", "Q7"),
+                org.junit.jupiter.params.provider.Arguments.of("Q\t7", "Q7"),
+                org.junit.jupiter.params.provider.Arguments.of("%51%37", "Q7"),
+                org.junit.jupiter.params.provider.Arguments.of("Q+7", "Q 7"),
+                org.junit.jupiter.params.provider.Arguments.of("Q\\/7", "Q/7"),
+                org.junit.jupiter.params.provider.Arguments.of("\\u0051\\u0037", "Q7"),
+                org.junit.jupiter.params.provider.Arguments.of("Ｑ７", "Q7"));
+    }
+
+    /** Harm guarded: an encoded or spaced credential must not bypass literal matching. */
+    @ParameterizedTest
+    @MethodSource("disguisedSecrets")
+    void normalizedKnownSecretsAreWithheld(final String content, final String secret)
+            throws Exception {
+        final String stderr =
+                startupError(
+                        List.of("Error: " + content), "failed", Map.of(Config.ADMIN_TOKEN, secret));
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("known secrets are withheld in every decoded and normalized form")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: retaking an account makes a password absent from the saved credentials. */
+    @Test
+    void aPasswordMadeWhileRetakingIsWithheldWithoutACredentialMarker() throws Exception {
+        final String password = "u9M4r2K8z6P3b7V5d1H0n8F6c4X2w9Y7";
+        final String stderr =
+                startupError(List.of("Error: " + password), "failed", Map.of(), password);
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("the extra password made by Keep.retake is withheld without marker words")
+                .isEqualTo("the homeserver's last error was withheld: it held a secret");
+        assertThat(stderr)
+                .as("the generated password never reaches stderr")
+                .doesNotContain(password);
+    }
+
+    /**
+     * Harm guarded: unavailable registration credentials must prevent reading a log for disclosure.
+     */
+    @Test
+    void anUnreadableRegistrationTokenGivesOnlyTheUnitState() throws Exception {
+        final String stderr =
+                startupError(
+                        Map.of("XDG_CONFIG_HOME", dir.toString()),
+                        new LoggedUnit(List.of("Error: unseen-credential"), "failed"));
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("an unreadable registration token allows only the unit state")
+                .isEqualTo("the homeserver's unit is failed");
+    }
+
+    /** Harm guarded: a failed start without an error must still supply Porelo a useful cause. */
+    @ParameterizedTest
+    @ValueSource(strings = {"active", "failed", "inactive"})
+    void theUnitStateExplainsAStartWithoutAnError(final String state) throws Exception {
+        final String stderr =
+                startupError(List.of("INFO startup", "INFO ERROR_CODE=0"), state, Map.of());
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("the unit state is the cause when the log has no error")
+                .isEqualTo("the homeserver's unit is " + state);
+    }
+
+    /** Harm guarded: control codes or an unbounded log line must not corrupt Porelo's cause. */
+    @Test
+    void theCauseIsStrippedAndLimitedToThreeHundredCharacters() throws Exception {
+        final String stderr =
+                startupError(
+                        List.of(
+                                "\u001b[31mError: \u001b[0m\u001b]0;title\u0007\u0000\t\r\n\u007f\u0085\u2028\u2029"
+                                        + "x".repeat(400)),
+                        "failed",
+                        Map.of());
+
+        assertThat(stderr.lines().toList().getLast())
+                .as("ANSI and controls are removed before keeping 300 characters")
+                .isEqualTo("Error: " + "x".repeat(293));
+    }
+
+    /** Harm guarded: parsing or filtering a slow log must not extend the diagnostic budget. */
+    @Test
+    void diagnosticsBoundSlowLogTraversal() throws Exception {
+        final List<String> slow =
+                new java.util.AbstractList<>() {
+                    @Override
+                    public int size() {
+                        return 1;
+                    }
+
+                    @Override
+                    public String get(final int index) {
+                        try {
+                            Thread.sleep(Duration.ofSeconds(30));
+                        } catch (final InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return "Error: delayed cause";
+                    }
+                };
+        assertTimeoutPreemptively(
+                Duration.ofSeconds(5),
+                () -> {
+                    final String stderr = startupError(slow, "failed", Map.of());
+                    assertThat(stderr.lines().toList().getLast())
+                            .as("a diagnostic budget includes traversing the log before filtering")
+                            .isEqualTo("the homeserver's unit is unknown");
+                });
+    }
+
+    private String startupError(
+            final List<String> log,
+            final String state,
+            final Map<String, String> credentials,
+            final String... secrets)
+            throws Exception {
+        final Map<String, String> env = new HashMap<>(credentials);
+        env.put("XDG_CONFIG_HOME", dir.toString());
+        final Path config = LocalHomeserver.directory(env);
+        Files.createDirectories(config);
+        Files.writeString(config.resolve("registration-token"), "Q7\n");
+        return startupError(env, new LoggedUnit(log, state), secrets);
+    }
+
+    private String startupError(
+            final Map<String, String> env, final Unit unit, final String... secrets)
+            throws Exception {
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        try {
+            LocalHomeserver.awaitUp(
+                    URI.create("http://127.0.0.1:1"), Duration.ZERO, env, unit, secrets);
+            throw new AssertionError("a homeserver with no time to answer must time out");
+        } catch (final Failure failure) {
+            final int exit =
+                    Main.reportFailure(
+                            "setup", failure, new PrintStream(err, true, StandardCharsets.UTF_8));
+            assertThat(exit)
+                    .as("the failed start keeps its temporary exit code")
+                    .isEqualTo(Exit.TEMPORARY);
+        }
+        return err.toString(StandardCharsets.UTF_8);
+    }
+
+    /** A stopped unit whose startup log and state are observable without a machine service. */
+    private record LoggedUnit(List<String> recentLog, String state) implements Unit {
+        @Override
+        public boolean installed() {
+            return true;
+        }
+
+        @Override
+        public boolean active() {
+            return "active".equals(state);
+        }
+
+        @Override
+        public void start() {
+            throw new AssertionError("the unit was already started");
+        }
+
+        @Override
+        public void stop() {
+            throw new AssertionError("diagnostics must not stop the unit");
+        }
+
+        @Override
+        public boolean hasDatabase() {
+            throw new AssertionError("diagnostics must not read the database");
+        }
+
+        @Override
+        public void removeDatabase() {
+            throw new AssertionError("diagnostics must not remove the database");
+        }
+
+        @Override
+        public void signalBackup() {
+            throw new AssertionError("diagnostics must not request a backup");
+        }
+
+        @Override
+        public int runOnce(final List<String> args, final Map<String, String> secrets) {
+            throw new AssertionError("diagnostics must not run the homeserver");
+        }
+    }
 
     @Test
     @DisplayName(

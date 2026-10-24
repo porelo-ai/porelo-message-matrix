@@ -3,7 +3,10 @@ package org.fuin.porelo.message.matrix;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +41,7 @@ class KeepTest {
     }
 
     /** A homeserver that only says what it is asked, and counts what it is told to do. */
-    private static final class StandIn implements Unit {
+    private static class StandIn implements Unit {
 
         boolean active;
 
@@ -58,6 +61,16 @@ class KeepTest {
         @Override
         public boolean active() {
             return active;
+        }
+
+        @Override
+        public String state() {
+            return active ? "active" : "inactive";
+        }
+
+        @Override
+        public List<String> recentLog() {
+            return List.of();
         }
 
         @Override
@@ -92,6 +105,58 @@ class KeepTest {
             database = true;
             return runExit;
         }
+    }
+
+    /** Harm guarded: the actual retake call must protect the password generated for its run. */
+    @Test
+    void retakingNeverDisclosesItsGeneratedPasswordOnAStartTimeout() throws Exception {
+        final String[] captured = {""};
+        final Unit retaking =
+                new StandIn() {
+                    @Override
+                    public int runOnce(final List<String> args, final Map<String, String> secrets) {
+                        final String execute = secrets.get("TUWUNEL_ADMIN_EXECUTE");
+                        captured[0] =
+                                execute.substring(
+                                        execute.indexOf("porelo ") + 7, execute.indexOf("\", "));
+                        return 0;
+                    }
+
+                    @Override
+                    public List<String> recentLog() {
+                        // Spacing avoids the generic token-shape guard so this exercises the
+                        // wiring.
+                        return List.of("Error: " + String.join(" ", captured[0].split("")));
+                    }
+                };
+        Files.createDirectories(LocalHomeserver.directory(env));
+        Files.writeString(LocalHomeserver.directory(env).resolve("registration-token"), "Q7\n");
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        try {
+            Keep.retake(
+                    new MatrixClient(new Config(URI.create("http://127.0.0.1:1"), "", null, true)),
+                    URI.create("http://127.0.0.1:1"),
+                    env,
+                    retaking,
+                    Duration.ZERO);
+            throw new AssertionError("the restarted homeserver must time out");
+        } catch (final Failure failure) {
+            Main.reportFailure(
+                    "setup", failure, new PrintStream(stderr, true, StandardCharsets.UTF_8));
+        }
+        assertThat(captured[0].length()).as("the run supplied a generated password").isEqualTo(32);
+        final String printed = stderr.toString(StandardCharsets.UTF_8);
+        assertThat(printed.replace(" ", "").contains(captured[0]))
+                .as("the generated password cannot reach stderr even with spacing")
+                .isFalse();
+        assertThat(
+                        printed.lines()
+                                .toList()
+                                .getLast()
+                                .equals(
+                                        "the homeserver's last error was withheld: it held a secret"))
+                .as("retake supplies its generated password to the diagnostic filter")
+                .isTrue();
     }
 
     /** A copy as backup writes one: a whole backup, the settings, a position. */

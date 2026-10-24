@@ -10,11 +10,16 @@ sequence.
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx34"></a>[MX34](MX34-The-Homeserver-Starts-On-A-Large-Machine.md) | S | - | The local homeserver starts, and `backup` and `restore` run, on a machine of any size: its pools, caches and container are bounded instead of growing with the cores |
 
-## Backlog
+## Implementing
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx37"></a>[MX37](MX37-The-Homeserver-Says-Why-It-Did-Not-Start.md) | XS | - | When `setup` gives up waiting for the local homeserver, a person reads why in Porelo's start from the homeserver's own words, never a secret; `describe` says what a start waits on, for porelo's [B268](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b268) |
+
+## Backlog
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
 | <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | M | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |

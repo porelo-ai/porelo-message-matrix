@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -13,12 +14,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -49,7 +59,37 @@ final class LocalHomeserver {
     private static final int LAST_PORT = 8099;
 
     /** The first start pulls the image; measured 5 to 6 s on the test machines. */
-    private static final Duration START_TIMEOUT = Duration.ofSeconds(180);
+    static final Duration START_TIMEOUT = Duration.ofSeconds(180);
+
+    private static final Pattern ANSI =
+            Pattern.compile(
+                    "\u001b(?:\\[[0-?]*[ -/]*[@-~]|\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)|[@-_])");
+
+    private static final Pattern CONTROLS = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]");
+
+    private static final Pattern ERROR_LEVEL = Pattern.compile("(?:^|\\s)ERROR(?:\\s|:|$)");
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
+    private static final Pattern CREDENTIAL =
+            Pattern.compile(
+                    "token|password|passwd|secret|authorization|bearer|cookie|session|access_token"
+                            + "|api[-_]?key",
+                    Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern JSON_ESCAPE =
+            Pattern.compile("\\\\(?:u[0-9a-fA-F]{4}|[\"\\\\/bfnrt])");
+
+    private static final String ALLOWED_PUNCTUATION = " .,:;()[]{} `'\"_-/!?";
+
+    private static final Pattern TOKEN_RUN = Pattern.compile("[A-Za-z0-9_-]{8,}+");
+
+    private static final Duration DIAGNOSTIC_TIMEOUT = Duration.ofSeconds(4);
+
+    private static final int CAUSE_LIMIT = 300;
+
+    private static final String WITHHELD =
+            "the homeserver's last error was withheld: it held a secret";
 
     record Running(URI url, int port, String registrationToken) {}
 
@@ -82,7 +122,7 @@ final class LocalHomeserver {
         }
         unit.start();
         final URI url = URI.create("http://127.0.0.1:" + port);
-        awaitUp(url);
+        awaitUp(url, env, unit);
         return new Running(url, port, registrationToken(env));
     }
 
@@ -188,8 +228,40 @@ final class LocalHomeserver {
         awaitUp(url, START_TIMEOUT);
     }
 
+    /** Waits after a unit start, protecting any additional secrets made during this invocation. */
+    static void awaitUp(
+            final URI url, final Map<String, String> env, final Unit unit, final String... secrets)
+            throws Failure {
+        awaitUp(url, START_TIMEOUT, env, unit, secrets);
+    }
+
+    /** Waits after starting the unit, with its environment available to protect diagnostics. */
+    static void awaitUp(
+            final URI url,
+            final Duration within,
+            final Map<String, String> env,
+            final Unit unit,
+            final String... secrets)
+            throws Failure {
+        if (!answersWithin(url, within)) {
+            throw new Failure(
+                    Exit.TEMPORARY,
+                    timeout(url, within) + "\n" + startupCause(env, unit, List.of(secrets)));
+        }
+    }
+
     /** Until the homeserver answers on its port, within the limit given. */
     static void awaitUp(final URI url, final Duration within) throws Failure {
+        if (!answersWithin(url, within)) {
+            throw new Failure(Exit.TEMPORARY, timeout(url, within));
+        }
+    }
+
+    private static String timeout(final URI url, final Duration within) {
+        return "the homeserver at " + url + " did not answer within " + within.toSeconds() + " s";
+    }
+
+    private static boolean answersWithin(final URI url, final Duration within) throws Failure {
         final HttpClient http =
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
         final Instant deadline = Instant.now().plus(within);
@@ -204,7 +276,7 @@ final class LocalHomeserver {
                                         .build(),
                                 HttpResponse.BodyHandlers.discarding());
                 if (response.statusCode() == 200) {
-                    return;
+                    return true;
                 }
             } catch (final IOException ex) {
                 // Not listening yet.
@@ -221,9 +293,173 @@ final class LocalHomeserver {
                         Exit.TEMPORARY, "interrupted while waiting for the homeserver", ex);
             }
         }
-        throw new Failure(
-                Exit.TEMPORARY,
-                "the homeserver at " + url + " did not answer within " + within.toSeconds() + " s");
+        return false;
+    }
+
+    private static String startupCause(
+            final Map<String, String> env, final Unit unit, final List<String> additionalSecrets) {
+        final FutureTask<String> cause =
+                new FutureTask<>(() -> readStartupCause(env, unit, additionalSecrets));
+        Thread.ofPlatform().daemon().name("homeserver-startup-cause").start(cause);
+        try {
+            return cause.get(DIAGNOSTIC_TIMEOUT.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (final InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return "the homeserver's unit is unknown";
+        } catch (final ExecutionException | TimeoutException ex) {
+            return "the homeserver's unit is unknown";
+        } finally {
+            cause.cancel(true);
+        }
+    }
+
+    private static String readStartupCause(
+            final Map<String, String> env, final Unit unit, final List<String> additionalSecrets) {
+        final List<String> secrets = new ArrayList<>(additionalSecrets);
+        try {
+            secrets.add(registrationToken(env));
+        } catch (final Failure ex) {
+            // Without the local token, no log line can be proved safe to print.
+            return "the homeserver's unit is " + unit.state();
+        }
+        env.forEach(
+                (key, value) -> {
+                    if (key.startsWith("PORELO_MATRIX_")
+                            && (key.contains("TOKEN")
+                                    || key.contains("PASSWORD")
+                                    || key.contains("SECRET"))) {
+                        secrets.add(value);
+                    }
+                });
+        final List<String> log =
+                unit.recentLog().stream()
+                        .filter(line -> line.length() <= PodmanUnit.MESSAGE_LIMIT)
+                        .toList();
+        final Optional<String> summary =
+                log.reversed().stream()
+                        .filter(line -> stripControls(line).startsWith("Error: "))
+                        .findFirst();
+        final Optional<String> chosen =
+                summary.or(
+                        () ->
+                                log.reversed().stream()
+                                        .filter(
+                                                line ->
+                                                        ERROR_LEVEL
+                                                                .matcher(stripControls(line))
+                                                                .find())
+                                        .findFirst());
+        if (chosen.isEmpty()) {
+            return "the homeserver's unit is " + unit.state();
+        }
+        final String raw = chosen.orElseThrow();
+        final String clean = stripControls(raw);
+        if (!safeCause(raw, clean, secrets)) {
+            return WITHHELD;
+        }
+        return clean.substring(0, Math.min(CAUSE_LIMIT, clean.length()));
+    }
+
+    private static boolean safeCause(
+            final String raw, final String clean, final List<String> secrets) {
+        if (clean.chars().anyMatch(point -> !allowedCharacter(point))) {
+            return false;
+        }
+        final Matcher runs = TOKEN_RUN.matcher(clean);
+        while (runs.find()) {
+            final String run = runs.group();
+            if (run.chars().anyMatch(point -> point >= '0' && point <= '9')
+                    && run.chars()
+                            .anyMatch(
+                                    point ->
+                                            point >= 'A' && point <= 'Z'
+                                                    || point >= 'a' && point <= 'z')) {
+                return false;
+            }
+        }
+        final Set<String> forms = new LinkedHashSet<>();
+        forms.add(raw);
+        forms.add(clean);
+        try {
+            for (int round = 0; round < 6; round++) {
+                final int before = forms.size();
+                for (final String form : List.copyOf(forms)) {
+                    if (Thread.currentThread().isInterrupted() || forms.size() > 1024) {
+                        return false;
+                    }
+                    forms.add(stripControls(form));
+                    forms.add(WHITESPACE.matcher(form).replaceAll(""));
+                    forms.add(URLDecoder.decode(form, StandardCharsets.UTF_8));
+                    forms.add(jsonUnescaped(form));
+                    forms.add(Normalizer.normalize(form, Normalizer.Form.NFKC));
+                }
+                for (final String form : forms) {
+                    if (CREDENTIAL.matcher(form).find()) {
+                        return false;
+                    }
+                    for (final String secret : secrets) {
+                        if (containsSecretWindow(form, secret)) {
+                            return false;
+                        }
+                    }
+                }
+                if (forms.size() == before) {
+                    return true;
+                }
+            }
+        } catch (final IllegalArgumentException ex) {
+            // Malformed encodings cannot establish that a message is safe.
+            return false;
+        }
+        // Refuse unresolved compositions rather than trusting a partial decoding.
+        return false;
+    }
+
+    private static boolean containsSecretWindow(final String form, final String secret) {
+        if (secret.isEmpty()) {
+            return false;
+        }
+        final int length = Math.min(8, secret.length());
+        for (int start = 0; start <= secret.length() - length; start++) {
+            if (form.contains(secret.substring(start, start + length))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean allowedCharacter(final int point) {
+        return point >= 'A' && point <= 'Z'
+                || point >= 'a' && point <= 'z'
+                || point >= '0' && point <= '9'
+                || ALLOWED_PUNCTUATION.indexOf(point) >= 0;
+    }
+
+    private static String jsonUnescaped(final String line) {
+        return JSON_ESCAPE
+                .matcher(line)
+                .replaceAll(
+                        escape ->
+                                Matcher.quoteReplacement(
+                                        switch (escape.group().charAt(1)) {
+                                            case 'u' ->
+                                                    String.valueOf(
+                                                            (char)
+                                                                    Integer.parseInt(
+                                                                            escape.group()
+                                                                                    .substring(2),
+                                                                            16));
+                                            case 'b' -> "\b";
+                                            case 'f' -> "\f";
+                                            case 'n' -> "\n";
+                                            case 'r' -> "\r";
+                                            case 't' -> "\t";
+                                            default -> escape.group().substring(1);
+                                        }));
+    }
+
+    private static String stripControls(final String line) {
+        return CONTROLS.matcher(ANSI.matcher(line).replaceAll("")).replaceAll("");
     }
 
     /**

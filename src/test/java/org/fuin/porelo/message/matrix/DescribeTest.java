@@ -73,6 +73,19 @@ class DescribeTest {
                 .containsExactly("machine");
     }
 
+    /** Harm guarded: Porelo needs the declared dependency to explain a start while it waits. */
+    @Test
+    void describeNamesWhatAStartWaitsOn() throws IOException {
+        describe();
+        final JsonNode description = MatrixClient.JSON.readTree(outBytes.toByteArray());
+
+        assertThat(description.path("waitsOn").asText())
+                .as("describe names the dependency a start waits on")
+                .isEqualTo("the room's homeserver")
+                .hasSizeLessThanOrEqualTo(80)
+                .doesNotContain("\n", "\r");
+    }
+
     /**
      * Harm guarded: once describe claims {@code "takes": ["machine"]}, Porelo passes {@code
      * --machine <name>} to every lifecycle verb; a verb that refuses the option with 64 stops the

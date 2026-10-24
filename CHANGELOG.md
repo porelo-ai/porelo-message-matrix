@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `describe` names what a start waits on as `"waitsOn": "the room's homeserver"`.
 - Several machines of one project share one conversation on a central homeserver (`homeserver` and `room` in the
   project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`
   (without regard to case, as a host name), and each machine registers only its own accounts (`@porelo.<machine>`,
@@ -43,6 +44,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- When the local homeserver does not answer within the start limit, its last `Error: ` summary, else last
+  `ERROR` message, else unit state explains why; after ANSI and control stripping, messages allow only ASCII
+  letters, digits, space and ``. , : ; ( ) [ ] { } ` ' " _ - / ! ?``, reject runs of at least 8
+  `[A-Za-z0-9_-]` characters containing both a letter and a digit, credential words and every 8-character
+  window of known secrets (whole secrets when shorter) across composed decodings, and otherwise say
+  `the homeserver's last error was withheld: it held a secret`;
+  diagnostics including parsing and filtering take at most four seconds, each command has a three-second
+  budget and a 1 MiB output cap with oversized reads discarded, messages over 4096 characters are skipped
+  whole, and safe causes are limited to 300 characters. Diagnostic commands use their own session and process
+  group when a root-owned, protected `/usr/bin/setsid` is available; cleanup kills the whole group and sampled
+  descendants after normal completion or timeout.
 - A `homeserver` in the project's settings is now always a central homeserver and needs `room` (a room alias or a
   room id; `room` without `homeserver` is refused too). A project on a homeserver elsewhere names its room as
   `room`, invites each machine's `@porelo.<machine>` into it, and enrolls its tasks again; the earlier accounts stay

@@ -1,5 +1,6 @@
 package org.fuin.porelo.message.matrix;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,6 +16,12 @@ interface Unit {
 
     /** Whether it runs now. */
     boolean active() throws Failure;
+
+    /** The unit's current state within a few seconds, or unknown when it cannot be read. */
+    String state();
+
+    /** Up to 200 whole journal messages within a few seconds; an unavailable log answers none. */
+    List<String> recentLog();
 
     /** Started, and enabled so it comes back after a boot; it may still be starting on return. */
     void start() throws Failure;
