@@ -1,6 +1,6 @@
 # MX36 — A Backup Runs While Tasks Poll
 
-**Status:** Idea.
+**Status:** Accepted.
 
 **What must be true.** `backup <dir>` succeeds within its bound while Porelo's poll loops run, so the host's
 playbook copies the conversation off a busy host without stopping the tasks. Polls lose no message and never
