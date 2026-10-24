@@ -40,8 +40,7 @@ On a test VM, against the pinned Tuwunel:
 - **Read in today's code (`Lifecycle.java`, `Person.java`):** the administrator's membership carries every room
   operation: `room` and `ours` (finds the room by alias and proves Porelo made it by reading its first events and
   state), `admit` (invites tasks and people), `clear` and `membersElsewhere` (reads every project room it is in, so
-  clearing one project never cuts a person off from another), and the central-homeserver verbs of
-  [MX12](README.md#mx12). `Person.java` strikes the poller from a person's `to` but keeps the administrator.
+  clearing one project never cuts a person off from another), and the central homeserver's verbs. `Person.java` strikes the poller from a person's `to` but keeps the administrator.
 - **The helpers stay in the room, named in words:** `setup` sets the administrator's display name to "Porelo
   (administrator)" and the relay's to "Porelo (delivery)", also on an existing room, so a room made before shows them
   after the next `setup`.

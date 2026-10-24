@@ -20,7 +20,7 @@ What is missing is who counts as a person. Today a text without `org.fuin.porelo
 (`Poll`, `Person.deliver`), and a direct chat is taken from anybody who shares a room with the task's account
 (`Direct.answerInvitations`, `sharesARoom`). On the account's own homeserver that is right: every account in the
 room is this Porelo's or a person it joined. On a central homeserver the room also holds every other machine's
-`@porelo.<M>`, relay and tasks, which [MX12](README.md#mx12) gives no more than their own rights. Such an account
+`@porelo.<M>`, relay and tasks, which the central homeserver's mode gives no more than their own rights. Such an account
 can post a plain text in the room, which every task on this machine is handed as a person's word without the
 filter, or open a direct chat with a task, which then reads as the operator's own channel.
 
