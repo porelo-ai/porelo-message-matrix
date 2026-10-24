@@ -32,6 +32,12 @@ sequence.
 | <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | - | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 
+## Idea
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | - | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
+
 ## Finished
 
 | # | Title | What was built |
