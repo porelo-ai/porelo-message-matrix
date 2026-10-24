@@ -1,6 +1,6 @@
 # MX34 — The Homeserver Starts On A Large Machine
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - One transport module, its launch template and regression tests; no transport contract change.
 
 **What must be true.** The local homeserver starts, and `backup` and `restore` run, on a machine of any size: on a

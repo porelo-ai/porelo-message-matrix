@@ -16,11 +16,6 @@ sequence.
 | <a id="mx31"></a>[MX31](MX31-A-Host-Named-In-Upper-Case-Joins-Its-Conversation.md) | XS | - | A host named in upper case joins its project's conversation: `--machine` is taken without regard to case |
 | <a id="mx32"></a>[MX32](MX32-The-Account-Is-Cleared-With-Its-Machine-Named.md) | XS | - | `porelo vault clear` takes the account's homeserver away also when the transport is told the machine's name |
 | <a id="mx33"></a>[MX33](MX33-A-Person-Is-Shown-By-Their-Name.md) | XS | - | A person is shown by the name they joined with, without the homeserver's emoji suffix |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 | <a id="mx34"></a>[MX34](MX34-The-Homeserver-Starts-On-A-Large-Machine.md) | S | - | The local homeserver starts, and `backup` and `restore` run, on a machine of any size: its pools, caches and container are bounded instead of growing with the cores |
 
 ## Backlog
