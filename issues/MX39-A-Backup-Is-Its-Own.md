@@ -1,6 +1,7 @@
 # MX39 — A Backup Is Its Own
 
-**Status:** Idea.
+**Status:** Analyzed.
+**Size:** S - one class, `Keep`, and its tests; no contract another repository reads.
 
 **What must be true.** A copy `backup <dir>` reports as made holds the homeserver's database and the poll positions
 of that one backup, so a restored relay hands over exactly what came after its last poll; and no backup ever empties
@@ -22,9 +23,37 @@ a directory another backup filled.
 
 ## Measured
 
-- A review reproduced both against the code with simulated completions and files: the second backup accepted the
-  first one's late `meta` entry, and the second run into one directory left it empty after the first had reported
-  its copy. Neither was run against the pinned Tuwunel.
+- A review reproduced both against the code with simulated completions and files.
+- **On a test VM, against the pinned Tuwunel, with the built transport and the unit in the account's own user
+  directory:**
+  - **Two backups into one empty directory at once: reproduced.** One ended 78 ("cannot copy into … database/meta/2"),
+    the other 0 with `{"backup":2}`, and the directory was empty afterwards: the first one's clean-up removed the
+    copy the second had reported.
+  - **Two signals 0.05 s apart made two snapshots, in signal order, 0.1 s apart.** The journal names each only as
+    `Created database backup backup_id=N`, not which signal asked for it.
+  - **A backup killed right after its signal, then a second one at once:** the second took its own snapshot (7),
+    since the first one's (6) was already done. With a database of about 1 MB a snapshot takes about 10 ms, so the
+    late completion did not happen at this size. It needs a snapshot still running when the next backup starts.
+
+## Plan
+
+- **A backup drains before it copies.** Holding both locks, it signals once and waits for a new snapshot: since the
+  homeserver makes snapshots in signal order, every snapshot asked for before, a dead backup's too, is done once
+  this one is. Only then does it copy the positions, signal again, and take the next snapshot as its own.
+- **The target is checked again under the lock.** A target that is no longer empty is refused with 78 and left as
+  it is; on a failure a backup removes only the files it copied, never the directory's earlier content.
+- **`TUWUNEL_DATABASE_BACKUPS_TO_KEEP`** (48 in the unit) then holds 24 hours of hourly backups instead of 48, since
+  each backup leaves two snapshots: see the open question.
+- **Red first:** `KeepTest`, a fake unit whose snapshots complete in signal order and an earlier signal's snapshot
+  completing after the next backup started: today the second backup reports the earlier one's id; and two backups
+  into one directory, the second started while the first holds the lock: today the target ends empty.
+- Files: `Keep.java`, `KeepTest.java`, `KeepIT.java`, `homeserver/porelo-matrix-homeserver.service` if the question
+  is answered so, `CHANGELOG.md`.
+
+## Open questions
+
+- Two snapshots per backup: keep 48 snapshots, so 24 hours of hourly backups, or raise it to 96 so 48 hours stay?
+  RocksDB's backups share their unchanged files, so the second snapshot costs little space. Proposed: 96.
 
 ## Acceptance
 
@@ -33,7 +62,5 @@ a directory another backup filled.
 
 ## To be checked
 
-- Whether the pinned Tuwunel names a snapshot so that it can be tied to the signal that started it, or the backup
-  must drain earlier snapshots before it copies the positions; read in its documentation and measured on a test VM.
-- Whether checking the target's emptiness again under the lock is enough, or each run must copy into a directory of
-  its own and move it into place.
+- That snapshots stay in signal order with a database large enough that one takes seconds, measured on a test VM
+  while the build is checked.
