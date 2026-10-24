@@ -111,7 +111,7 @@ final class Poll {
         // Shared with every other poll, and refused while a backup copies the positions: none
         // moves between that copy and the backup.
         try (FileChannel keep = Keep.lockFile(stateDir);
-                FileLock kept = Keep.shared(keep);
+                FileLock kept = Keep.shared(keep, stateDir);
                 FileChannel lockFile =
                         FileChannel.open(
                                 stateDir.resolve(key + ".lock"),

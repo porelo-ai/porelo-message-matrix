@@ -41,7 +41,7 @@ class KeepTest {
     }
 
     /** A homeserver that only says what it is asked, and counts what it is told to do. */
-    private static class StandIn implements Unit {
+    static class StandIn implements Unit {
 
         boolean active;
 
@@ -94,7 +94,7 @@ class KeepTest {
         }
 
         @Override
-        public void signalBackup() {
+        public void signalBackup() throws Failure {
             signals++;
         }
 
@@ -219,6 +219,63 @@ class KeepTest {
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.TEMPORARY));
         assertThat(unit.signals).as("backups asked for").isEqualTo(1);
         assertThat(into).as("no half copy left to be taken for a whole one").isEmptyDirectory();
+    }
+
+    /** Harm guarded: copying a lock would replace the identity shared by live processes. */
+    @Test
+    void aBackupCopiesPositionsAndReferencesWithoutItsWantedLock() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env));
+        Files.writeString(state.resolve(Keep.WANTED), "");
+        Files.writeString(state.resolve("abc.since"), "s1\n");
+        Files.createDirectories(state.resolve("refs"));
+        Files.writeString(state.resolve("refs/event"), "reference");
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        final StandIn answering =
+                new StandIn() {
+                    @Override
+                    public void signalBackup() throws Failure {
+                        try {
+                            Files.writeString(Keep.backups(env).resolve("meta/1"), "snapshot");
+                        } catch (final IOException failure) {
+                            throw new Failure(
+                                    Exit.CONFIG, "cannot make the test snapshot", failure);
+                        }
+                    }
+                };
+        answering.active = true;
+        final Path into = Files.createDirectory(dir.resolve("into"));
+
+        Keep.backup(into, env, answering, Duration.ofSeconds(1));
+
+        try (var files = Files.list(into.resolve("positions"))) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .as("only the position and references are copied, never keep.wanted")
+                    .containsExactlyInAnyOrder("abc.since", "refs");
+        }
+        assertThat(into.resolve("positions/refs/event"))
+                .as("references are preserved alongside the position")
+                .hasContent("reference");
+    }
+
+    /** Harm guarded: restoring a lock can split synchronization between running processes. */
+    @Test
+    void restoreRefusesAWantedLockAmongThePositions() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(copy.resolve("positions").resolve(Keep.WANTED), "");
+
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .as("a copy cannot supply the live processes' backup gate")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("a lock in the copy is a configuration refusal")
+                                        .isEqualTo(Exit.CONFIG));
+        assertThat(Poll.stateDirectory(env).resolve(Keep.WANTED))
+                .as("the foreign lock is never restored")
+                .doesNotExist();
+        assertThat(unit.runs).as("the refused copy never reaches the homeserver").isZero();
+        assertNothingMade();
     }
 
     @Test

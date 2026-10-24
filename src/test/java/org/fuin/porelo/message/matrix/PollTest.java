@@ -16,11 +16,13 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -236,6 +238,80 @@ class PollTest {
             holder.waitFor();
         }
         assertThat(stderr()).contains("a backup is copying the poll positions");
+    }
+
+    /**
+     * Harm guarded: a new poll must not deliver or advance its position ahead of a waiting backup.
+     */
+    @Test
+    @Timeout(15)
+    void aBackupHoldingWantedRefusesThePollAndTheNextPollDelivers() throws Exception {
+        final String sync =
+                """
+                {"next_batch":"s1","rooms":{"join":{"!room:matrix.test":{"timeline":{"events":[
+                  {"event_id":"$waiting","origin_server_ts":1000,"sender":"@alice:matrix.test",
+                   "type":"m.room.message","content":{"org.fuin.porelo.signature":"c2ln",
+                   "org.fuin.porelo.message":"message held for the next poll"}}
+                ]}}}}}
+                """;
+        final Map<String, String> env = env();
+        final Path state = Files.createDirectories(Poll.stateDirectory(env));
+        final Path wanted = Files.createFile(state.resolve(Keep.WANTED));
+        final Process backup =
+                new ProcessBuilder(
+                                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                                "-cp",
+                                System.getProperty("java.class.path"),
+                                LockHolder.class.getName(),
+                                wanted.toString())
+                        .redirectError(ProcessBuilder.Redirect.INHERIT)
+                        .start();
+        try {
+            assertThat(backup.inputReader(StandardCharsets.UTF_8).readLine())
+                    .as("the backup holds keep.wanted while keep.lock is available")
+                    .isEqualTo("held");
+            homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, sync);
+
+            final int exit =
+                    assertTimeoutPreemptively(
+                            Duration.ofSeconds(1), () -> poll(env, "--into", inbound.toString()));
+            assertThat(exit)
+                    .as(
+                            "the real poll command must honor the waiting backup's wanted gate: %s",
+                            stderr())
+                    .isEqualTo(Exit.TEMPORARY);
+            assertThat(filesIn(inbound))
+                    .as("a refused poll delivers no message or sidecar")
+                    .isZero();
+            assertThat(state.resolve(Poll.key(Config.from(env), "@bob:matrix.test") + ".since"))
+                    .as("a refused poll must not advance the position")
+                    .doesNotExist();
+            assertThat(homeserver.requests())
+                    .as("a refused poll asks only whose token it has")
+                    .extracting(FakeHomeserver.Request::rawPath)
+                    .containsExactly("/_matrix/client/v3/account/whoami");
+        } finally {
+            backup.getOutputStream().close();
+            if (!backup.waitFor(5, TimeUnit.SECONDS)) {
+                backup.destroyForcibly();
+                assertThat(backup.waitFor(5, TimeUnit.SECONDS))
+                        .as("the backup lock holder must be reaped")
+                        .isTrue();
+            }
+        }
+        homeserver.clearAnswers();
+        homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, sync);
+
+        assertThat(poll(env, "--into", inbound.toString()))
+                .as("the next poll succeeds once the backup has finished: %s", stderr())
+                .isEqualTo(Exit.OK);
+        final Path message = inbound.resolve(Reference.of("$waiting", 1000) + ".json");
+        assertThat(message)
+                .as("the refused poll leaves the message available to the next poll")
+                .hasContent("message held for the next poll");
+        assertThat(Path.of(message + ".sig"))
+                .as("the signature arrives with the message")
+                .hasContent("sig");
     }
 
     /** The account's own lock, never the one every poll shares with a backup. */

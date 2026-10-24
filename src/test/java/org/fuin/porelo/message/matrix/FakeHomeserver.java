@@ -54,6 +54,10 @@ final class FakeHomeserver implements AutoCloseable {
         return List.copyOf(requests);
     }
 
+    synchronized void clearAnswers() {
+        answers.clear();
+    }
+
     private void handle(final HttpExchange exchange) throws IOException {
         final Answer answer;
         synchronized (this) {

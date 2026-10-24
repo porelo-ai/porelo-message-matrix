@@ -75,6 +75,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A backup stops trying to acquire its locks when their shared wait budget expires, even when a
+  holder releases a lock just after the deadline.
+- A backup no longer starves behind Porelo's poll loops; it waits at most about the longest poll
+  already running.
 - The local homeserver no longer sizes itself from the machine's cores: its database pool is capped at 64
   workers, its read cache at 256 MB and RocksDB at 2 threads, and its container runs with `--pids-limit=512`,
   `--memory=1g` and `--cpus=2`, for backup and restore too. On 32 cores the pool had reached podman's pids limit and

@@ -37,6 +37,9 @@ final class Keep {
     /** In the state directory: held shared by every poll, and alone by a backup. */
     static final String LOCK = "keep.lock";
 
+    /** In the state directory: a backup holds off new polls while existing polls finish. */
+    static final String WANTED = "keep.wanted";
+
     /**
      * In the state directory: left by a restore, so the next setup takes the administrator back.
      */
@@ -101,6 +104,18 @@ final class Keep {
     static ObjectNode backup(
             final Path dir, final Map<String, String> env, final Unit unit, final Duration wait)
             throws Failure {
+        return backup(dir, env, unit, wait, LOCK_WAIT);
+    }
+
+    /** A backup with one bounded budget for acquiring its locks. */
+    static ObjectNode backup(
+            final Path dir,
+            final Map<String, String> env,
+            final Unit unit,
+            final Duration wait,
+            final Duration lockWait)
+            throws Failure {
+        final long started = System.nanoTime();
         if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) {
             throw new Failure(Exit.CONFIG, dir + " is not a directory to copy into");
         }
@@ -129,20 +144,24 @@ final class Keep {
         boolean done = false;
         try {
             Files.createDirectories(state);
-            try (FileChannel channel = lockFile(state);
-                    FileLock held = exclusive(channel)) {
-                // The positions first: taken before the backup, none points past what it holds.
-                copyPositions(state, dir.resolve(POSITIONS));
-                final long before = newest(backups.resolve("meta")).orElse(0);
-                unit.signalBackup();
-                id = awaitBackup(backups.resolve("meta"), before, wait);
-                // Still held: a later backup thins the old ones, and would remove files being
-                // copied.
-                copyTree(backups, dir.resolve(DATABASE));
-            }
-            final Path conf = LocalHomeserver.directory(env).resolve(CONF);
-            if (Files.isRegularFile(conf)) {
-                Files.copy(conf, dir.resolve(CONF));
+            // New polls yield before the positions lock, so overlapping polls cannot starve us.
+            try (FileChannel wanted = lockFile(state, WANTED);
+                    FileLock intent = exclusive(wanted, started, lockWait)) {
+                try (FileChannel channel = lockFile(state);
+                        FileLock held = exclusive(channel, started, lockWait)) {
+                    // The positions first: taken before the backup, none points past what it holds.
+                    copyPositions(state, dir.resolve(POSITIONS));
+                    final long before = newest(backups.resolve("meta")).orElse(0);
+                    unit.signalBackup();
+                    id = awaitBackup(backups.resolve("meta"), before, wait);
+                    // Still held: a later backup thins the old ones, and would remove files being
+                    // copied.
+                    copyTree(backups, dir.resolve(DATABASE));
+                }
+                final Path conf = LocalHomeserver.directory(env).resolve(CONF);
+                if (Files.isRegularFile(conf)) {
+                    Files.copy(conf, dir.resolve(CONF));
+                }
             }
             done = true;
         } catch (final IOException ex) {
@@ -398,8 +417,12 @@ final class Keep {
     // ------------------------------------------------------------------------------------------
 
     static FileChannel lockFile(final Path state) throws IOException {
+        return lockFile(state, LOCK);
+    }
+
+    private static FileChannel lockFile(final Path state, final String name) throws IOException {
         return FileChannel.open(
-                state.resolve(LOCK),
+                state.resolve(name),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.READ,
                 StandardOpenOption.WRITE);
@@ -409,7 +432,15 @@ final class Keep {
      * For a poll: 75 while a backup holds it, never a wait, so a backup that hangs never hangs the
      * polls with it; Porelo polls again.
      */
-    static FileLock shared(final FileChannel channel) throws IOException, Failure {
+    static FileLock shared(final FileChannel channel, final Path state)
+            throws IOException, Failure {
+        try (FileChannel wanted = lockFile(state, WANTED);
+                FileLock intent = shared(wanted)) {
+            return shared(channel);
+        }
+    }
+
+    private static FileLock shared(final FileChannel channel) throws IOException, Failure {
         @Nullable FileLock lock;
         try {
             lock = channel.tryLock(0, Long.MAX_VALUE, true);
@@ -424,9 +455,19 @@ final class Keep {
         return lock;
     }
 
-    private static FileLock exclusive(final FileChannel channel) throws IOException, Failure {
-        final Instant deadline = Instant.now().plus(LOCK_WAIT);
+    private static FileLock exclusive(
+            final FileChannel channel, final long started, final Duration lockWait)
+            throws IOException, Failure {
         while (true) {
+            if (System.nanoTime() - started >= lockWait.toNanos()) {
+                throw new Failure(
+                        Exit.TEMPORARY,
+                        "a poll or another backup held "
+                                + LOCK
+                                + " for "
+                                + lockWait.toSeconds()
+                                + " s");
+            }
             try {
                 final @Nullable FileLock lock = channel.tryLock();
                 if (lock != null) {
@@ -435,16 +476,10 @@ final class Keep {
             } catch (final OverlappingFileLockException ex) {
                 // Held in this process: waited for like any other.
             }
-            if (!Instant.now().isBefore(deadline)) {
-                throw new Failure(
-                        Exit.TEMPORARY,
-                        "a poll or another backup held "
-                                + LOCK
-                                + " for "
-                                + LOCK_WAIT.toSeconds()
-                                + " s");
+            final long remaining = lockWait.toNanos() - (System.nanoTime() - started);
+            if (remaining > 0) {
+                pause(Duration.ofNanos(Math.min(100_000_000L, remaining)));
             }
-            pause();
         }
     }
 
@@ -579,8 +614,12 @@ final class Keep {
     }
 
     private static void pause() throws Failure {
+        pause(Duration.ofMillis(100));
+    }
+
+    private static void pause(final Duration duration) throws Failure {
         try {
-            Thread.sleep(100);
+            Thread.sleep(duration);
         } catch (final InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new Failure(Exit.TEMPORARY, "interrupted while waiting", ex);

@@ -1,6 +1,6 @@
 # MX36 — A Backup Runs While Tasks Poll
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one module (`Keep`, `Poll`) and its tests, no contract other repositories read.
 
 **What must be true.** `backup <dir>` succeeds within its bound while Porelo's poll loops run, so the host's
@@ -50,6 +50,7 @@ still hangs no poll.
   back, and a backup that must hold it within the longest hold plus 2 s; today it answers 75 ("writer
   starvation"). Then: a poll started while a backup waits answers 75 within 1 s; a restore refuses `keep.wanted`
   among the positions.
+- **Accepted:** backups started back to back can each take `keep.wanted` at once after the last, holding polls at 75 for as long as they keep coming; the host's playbook takes one an hour, so a poll waits at most one backup.
 - Files: `Keep.java`, `Poll.java`, `KeepTest.java`, the new `KeepWriterPreferenceTest.java` and
   `SharedLockLooper.java`, `CHANGELOG.md`.
 
