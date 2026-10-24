@@ -1,6 +1,6 @@
 # MX37 — The Homeserver Says Why It Did Not Start
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** XS - the start's failure path, the unit's log and state, and one optional field in `describe`.
 
 **What must be true.** When `setup` gives up waiting for the local homeserver, a person reads why in Porelo's
