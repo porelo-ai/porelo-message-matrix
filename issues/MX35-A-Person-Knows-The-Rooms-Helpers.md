@@ -3,10 +3,10 @@
 **Status:** Analyzed.
 **Size:** M - one contract field another repository reads, docs, two classes.
 
-**What must be true.** A person in the project's room knows what the room's helper accounts are, or sees none at
-all: while the helpers stay visible in the room, each carries a display name a person reads, and a mention of only
-helpers wakes no task and is answered with a standard line, such as "This is a technical account for delivering the
-room's messages; it does not read along.", through porelo's half,
+**What must be true.** A person in the project's room knows what the room's helper accounts are: each carries a
+display name a person reads, "Porelo (administrator)" and "Porelo (delivery)", and a mention of only helpers wakes
+no task and is answered with the standard line "This is Porelo's technical account; it passes your messages on to
+the tasks and does not answer itself. Mention a task to reach it.", through porelo's half,
 [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264).
 
 ## Why
@@ -42,15 +42,18 @@ On a test VM, against the pinned Tuwunel:
   state), `admit` (invites tasks and people), `clear` and `membersElsewhere` (reads every project room it is in, so
   clearing one project never cuts a person off from another), and the central-homeserver verbs of
   [MX12](README.md#mx12). `Person.java` strikes the poller from a person's `to` but keeps the administrator.
-- **The helpers stay in the room, named in words:** `setup` sets the administrator's display name to
-  "Porelo (administrator)" and the relay's to "Porelo (delivery)" (the words pending the second open question), also
-  on an existing room, so a room made before shows them after the next `setup`.
+- **The helpers stay in the room, named in words:** `setup` sets the administrator's display name to "Porelo
+  (administrator)" and the relay's to "Porelo (delivery)", also on an existing room, so a room made before shows them
+  after the next `setup`.
 - **Mentions of helpers marked for Porelo:** `Person.java` strikes both helpers from `to`, and a person's line whose
-  `to` named only helpers is handed over marked with `helpers: true` in the person file (`doc/transport.md`, the
-  contract with `porelo`), so porelo's half
-  [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264) wakes no task and answers with
-  the standard line through `send`. The transport itself never answers: it decides nothing.
-- **Not chosen:** the administrator leaving the room moves every room operation and the cross-project checks to the
+  `to` named only helpers is handed over marked with `"helpers": true` in the person file, absent otherwise and never
+  `false`, with `to` empty then (`doc/transport.md`, the contract with `porelo`), so porelo's half
+  [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264) wakes no task and answers with the
+  standard line through `send`, run with the relay's token, so the relay's account answers and no task speaks. The
+  transport itself never answers: it decides nothing. Red first, besides: `send` run with the relay's token, which no
+  test runs today.
+- **This is the interim:** a room that shows no helper at all is [MX38](README.md#mx38)'s, for a later round.
+- **Not chosen here:** the administrator leaving the room moves every room operation and the cross-project checks to the
   relay and back (size L, the central homeserver too); the relay as an application service needs a listening service
   in place of `poll` and a new contract with `porelo` (size L, and a service where today a program runs).
 - **Files and tests:** `Lifecycle.java` (`setup`, the display names), `Person.java` (the strike and the mark),
@@ -63,14 +66,6 @@ On a test VM, against the pinned Tuwunel:
 - A person's line mentioning only a helper reaches Porelo with `to` empty and the mark, and is seen to fail without
   the fix.
 - A line naming a task and a helper names only the task, unmarked.
-
-## Open questions
-
-- Whether helpers named in words are enough, or the room must show no helper at all: then the relay as an
-  application service is the only measured way (the administrator leaving still leaves the relay visible), an L of
-  its own across this transport and `porelo`, and this plan is replaced.
-- The display names' words, and the standard line `porelo` answers with (proposed: "This is a technical account for
-  delivering the room's messages; it does not read along.").
 
 ## To be checked
 
