@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `poll` hands over no event the polling account sent itself, in the room as in a direct chat, so Porelo's
+  answer through the relay never reaches the tasks.
+- A person file carries `"helpers": true` with an empty `to` exactly when the line names only the room's
+  helper accounts, so Porelo can answer through the relay without waking a task.
 - `describe` names what a start waits on as `"waitsOn": "the room's homeserver"`.
 - Several machines of one project share one conversation on a central homeserver (`homeserver` and `room` in the
   project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`
@@ -44,6 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Every `setup` sets the administrator's display name to `Porelo (administrator)` and the relay's to
+  `Porelo (delivery)`, on new and existing rooms, including this machine's accounts on a central homeserver.
 - When the local homeserver does not answer within the start limit, its last `Error: ` summary, else last
   `ERROR` message, else unit state explains why; after ANSI and control stripping, messages allow only ASCII
   letters, digits, space and ``. , : ; ( ) [ ] { } ` ' " _ - / ! ?``, reject runs of at least 8

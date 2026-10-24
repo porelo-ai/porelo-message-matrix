@@ -175,6 +175,44 @@ class LifecycleIT {
         assertThat(second).isEqualTo(first);
     }
 
+    /** Harm guarded: people must distinguish the room's helpers from task accounts. */
+    @Test
+    void setupNamesBothHelpersOnANewAndAnExistingRoom() throws Exception {
+        final JsonNode first = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), first.path("account"), first.path("secrets"));
+        final MatrixClient relay = new MatrixClient(Config.from(kept));
+        final String relayId =
+                relay.get("/_matrix/client/v3/account/whoami").path("user_id").asText();
+        final String adminId = "@porelo:" + AdminRoom.server(relayId);
+        final MatrixClient admin = relay.as(kept.get(Config.ADMIN_TOKEN));
+
+        assertThat(displayName(adminId))
+                .as("the administrator is recognizable")
+                .isEqualTo("Porelo (administrator)");
+        assertThat(displayName(relayId))
+                .as("the delivery account is recognizable")
+                .isEqualTo("Porelo (delivery)");
+        admin.put(
+                "/_matrix/client/v3/profile/" + MatrixClient.segment(adminId) + "/displayname",
+                MatrixClient.JSON.createObjectNode().put("displayname", "changed administrator"));
+        relay.put(
+                "/_matrix/client/v3/profile/" + MatrixClient.segment(relayId) + "/displayname",
+                MatrixClient.JSON.createObjectNode().put("displayname", "changed relay"));
+
+        final JsonNode second = run(kept, "setup", "--project", PROJECT);
+
+        assertThat(second.path("conversation"))
+                .as("setup reuses the existing room")
+                .isEqualTo(first.path("conversation"));
+        assertThat(displayName(adminId))
+                .as("setup restores the administrator's name")
+                .isEqualTo("Porelo (administrator)");
+        assertThat(displayName(relayId))
+                .as("setup restores the delivery account's name")
+                .isEqualTo("Porelo (delivery)");
+    }
+
     @Test
     @DisplayName(
             "clear --project deactivates every account in the room and deletes the room; run again it finds nothing, and setup makes it anew")

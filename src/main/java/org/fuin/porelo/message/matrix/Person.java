@@ -68,6 +68,7 @@ final class Person {
             return "an edit of an earlier message: from " + sender + " in " + room;
         }
         final Set<String> to = new LinkedHashSet<>();
+        boolean helpers = false;
         final String replyTo =
                 content.path("m.relates_to").path("m.in_reply_to").path("event_id").asText("");
         if (directTo != null) {
@@ -97,15 +98,18 @@ final class Person {
                     to.add(original.path("sender").asText(""));
                 }
             }
+            final String administrator = "@" + Lifecycle.ADMIN + ":" + AdminRoom.server(self);
+            // The writer naming themselves names nobody else, so it neither marks nor hides a
+            // helper.
+            to.removeIf(id -> id.isEmpty() || id.equals(sender) || !id.startsWith("@"));
+            helpers =
+                    !to.isEmpty()
+                            && to.stream()
+                                    .allMatch(id -> id.equals(self) || id.equals(administrator));
             // Whom it is meant for, not who reads it: every task of the project reads every message
             // in the room,
             // and one that names nobody is handed over all the same.
-            to.removeIf(
-                    id ->
-                            id.isEmpty()
-                                    || id.equals(sender)
-                                    || id.equals(self)
-                                    || !id.startsWith("@"));
+            to.removeIf(id -> id.equals(self) || id.equals(administrator));
         }
         final String eventId = event.path("event_id").asText("");
         if (eventId.isEmpty()) {
@@ -117,6 +121,9 @@ final class Person {
         file.put("body", content.path("body").asText());
         if (directTo != null) {
             file.put("direct", true);
+        }
+        if (helpers) {
+            file.put("helpers", true);
         }
         file.put("eventId", eventId);
         if (!replyTo.isEmpty()) {

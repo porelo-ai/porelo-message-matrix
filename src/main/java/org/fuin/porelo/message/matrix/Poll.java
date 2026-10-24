@@ -298,6 +298,11 @@ final class Poll {
                     }
                     continue;
                 }
+                // The poller writes in the room only to answer a person for Porelo; handed back,
+                // that answer would reach every task.
+                if (self.equals(event.path("sender").asText(""))) {
+                    continue;
+                }
                 if (deliver(event, inbound, stateDir)) {
                     handed++;
                     continue;

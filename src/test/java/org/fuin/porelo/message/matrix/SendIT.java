@@ -3,6 +3,7 @@ package org.fuin.porelo.message.matrix;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -11,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,6 +65,64 @@ class SendIT {
                 Map.of(Config.HOMESERVER, tuwunel.url(), Config.ACCESS_TOKEN, from.accessToken()),
                 new PrintStream(OutputStream.nullOutputStream()),
                 new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+    }
+
+    /** Harm guarded: a reply from Porelo must use the relay's identity, never a task's. */
+    @Test
+    void sendWithTheSetupTokenWritesAsTheRelay() throws Exception {
+        final Map<String, String> env = new HashMap<>();
+        env.put("HOME", dir.resolve("home").toString());
+        env.put("XDG_CONFIG_HOME", dir.resolve("config").toString());
+        env.put("XDG_STATE_HOME", dir.resolve("state").toString());
+        final ByteArrayOutputStream setupOutput = new ByteArrayOutputStream();
+        try (ProcessUnit unit =
+                new ProcessUnit(env, ProcessUnit.binary(dir), dir.resolve("unit"))) {
+            Lifecycle.run(
+                    "setup",
+                    List.of("--project", "delivery"),
+                    env,
+                    new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)),
+                    new PrintStream(setupOutput, true, StandardCharsets.UTF_8),
+                    new PrintStream(errBytes, true, StandardCharsets.UTF_8),
+                    unit);
+            final JsonNode setup = MatrixClient.JSON.readTree(setupOutput.toByteArray());
+            setup.path("secrets")
+                    .properties()
+                    .forEach(entry -> env.put(entry.getKey(), entry.getValue().asText()));
+            final String conversation = setup.path("conversation").asText();
+            final Path file = Files.writeString(dir.resolve("relay-message"), MESSAGE);
+            final Path sig = Files.write(dir.resolve("relay-message.sig"), SIGNATURE);
+
+            final Transport.Result sent =
+                    Transport.run(
+                            env, "send", file.toString(), sig.toString(), "--to", conversation);
+
+            assertThat(sent.exit())
+                    .as("the relay sends successfully: %s", sent.err())
+                    .isEqualTo(Exit.OK);
+            final String reference =
+                    MatrixClient.JSON.readTree(sent.out()).path("reference").asText();
+            final MatrixClient observer =
+                    new MatrixClient(Config.from(env))
+                            .as(setup.path("account").path(Config.ADMIN_TOKEN).asText());
+            final JsonNode event =
+                    observer.get(
+                            "/_matrix/client/v3/rooms/"
+                                    + MatrixClient.segment(conversation)
+                                    + "/event/"
+                                    + MatrixClient.segment(reference));
+            assertThat(event.path("sender").asText())
+                    .as("the homeserver attributes the reply to the relay")
+                    .isEqualTo(
+                            "@porelo-relay-delivery:"
+                                    + AdminRoom.server(
+                                            observer.get("/_matrix/client/v3/account/whoami")
+                                                    .path("user_id")
+                                                    .asText()));
+            assertThat(event.path("content").path(Send.MESSAGE_FIELD).asText())
+                    .as("the relay's message reaches the room whole")
+                    .isEqualTo(MESSAGE);
+        }
     }
 
     @Test

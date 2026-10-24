@@ -143,6 +143,7 @@ final class Lifecycle {
         final MatrixClient nobody = client(url, "", settings);
 
         final Accounts.Session admin = admin(nobody, env, registrationToken, unit);
+        displayName(nobody, admin, "Porelo (administrator)");
         final MatrixClient asAdmin = nobody.as(admin.accessToken());
         AdminRoom.of(asAdmin, admin.userId());
         final String server = AdminRoom.server(admin.userId());
@@ -156,6 +157,7 @@ final class Lifecycle {
                         "porelo-relay-" + options.project(),
                         env.get(Config.ACCESS_TOKEN),
                         registrationToken);
+        displayName(nobody, relay, "Porelo (delivery)");
         admit(asAdmin, room, relay, nobody);
 
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
@@ -215,6 +217,7 @@ final class Lifecycle {
             return answer;
         }
         checkCentralRoom(asMachine, configuredRoom, room, true);
+        displayName(nobody, machineAccount, "Porelo (administrator)");
 
         final Accounts.Session relay =
                 derivedAccount(
@@ -223,6 +226,7 @@ final class Lifecycle {
                         secret,
                         env.get(Config.ACCESS_TOKEN),
                         registrationToken);
+        displayName(nobody, relay, "Porelo (delivery)");
         admit(asMachine, room, relay, nobody);
 
         put(answer.putObject("secrets"), settings.environment(url, relay.accessToken()));
@@ -231,6 +235,18 @@ final class Lifecycle {
         answer.put("machine", machine);
         answer.put("admitted", true);
         return answer;
+    }
+
+    /** Keeps an account recognizable when setup recovers it or reuses its room. */
+    private static void displayName(
+            final MatrixClient nobody, final Accounts.Session account, final String name)
+            throws Failure {
+        nobody.as(account.accessToken())
+                .put(
+                        "/_matrix/client/v3/profile/"
+                                + MatrixClient.segment(account.userId())
+                                + "/displayname",
+                        MatrixClient.JSON.createObjectNode().put("displayname", name));
     }
 
     /**

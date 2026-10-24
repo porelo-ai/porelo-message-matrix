@@ -76,6 +76,11 @@ class PollIT {
     }
 
     private void send(final String message, final byte[] signature) throws IOException {
+        send(alice, message, signature);
+    }
+
+    private void send(final Tuwunel.Account sender, final String message, final byte[] signature)
+            throws IOException {
         final Path file = Files.writeString(dir.resolve("out"), message, StandardCharsets.UTF_8);
         final Path sig = Files.write(dir.resolve("out.sig"), signature);
         assertThat(
@@ -83,7 +88,7 @@ class PollIT {
                                 new String[] {
                                     "send", file.toString(), sig.toString(), "--to", room
                                 },
-                                env(alice),
+                                env(sender),
                                 new PrintStream(OutputStream.nullOutputStream()),
                                 new PrintStream(errBytes, true, StandardCharsets.UTF_8)))
                 .as(this::stderr)
@@ -248,6 +253,23 @@ class PollIT {
         assertThat(delivered())
                 .containsOnlyKeys("Grüße ✓\n\tline two\r\n", "second\n")
                 .allSatisfy((message, signature) -> assertThat(signature).isEqualTo(SIGNATURE));
+    }
+
+    /**
+     * Harm guarded: Porelo's answer through the relay must not come back as a message for every
+     * task.
+     */
+    @Test
+    @DisplayName("A message the polling account sent itself into the room is not handed back")
+    void theAccountsOwnMessageIsNotHandedBack() throws IOException {
+        send(bob, "the relay's own answer\n", SIGNATURE);
+        send("a task's message\n");
+
+        assertThat(poll()).as(this::stderr).isEqualTo(Exit.OK);
+
+        assertThat(delivered())
+                .as("only what another account sent reaches inbound")
+                .containsOnlyKeys("a task's message\n");
     }
 
     /** The position files poll keeps, one per account and homeserver. */

@@ -1,6 +1,6 @@
 # MX35 — A Person Knows The Room's Helpers
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - one contract field another repository reads, docs, two classes.
 
 **What must be true.** A person in the project's room knows what the room's helper accounts are: each carries a

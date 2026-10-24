@@ -98,7 +98,7 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
 | `check` | Whether it could work now: the configuration complete, the homeserver answering, the token accepted. 0 usable, 2 not |
 | `send <file> <sig> --to <room id \| @user:server> [--shown <line>] [--mention @user:server]...` | To a person's user id: into the acting account's direct chat with them, opened (invite-only, marked direct) if there is none. One `m.text` event: the message in `org.fuin.porelo.message`, the signature in `org.fuin.porelo.signature`, and as its `body`, what a client shows, the line `--shown` names. In a room, each `--mention` is named in `m.mentions` and shown as a pill, by the name that person's or task's account shows, before the line, so that person's client highlights it; without one, `m.mentions` is empty and the message notifies nobody. In a direct chat nobody is mentioned. Prints `{"reference":"<event id>"}`. A retry is the same event |
 | `rename --display <nickname>` | Run with a task's token: the name its account shows in the room and its direct chats becomes the nickname. Its id, its token and every address stay. Prints nothing |
-| `poll --into <dir> [--persons \| --direct] [--wait <s>]` | Writes every new Porelo message as `<time>--matrix-<uuid>.json` with its `.sig` and its `.sender` (the account that sent it, as the homeserver says), each file whole, from `org.fuin.porelo.message`. With `--persons`, a person's text in the room too, as `<time>--matrix-person-<uuid>.json`, no `.sig`. With `--direct`, run with a task's token: only its direct chats with people, as person files marked `direct`. With `--wait` (1 to 30 s), the homeserver holds the sync open and it answers as soon as a message to hand over arrives; an answer with nothing in it, such as a read receipt the homeserver woke for, does not end the wait. Anything else is skipped and named on stderr |
+| `poll --into <dir> [--persons \| --direct] [--wait <s>]` | Writes every new Porelo message as `<time>--matrix-<uuid>.json` with its `.sig` and its `.sender` (the account that sent it, as the homeserver says), each file whole, from `org.fuin.porelo.message`. With `--persons`, a person's text in the room too, as `<time>--matrix-person-<uuid>.json`, no `.sig`. With `--direct`, run with a task's token: only its direct chats with people, as person files marked `direct`. With `--wait` (1 to 30 s), the homeserver holds the sync open and it answers as soon as a message to hand over arrives; an answer with nothing in it, such as a read receipt the homeserver woke for, does not end the wait. An event the polling account sent itself is never handed over, in the room as in a direct chat: it writes there only to answer a person for Porelo. Anything else is skipped and named on stderr |
 | `receipt <reference> --by <account>` | `{"state":"read","at":…}`, `{"state":"delivered"}` or `{"state":"unknown"}` |
 | `read <reference>` | Posts the account's read receipt, so the sender's `receipt` answers `read`. The reference is the event id or the file name `poll` gave, less `.json` |
 
@@ -107,10 +107,14 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
   transport carries it unread, and cuts it where the event would not fit, ending "… (cut; N characters in
   all)"; the message is never cut. Without `--shown` the body is "A Porelo message.", never the message.
 - **An event without `org.fuin.porelo.message`**, the message in its body as before, is not delivered.
-- **A person's file** is `{"sender", "to": [...], "body", "eventId", "replyTo"?, "direct"?, "at"}`.
+- **A person's file** is `{"sender", "to": [...], "body", "eventId", "replyTo"?, "direct"?, "helpers"?, "at"}`.
   - **Its `to`** is whom it is meant for, as Matrix states it: the accounts the client marked as mentioned
     (`m.mentions`, else `matrix.to` links), plus the sender of the message it replies to, less the writer
-    and the poller. It may be `[]`. Every task reads the room, so who reads it is Porelo's, not `to`'s.
+    and the room's helpers (the administrator and the relay). It may be `[]`. Every task reads the room,
+    so who reads it is Porelo's, not `to`'s.
+  - **Its `helpers`** is present and `true` exactly when the line named only the room's helpers, with `to`
+    then empty; otherwise it is absent, never `false`. Porelo then wakes no task and answers through `send`
+    with the relay's token.
   - **In a direct chat**, `to` is the task's own account and `direct` is `true`.
   - **Not handed over:** notices, edits, and anything not text.
 - **A direct chat is taken only from somebody who shares a room with the task's account**, the project's
