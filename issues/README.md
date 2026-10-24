@@ -8,10 +8,6 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
-| <a id="mx27"></a>[MX27](MX27-The-Homeserver-Starts-Without-A-Container.md) | S | - | The integration tests start Tuwunel's own binary where a task names it, so they run inside a Porelo task, as [PJ49](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj49) asks |
-| <a id="mx19"></a>[MX19](MX19-Clear-Leaves-A-Member-Of-Another-Project.md) | S | - | Clearing one project never cuts a person off from another project on the same homeserver |
-| <a id="mx20"></a>[MX20](MX20-The-Local-Homeserver-Is-Proven-The-Accounts-Own.md) | M | - | A token for the account's own local homeserver reaches it and no other account's listener on the same port |
-| <a id="mx28"></a>[MX28](MX28-A-Task-Account-Per-Project.md) | S | - | Two projects' tasks never share one account when their names run together; enroll and retire refuse a task account that is another project's |
 | <a id="mx34"></a>[MX34](MX34-The-Homeserver-Starts-On-A-Large-Machine.md) | S | - | The local homeserver starts, and `backup` and `restore` run, on a machine of any size: its pools, caches and container are bounded instead of growing with the cores |
 
 ## Backlog
@@ -22,7 +18,7 @@ sequence.
 | <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | M | - | A person sees no helper account in the room, or needs none; a helper that must stay visible is named and answers a mention |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
-| <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window [MX20](README.md#mx20) leaves |
+| <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
 ## Accepted
 
@@ -40,6 +36,10 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx27"></a>[MX27](README.md#mx27) | The Homeserver Starts Without A Container | The integration tests start Tuwunel's own binary where `MATRIX_TEST_TUWUNEL` names it, so they run inside a Porelo task |
+| <a id="mx19"></a>[MX19](README.md#mx19) | Clear Leaves A Member Of Another Project | `clear --project` deactivates only the accounts of the project's room that are in no other project's room, and names each one it kept |
+| <a id="mx20"></a>[MX20](README.md#mx20) | The Local Homeserver Is Proven The Account's Own | A token for the account's own local homeserver goes only to a loopback listener of that account; another account's listener is refused with 78 |
+| <a id="mx28"></a>[MX28](README.md#mx28) | A Task Account Per Project | `enroll` and `retire` refuse with 78 a task account that is in another project's room, so no project takes over or deactivates another's task |
 | <a id="mx12"></a>[MX12](README.md#mx12) | Several Machines On One Homeserver | A central homeserver's mode: each machine registers and acts only as the accounts it made, with passwords derived from its own secret, in a room a person made and invites it into; `--machine` on every verb |
 | <a id="mx31"></a>[MX31](README.md#mx31) | A Host Named In Upper Case Joins Its Conversation | `--machine` folded to lower case before it is checked, so a host named in upper case joins its project's conversation |
 | <a id="mx32"></a>[MX32](README.md#mx32) | The Account Is Cleared With Its Machine Named | The account-level `clear` takes `--machine`, so `porelo vault clear` takes the account's own homeserver away on a machine whose transport is told its name |

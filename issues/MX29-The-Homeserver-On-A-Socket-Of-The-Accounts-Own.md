@@ -4,11 +4,11 @@
 
 **What must be true.** The account's own homeserver is reached through a unix socket only that account can
 open, so no other account on the machine can stand in for it at any moment - not even for the milliseconds
-[MX20](README.md#mx20)'s check of the listener's owner leaves open while a homeserver dies.
+the transport's check of the listener's owner leaves open while a homeserver dies.
 
 ## Why
 
-[MX20](README.md#mx20) refuses a loopback listener that is not the account's own, and leaves a window of
+The transport refuses a loopback listener that is not the account's own, and leaves a window of
 milliseconds between that check and the request as an accepted risk. A socket under `$XDG_RUNTIME_DIR` has no
 such window: the filesystem decides who may connect, at every connection.
 

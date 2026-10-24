@@ -19,6 +19,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 | [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each machine acts only as the accounts it made, with passwords derived by HMAC-SHA256 from the machine's secret in `account`. |
+| [A task account of another project is refused, not renamed](#a-task-account-of-another-project-is-refused-not-renamed) | `enroll` and `retire` answer 78 for a task account in another project's room; an account's id stays its task's name. |
 
 ## The homeserver is Tuwunel
 
@@ -348,3 +349,20 @@ the machine takes another name.
 **What would change the answer:** Porelo handing every task's kept secrets to `enroll` and `clear --project`
 too, so each account could have an independent random password of its own; or Matrix offering scoped
 provisioning credentials per machine namespace.
+
+## A task account of another project is refused, not renamed
+
+**Decided:** a task's account is `@<task>` on the account's own homeserver, named by the task alone. When `enroll` or
+`retire` meets an `@<task>` that is joined or invited in another project's room, it refuses with 78 before a
+password is set or the account is deactivated, and names the other room. An account in the project's own room, or
+in none, is taken back as before. A project cleared already has no room of its own, so every room counts as
+another's and retiring a task of it stays harmless.
+
+**Why:** taking such an account over would set a new password and log every other session out, so the first
+project's task would lose its token at once; retiring it would deactivate another project's task. Porelo names a
+task `porelo-<project>_<task>`, which two pairs no longer share, so a clash comes only from a Porelo that named tasks
+otherwise or a task named by hand. Naming the account by the pair instead would give every enrolled task a new
+address Porelo keeps, for a case the names already prevent.
+
+**What would change the answer:** task names that two projects can share again, or several projects' tasks meant
+to act as one account.

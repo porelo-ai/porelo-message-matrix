@@ -53,7 +53,7 @@ On a test VM, against the pinned Tuwunel:
   boundaries; this design applies to the account's own local homeserver.
 - **Anchored, collision-free namespace per project:** the application service's exclusive user namespace holds only
   that project's task accounts, never a person or the administrator, with an anchored, escaped regex and a
-  collision-free project encoding (as [MX28](README.md#mx28) keeps projects apart) so two projects' names never
+  collision-free project encoding (as `enroll` and `retire` keep projects apart today) so two projects' names never
   overlap and existing human accounts are refused on collision. The exclusive alias namespace holds only the exact
   `#porelo-<project>:<server>` alias, the room namespace is empty, and `sender_localpart` is a separate unprivileged
   account per project that joins no room and holds power in none.
@@ -221,7 +221,7 @@ Order: 1, then 2, 3, 4. Build estimate for all: 960 min, a guess.
 ## To be checked
 
 - The task accounts' prefix and how its anchored, escaped form keeps two projects apart and avoids human accounts,
-  read against [MX28](README.md#mx28) and what Porelo passes as `--task`.
+  read against the check that keeps projects' task accounts apart and what Porelo passes as `--task`.
 - That a backup and restore ([MX24](README.md#mx24)) carries the registration and the lobby and rotates the
   application service's token so the old token is refused.
 - Whether Tuwunel accepts a registration with `url: null` so it pushes to nothing and queues no pushes across
