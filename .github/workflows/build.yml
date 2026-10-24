@@ -1,9 +1,10 @@
 name: Build
 
 # A change to documents alone builds nothing: its checks run locally before every hand-over and in the
-# Shared rules check once a day; a tag's push is never filtered by path. A push that changes only the
-# workflows builds nothing either: the next push with content builds with it, and a pull request still
-# checks them. porelo.yml, the image a Porelo task builds this repository in, is no part of the Build either.
+# Shared rules check once a day; a tag's push is never filtered by path. porelo.yml, the image a Porelo
+# task builds this repository in, is no part of the Build either.
+# Workflows alone build nothing: an action's move is checked by its pull request, and the next push with
+# content builds with it.
 on:
     push:
         branches: [main]
@@ -11,7 +12,7 @@ on:
         tags: ['v*']
         paths-ignore: ['**/*.md', 'doc/**', 'issues/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
     pull_request:
-        paths-ignore: ['**/*.md', 'doc/**', 'issues/**', 'mkdocs.yml', 'porelo.yml']
+        paths-ignore: ['**/*.md', 'doc/**', 'issues/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
 
 permissions:
     contents: read
