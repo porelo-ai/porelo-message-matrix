@@ -1,6 +1,6 @@
 # MX37 — The Homeserver Says Why It Did Not Start
 
-**Status:** Idea.
+**Status:** Backlog.
 **Size:** XS - one class and its test, and one optional field in `describe`.
 
 **What must be true.** When `setup` gives up waiting for the local homeserver, a person reads why in Porelo's

@@ -1,6 +1,6 @@
 # MX36 — A Backup Runs While Tasks Poll
 
-**Status:** Analyzed.
+**Status:** Backlog.
 **Size:** S - one module (`Keep`, `Poll`) and its tests, no contract other repositories read.
 
 **What must be true.** `backup <dir>` succeeds within its bound while Porelo's poll loops run, so the host's
