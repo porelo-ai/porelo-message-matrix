@@ -42,18 +42,12 @@ a directory another backup filled.
   this one is. Only then does it copy the positions, signal again, and take the next snapshot as its own.
 - **The target is checked again under the lock.** A target that is no longer empty is refused with 78 and left as
   it is; on a failure a backup removes only the files it copied, never the directory's earlier content.
-- **`TUWUNEL_DATABASE_BACKUPS_TO_KEEP`** (48 in the unit) then holds 24 hours of hourly backups instead of 48, since
-  each backup leaves two snapshots: see the open question.
+- **`TUWUNEL_DATABASE_BACKUPS_TO_KEEP` goes from 48 to 96** in the unit, since each backup leaves two snapshots: so
+  48 hours of hourly backups stay. RocksDB's backups share their unchanged files, so the extra snapshots cost little.
 - **Red first:** `KeepTest`, a fake unit whose snapshots complete in signal order and an earlier signal's snapshot
   completing after the next backup started: today the second backup reports the earlier one's id; and two backups
   into one directory, the second started while the first holds the lock: today the target ends empty.
-- Files: `Keep.java`, `KeepTest.java`, `KeepIT.java`, `homeserver/porelo-matrix-homeserver.service` if the question
-  is answered so, `CHANGELOG.md`.
-
-## Open questions
-
-- Two snapshots per backup: keep 48 snapshots, so 24 hours of hourly backups, or raise it to 96 so 48 hours stay?
-  RocksDB's backups share their unchanged files, so the second snapshot costs little space. Proposed: 96.
+- Files: `Keep.java`, `KeepTest.java`, `KeepIT.java`, `homeserver/porelo-matrix-homeserver.service`, `CHANGELOG.md`.
 
 ## Acceptance
 

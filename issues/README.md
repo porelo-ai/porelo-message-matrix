@@ -29,7 +29,7 @@ sequence.
 
 | # | Size | Open questions | Blocked by | What it covers |
 |---|---|---|---|---|
-| <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | 1 | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
+| <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | 0 | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
 
 ## Accepted
 
