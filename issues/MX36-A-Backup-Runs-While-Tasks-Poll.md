@@ -1,6 +1,7 @@
 # MX36 — A Backup Runs While Tasks Poll
 
-**Status:** Accepted.
+**Status:** Analyzed.
+**Size:** S - one module (`Keep`, `Poll`) and its tests, no contract other repositories read.
 
 **What must be true.** `backup <dir>` succeeds within its bound while Porelo's poll loops run, so the host's
 playbook copies the conversation off a busy host without stopping the tasks. Polls lose no message and never
@@ -22,6 +23,35 @@ still hangs no poll.
   tasks stopped it ran at once.
 - On a busy machine the playbook's backup therefore never succeeds, and the conversation does not outlive the
   host.
+- The host's playbook takes a backup every hour as well as at `down`
+  ([HO07](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho07)), so while tasks poll no
+  hourly backup succeeds either.
+
+## Measured
+
+- A prototype of a writer preference, against three processes taking `keep.lock` shared back to back, each for a
+  random time, five runs each: with holds of 1-3 s the backup held `keep.lock` after 1.9-2.9 s, with holds of
+  8-12 s after 10.0-11.8 s; today's code exited 75 every time at the bound it was given. A poll started while the
+  backup waited answered 75 within 1 s. The whole unit suite stayed green with it.
+- So a backup waits at most about the longest poll already running: one long sync of `--wait` (at most 30 s,
+  `Poll.MAX_WAIT_SECONDS`) and its delivery, well inside `LOCK_WAIT` of 180 s, which stays.
+
+## Plan
+
+- A second file in the state directory, `keep.wanted` (`Keep.WANTED`). A backup takes it exclusively first, within
+  `LOCK_WAIT` (another backup may hold it), and holds it to its end; only then it waits for `keep.lock`
+  exclusively, within the same budget.
+- A poll takes `keep.wanted` shared with `tryLock`, never a wait: refused, it answers 75 at once, as today when a
+  backup holds `keep.lock`. Holding it, it takes `keep.lock` shared as today and lets `keep.wanted` go at once
+  (`Keep.shared(channel, state)`, called from `Poll`).
+- `copyPositions` and `restore`'s check of the positions already take only `.since` files and `refs`, so
+  `keep.wanted` is never copied or restored; a test holds that.
+- Red first: `KeepWriterPreferenceTest`, three `SharedLockLooper` processes holding `keep.lock` shared back to
+  back, and a backup that must hold it within the longest hold plus 2 s; today it answers 75 ("writer
+  starvation"). Then: a poll started while a backup waits answers 75 within 1 s; a restore refuses `keep.wanted`
+  among the positions.
+- Files: `Keep.java`, `Poll.java`, `KeepTest.java`, the new `KeepWriterPreferenceTest.java` and
+  `SharedLockLooper.java`, `CHANGELOG.md`.
 
 ## Acceptance
 
@@ -30,11 +60,8 @@ still hangs no poll.
 - Polls started while the backup waits or runs answer 75 at once, and the next poll after the backup hands over
   every message without loss.
 - The existing test that a backup holding the lock makes a poll answer 75 at once stays green.
+- On a test VM, `backup` while a project's tasks poll ends 0 within one long sync, read with the tasks running.
 
 ## To be checked
 
-- Whether a second lock file that a backup takes first, and that new polls test and refuse on with 75 (writer
-  preference), lets the running polls drain within one long sync.
-- How long the backup then waits at most (one `--wait` of 30 s plus margin), measured, and whether `LOCK_WAIT`
-  of 180 s still fits.
-- The same measured on the test VM with a project's tasks running.
+- On a test VM with a project's tasks running: the backup's wait, measured.
