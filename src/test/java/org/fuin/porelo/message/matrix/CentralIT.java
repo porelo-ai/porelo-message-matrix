@@ -23,10 +23,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * The central lifecycle mode - {@code setup}, {@code enroll}, {@code retire}, {@code join} and
- * {@code clear --project} when the project's settings name a {@code homeserver} and a {@code room}
- * - against one real homeserver shared by two machines, with a room made and administered by a
- * person.
+ * The central lifecycle mode - {@code setup}, {@code enroll}, {@code retire}, {@code join}, {@code
+ * part} and {@code clear --project} when the project's settings name a {@code homeserver} and a
+ * {@code room} - against one real homeserver shared by two machines, with a room made and
+ * administered by a person.
  */
 class CentralIT {
 
@@ -702,6 +702,24 @@ class CentralIT {
         assertThat(result.exit())
                 .as("central join: %s", result.err())
                 .isEqualTo(Exit.NOT_PERMITTED);
+    }
+
+    /** Harm guarded: part must not remove or lock a person managed by a central homeserver. */
+    @Test
+    @DisplayName("part on a central homeserver exits with 77 and leaves the person alone")
+    void partOnACentralHomeserverIsNotPermitted() throws Exception {
+        final Transport.Result result =
+                attempt(baseEnv(), "part", "--project", PROJECT, "--person", "carol");
+
+        assertThat(result.exit())
+                .as("central part: %s", result.err())
+                .isEqualTo(Exit.NOT_PERMITTED);
+        assertThat(status(person.accessToken()))
+                .as("the person's session stays valid")
+                .isEqualTo(200);
+        assertThat(tuwunel.membership(person, room, person.userId()))
+                .as("the person remains in the central room")
+                .isEqualTo("join");
     }
 
     /**

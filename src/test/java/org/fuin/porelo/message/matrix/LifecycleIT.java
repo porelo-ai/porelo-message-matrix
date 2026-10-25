@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
@@ -25,11 +26,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * The lifecycle Porelo drives - setup, enroll, retire, join, clear - against the real homeserver
- * run as the account's own: each test is a directory of its own, with its own configuration, state
- * and database.
+ * The lifecycle Porelo drives - setup, enroll, retire, join, part, clear - against the real
+ * homeserver run as the account's own: each test is a directory of its own, with its own
+ * configuration, state and database.
  */
 class LifecycleIT {
 
@@ -855,6 +858,203 @@ class LifecycleIT {
                 run(lifecycle, "join", "--project", PROJECT, "--person", "carol", "--reset")
                         .path("login");
         assertThat(reset.path("password").asText()).isNotEqualTo(login.path("password").asText());
+    }
+
+    /** Harm guarded: removing one project must not lock a person out of another project. */
+    @ParameterizedTest(name = "other room membership: {0}")
+    @ValueSource(strings = {"join", "invite"})
+    @DisplayName("part keeps the account and its sessions when another project still uses it")
+    void partKeepsAMemberOfAnotherProject(final String otherMembership) throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode other = run(kept, "setup", "--project", "other");
+        final JsonNode credentials =
+                run(kept, "join", "--project", PROJECT, "--person", "carol").path("login");
+        final String id = credentials.path("user").asText();
+        final String password = credentials.path("password").asText();
+        final String token = login("carol", password);
+        final MatrixClient admin =
+                new MatrixClient(Config.from(kept))
+                        .as(setup.path("account").path(Config.ADMIN_TOKEN).asText());
+        final String room = setup.path("conversation").asText();
+        final String otherRoom = other.path("conversation").asText();
+        admin.post(
+                "/_matrix/client/v3/rooms/" + MatrixClient.segment(otherRoom) + "/invite",
+                MatrixClient.JSON.createObjectNode().put("user_id", id));
+        if ("join".equals(otherMembership)) {
+            admin.as(token)
+                    .post(
+                            "/_matrix/client/v3/join/" + MatrixClient.segment(otherRoom),
+                            MatrixClient.JSON.createObjectNode());
+        }
+        assertThat(membership(admin, room, id))
+                .as("the person starts in this room")
+                .isEqualTo("join");
+        assertThat(membership(admin, otherRoom, id))
+                .as("the other project already uses this account")
+                .isEqualTo(otherMembership);
+        assertThat(status(url(), token)).as("the original token starts valid").isEqualTo(200);
+
+        final JsonNode parted = run(kept, "part", "--project", PROJECT, "--person", "carol");
+
+        assertThat(parted)
+                .as("the contract names the account kept and the project that keeps it")
+                .isEqualTo(
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("kept", id)
+                                .put("why", "a member of #porelo-other:" + SERVER_NAME + " too"));
+        assertThat(membership(admin, room, id)).as("the person was kicked out").isEqualTo("leave");
+        assertThat(membership(admin, otherRoom, id))
+                .as("the other project's membership stays")
+                .isEqualTo(otherMembership);
+        assertThat(status(url(), token)).as("the original session stays valid").isEqualTo(200);
+        assertThat(status(url(), login("carol", password)))
+                .as("the original password stays valid")
+                .isEqualTo(200);
+        final Transport.Result again =
+                attempt(kept, "join", "--project", PROJECT, "--person", "carol");
+        assertThat(again.exit())
+                .as("an account still used by another project needs --reset: %s", again.err())
+                .isEqualTo(Exit.NOT_PERMITTED);
+        assertThat(status(url(), token))
+                .as("the refused join leaves the original session valid")
+                .isEqualTo(200);
+    }
+
+    /** Harm guarded: a removed person's sessions and password must stop granting access. */
+    @ParameterizedTest(name = "membership before part: {0}")
+    @ValueSource(strings = {"join", "invite"})
+    @DisplayName("part locks a person's last project membership and join can take the name back")
+    void partLocksTheAccountAndJoinTakesItBack(final String before) throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode credentials =
+                run(kept, "join", "--project", PROJECT, "--person", "carol").path("login");
+        final String id = credentials.path("user").asText();
+        final String password = credentials.path("password").asText();
+        final String firstToken = login("carol", password);
+        final String secondToken = login("carol", password);
+        final MatrixClient admin =
+                new MatrixClient(Config.from(kept))
+                        .as(setup.path("account").path(Config.ADMIN_TOKEN).asText());
+        final String room = setup.path("conversation").asText();
+        if ("invite".equals(before)) {
+            final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
+            admin.as(firstToken).post(path + "/leave", MatrixClient.JSON.createObjectNode());
+            admin.post(path + "/invite", MatrixClient.JSON.createObjectNode().put("user_id", id));
+        }
+        assertThat(membership(admin, room, id)).as("the membership to remove").isEqualTo(before);
+        assertThat(status(url(), firstToken)).as("the first session starts valid").isEqualTo(200);
+        assertThat(status(url(), secondToken)).as("the second session starts valid").isEqualTo(200);
+        final Transport.Result beforeJoin =
+                attempt(kept, "join", "--project", PROJECT, "--person", "carol");
+        assertThat(beforeJoin.exit())
+                .as("the current project's membership needs --reset: %s", beforeJoin.err())
+                .isEqualTo(Exit.NOT_PERMITTED);
+
+        final JsonNode parted =
+                run(kept, "part", "--project", PROJECT, "--person", "carol", "--loopback-only");
+
+        assertThat(parted)
+                .as("the contract reports only the removed account, without a password")
+                .isEqualTo(MatrixClient.JSON.createObjectNode().put("removed", id));
+        assertThat(membership(admin, room, id)).as("the person was kicked out").isEqualTo("leave");
+        assertThat(status(url(), firstToken)).as("the first old session is refused").isEqualTo(401);
+        assertThat(status(url(), secondToken)).as("every old session is refused").isEqualTo(401);
+        assertThatThrownBy(() -> Accounts.login(admin.as(""), "carol", password))
+                .as("the old password cannot log in")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("the old password is refused with 77")
+                                        .isEqualTo(Exit.NOT_PERMITTED));
+
+        final JsonNode returned =
+                run(kept, "join", "--project", PROJECT, "--person", "carol").path("login");
+        assertThat(returned.path("user").asText()).as("the account's name survives").isEqualTo(id);
+        assertThat(status(url(), login("carol", returned.path("password").asText())))
+                .as("join without --reset gives a working login")
+                .isEqualTo(200);
+        assertThat(membership(admin, room, id))
+                .as("the person is admitted again")
+                .isEqualTo("join");
+        assertThat(status(url(), firstToken))
+                .as("returning never revives an old session")
+                .isEqualTo(401);
+    }
+
+    /**
+     * Harm guarded: a person joining under a retired task's name must not take over its account,
+     * and with it every line the task wrote in the room.
+     */
+    @Test
+    @DisplayName("join without --reset refuses the name of a retired task's account with 77")
+    void joinDoesNotTakeOverARetiredTask() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        run(kept, "enroll", "--project", PROJECT, "--task", "erin");
+        run(kept, "retire", "--project", PROJECT, "--task", "erin");
+
+        final Transport.Result joined =
+                attempt(kept, "join", "--project", PROJECT, "--person", "erin");
+
+        assertThat(joined.exit())
+                .as("a retired task's name is not free for a person: %s", joined.err())
+                .isEqualTo(Exit.NOT_PERMITTED);
+    }
+
+    /** Harm guarded: retries and absent memberships must not change an unrelated account. */
+    @Test
+    @DisplayName("part twice or without membership succeeds with nothing to do")
+    void partAgainOrWithoutMembershipDoesNothing() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        run(kept, "join", "--project", PROJECT, "--person", "carol");
+        final MatrixClient nobody = new MatrixClient(Config.from(kept)).as("");
+        final Accounts.Session unused =
+                Accounts.register(
+                        nobody,
+                        "dave",
+                        Accounts.password(),
+                        LocalHomeserver.registrationToken(firstRun()));
+        assertThat(status(url(), unused.accessToken()))
+                .as("the account with no room starts valid")
+                .isEqualTo(200);
+
+        assertThat(run(kept, "part", "--project", PROJECT, "--person", "carol"))
+                .as("the first part actually removes a member")
+                .isEqualTo(
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("removed", "@carol:" + SERVER_NAME));
+        for (final String person : new String[] {"carol", "dave", "unknown"}) {
+            assertThat(run(kept, "part", "--project", PROJECT, "--person", person))
+                    .as("part of %s has nothing to do", person)
+                    .isEqualTo(MatrixClient.JSON.createObjectNode());
+        }
+        assertThat(status(url(), unused.accessToken()))
+                .as("an account that never joined keeps its session")
+                .isEqualTo(200);
+        assertThat(Accounts.available(nobody, "unknown"))
+                .as("part never creates an unknown account")
+                .isTrue();
+    }
+
+    private static String membership(
+            final MatrixClient reader, final String room, final String userId) throws Failure {
+        return reader.get(
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(room)
+                                + "/state/m.room.member/"
+                                + MatrixClient.segment(userId))
+                .path("membership")
+                .asText();
     }
 
     @Test

@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class DescribeTest {
 
@@ -66,9 +68,9 @@ class DescribeTest {
         assertThat(description.path("hosts").isArray()).isTrue();
         assertThat(description.path("lifecycle"))
                 .extracting(JsonNode::asText)
-                .containsExactly("setup", "enroll", "retire", "join", "clear", "settings");
+                .containsExactly("setup", "enroll", "retire", "join", "part", "clear", "settings");
         assertThat(description.path("takes"))
-                .as("lifecycle verbs take --machine")
+                .as("central lifecycle verbs take --machine")
                 .extracting(JsonNode::asText)
                 .containsExactly("machine");
     }
@@ -87,13 +89,13 @@ class DescribeTest {
     }
 
     /**
-     * Harm guarded: once describe claims {@code "takes": ["machine"]}, Porelo passes {@code
-     * --machine <name>} to every lifecycle verb; a verb that refuses the option with 64 stops the
-     * project, and an unsanitized machine name would go into a Matrix user id's localpart.
+     * Harm guarded: central lifecycle verbs must accept {@code --machine <name>} so each machine
+     * can manage its own accounts; an unsanitized name would go into a Matrix user id's localpart.
      */
     @Test
     @DisplayName(
-            "Every lifecycle verb takes --machine without regard to case, and refuses invalid characters with 64")
+            "Central lifecycle verbs take --machine without regard to case, and refuse invalid"
+                    + " characters with 64")
     void lifecycleVerbsTakeMachine() {
         for (final String[] args :
                 new String[][] {
@@ -125,6 +127,73 @@ class DescribeTest {
                             new PrintStream(OutputStream.nullOutputStream()));
             assertThat(exit).as(bad).isEqualTo(Exit.USAGE);
         }
+    }
+
+    /** Harm guarded: malformed part arguments must be refused before any account is changed. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "part --project p",
+                "part --project p --person n --reset",
+                "part --project p --person n --machine Node-1",
+                "part --project p --person n --task t"
+            })
+    @DisplayName("part requires --person and refuses --reset, --machine and --task")
+    void partRefusesArgumentsOutsideItsShape(final String line) {
+        final int exit =
+                Main.run(
+                        line.split(" "),
+                        Map.of(),
+                        new ByteArrayInputStream("{".getBytes(StandardCharsets.UTF_8)),
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).as("%s must stop before reading settings", line).isEqualTo(Exit.USAGE);
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("part is recognized and explains the allowed arguments")
+                .contains("usage: part");
+        assertThat(outBytes.toString(StandardCharsets.UTF_8))
+                .as("a refused command produces no success answer")
+                .isEmpty();
+    }
+
+    /**
+     * Harm guarded: a valid part invocation must reach lifecycle dispatch instead of doing nothing.
+     */
+    @Test
+    @DisplayName("part with --person and --loopback-only reaches the settings check")
+    void partReachesTheLifecycle() {
+        final int exit =
+                Main.run(
+                        new String[] {"part", "--project", "p", "--person", "n", "--loopback-only"},
+                        Map.of(),
+                        new ByteArrayInputStream("{".getBytes(StandardCharsets.UTF_8)),
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+
+        assertThat(exit)
+                .as("valid part arguments reach the malformed settings")
+                .isEqualTo(Exit.CONFIG);
+    }
+
+    /** Harm guarded: part must never kick or lock a machinery account. */
+    @Test
+    @DisplayName("part refuses a person's name beginning with porelo")
+    void partRefusesAMachineryName() {
+        final int exit =
+                Main.run(
+                        new String[] {"part", "--project", "p", "--person", "porelo-admin"},
+                        Map.of(),
+                        new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)),
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+
+        assertThat(exit)
+                .as("a machinery name is refused before provisioning")
+                .isEqualTo(Exit.USAGE);
+        assertThat(errBytes.toString(StandardCharsets.UTF_8))
+                .as("the refusal explains the protected namespace")
+                .contains("a person's name must not begin with 'porelo'");
     }
 
     @Test

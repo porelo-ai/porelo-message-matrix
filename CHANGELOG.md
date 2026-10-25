@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `part --project P --person N [--loopback-only]` removes a person from the project's room, keeping the
+  account's password and sessions when another project uses it; otherwise it replaces the password and
+  logs out every session without deactivating the account. `join` takes an account `part` locked back
+  without `--reset`, but never a retired task's account. On a central homeserver, `part` is refused with 77.
 - `poll` hands over no event the polling account sent itself, in the room as in a direct chat, so Porelo's
   answer through the relay never reaches the tasks.
 - A person file carries `"helpers": true` with an empty `to` exactly when the line names only the room's

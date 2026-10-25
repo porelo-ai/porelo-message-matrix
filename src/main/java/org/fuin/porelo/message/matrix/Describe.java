@@ -73,8 +73,7 @@ final class Describe {
         // Offered so a project file's draft can be checked against this transport before it is
         // committed.
         lifecycle.add("settings");
-        // Every lifecycle verb takes --machine <name>, so each machine on a central homeserver
-        // registers its own accounts.
+        // --machine scopes the accounts made on a central homeserver to one machine.
         description.putArray("takes").add("machine");
         try {
             out.println(MatrixClient.JSON.writeValueAsString(description));

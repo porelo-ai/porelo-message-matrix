@@ -1,6 +1,6 @@
 # MX40 — A Person Leaves A Project's Room
 
-**Status:** Analyzed.
+**Status:** Implementing.
 **Size:** S - one verb in `Lifecycle` and its tests, and one row of the contract `doc/transport.md`, agreed with `porelo`.
 
 **What must be true.** When a person is removed from a project's conversation, that person can no longer read or
@@ -23,12 +23,15 @@ the account, without touching `N`'s place in any other project's room.
 - **On the account's own homeserver**, as the administrator `@porelo`:
   - `N` joined or invited in `#porelo-P`: kicked out of it (the membership reads `leave`). Not a member, or no
     account at all: nothing to do, success.
-  - `N` in no other project's room (the same reading as `clear`'s `membersElsewhere`): every session of the
-    account logged out and its password replaced by one nobody is shown, so a later `join` brings the person
-    back. Where `N` is in another project's room too, the account stays as it is and is named in `kept`.
-- **`join` takes a locked account back:** an existing account that is joined or invited in no project's room
-  (`#porelo-*`) gets a new password, shown once, and is invited into P's room again, without `--reset`. An
-  account in another project's room is still refused with 77 without `--reset`, as today.
+  - `N` in no other project's room (the same reading as `clear`'s `membersElsewhere`): its password replaced by
+    one nobody is shown, then every session logged out by logging in with it and `logout/all`, so a later `join`
+    brings the person back. The lock comes before the kick, so a run that fails between the two finds the
+    membership again. Where `N` is in another project's room too, the account stays as it is and is named in `kept`.
+- **`join` takes a locked account back:** an existing account the administrator put out of P's room (its
+  membership `leave`, sent by `@porelo`) that is joined or invited in no project's room (`#porelo-*`) gets a new
+  password, shown once, and is invited into P's room again, without `--reset`. Any other existing account is
+  still refused with 77 without `--reset`: one in another project's room, and one that left by itself, such as a
+  retired task's, deactivated, which a new password would hand to a person.
 - **The answer, exit 0 each, as `porelo` reads it:** `{"removed": "@N:server"}` when the account is locked and
   out of the room; `{"kept": "@N:server", "why": "a member of #porelo-Q too"}` when it is out of the room and
   stays for another; `{}` when there was nothing to do. Run again it finds less and succeeds.
@@ -45,7 +48,9 @@ the account, without touching `N`'s place in any other project's room.
 - The failure paths seen: a central homeserver refused with 77, a person's name that begins with `porelo` refused
   as `join` refuses it.
 
-## To be checked
+## Measured
 
-- Whether Tuwunel's admin room logs out every session of a user (`users logout`), and whether replacing a password
-  does already.
+- Against the pinned Tuwunel 1.9.4: the admin room has no command that logs out every session of a user
+  (`users logout` is an unrecognized subcommand); only single devices can be deleted.
+- A `join` without `--reset` that took back any account in no project's room gave a person a retired task's
+  deactivated account: it exited 0 with a working login under the task's id.

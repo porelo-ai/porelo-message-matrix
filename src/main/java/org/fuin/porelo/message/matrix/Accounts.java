@@ -148,10 +148,19 @@ final class Accounts {
      */
     static Session alone(final MatrixClient anybody, final String localpart, final String password)
             throws Failure {
-        final Session first = login(anybody, localpart, password);
-        anybody.as(first.accessToken())
-                .post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
+        logoutAll(anybody, localpart, password);
         return login(anybody, localpart, password);
+    }
+
+    /** Logs in as the account and ends every session, including the one just made. */
+    static void logoutAll(final MatrixClient anybody, final String localpart, final String password)
+            throws Failure {
+        final Session session = login(anybody, localpart, password);
+        logoutAll(anybody.as(session.accessToken()));
+    }
+
+    private static void logoutAll(final MatrixClient account) throws Failure {
+        account.post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
     }
 
     /**
@@ -175,7 +184,7 @@ final class Accounts {
         if (leave.status() != 200 && leave.status() != 403 && leave.status() != 404) {
             throw refused("leaving " + room + " as " + localpart, leave);
         }
-        asAccount.post("/_matrix/client/v3/logout/all", MatrixClient.JSON.createObjectNode());
+        logoutAll(asAccount);
     }
 
     /** The account's own id, or null when the homeserver does not know the token. */

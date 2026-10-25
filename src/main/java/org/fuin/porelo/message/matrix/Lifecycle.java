@@ -24,13 +24,13 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The verbs by which Porelo has the transport make what a project's conversation needs - {@code
- * setup}, {@code enroll}, {@code retire} and {@code join} - and take it away again, {@code clear}.
- * Porelo hands each the project's settings on stdin and the secrets it kept as the environment, and
- * keeps what it prints without reading it: all that is Matrix is here.
+ * setup}, {@code enroll}, {@code retire}, {@code join} and {@code part} - and take it away again,
+ * {@code clear}. Porelo hands each the project's settings on stdin and the secrets it kept as the
+ * environment, and keeps what it prints without reading it: all that is Matrix is here.
  */
 final class Lifecycle {
 
-    static final List<String> VERBS = List.of("setup", "enroll", "retire", "join", "clear");
+    static final List<String> VERBS = List.of("setup", "enroll", "retire", "join", "part", "clear");
 
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
@@ -110,6 +110,7 @@ final class Lifecycle {
                     case "enroll" -> enroll(options, settings, env);
                     case "retire" -> retire(options, settings, env);
                     case "join" -> join(options, settings, env);
+                    case "part" -> part(options, settings, env);
                     case "clear" -> clear(options, settings, env);
                     default -> throw new IllegalArgumentException(verb);
                 };
@@ -418,7 +419,7 @@ final class Lifecycle {
         return Accounts.register(nobody, ADMIN, Accounts.password(), registrationToken);
     }
 
-    // --- enroll, retire, join
+    // --- enroll, retire, join, part
     // ----------------------------------------------------------------------------
 
     private static ObjectNode enroll(
@@ -729,19 +730,12 @@ final class Lifecycle {
     private static ObjectNode join(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
-        final String person = required(options.person(), "--person");
-        if (person.startsWith(ADMIN)) {
-            throw new Failure(
-                    Exit.USAGE,
-                    "a person's name must not begin with '"
-                            + ADMIN
-                            + "', which the machinery's accounts use");
-        }
-        if (settings.homeserver() != null) {
-            throw new Failure(Exit.NOT_PERMITTED, "people are managed at the homeserver itself");
-        }
+        final String person = localPerson(options, settings);
         final Place place = place(settings, env);
+        final String server = AdminRoom.server(place.adminId());
+        final String id = "@" + person + ":" + server;
         final String password = Accounts.password();
+        final String room = place.room(options.project());
         final Accounts.Session account;
         if (Accounts.available(place.nobody(), person)) {
             account =
@@ -750,8 +744,9 @@ final class Lifecycle {
                             person,
                             password,
                             place.registrationToken(settings, env));
-        } else if (options.reset()) {
-            final String id = "@" + person + ":" + AdminRoom.server(place.adminId());
+        } else if (options.reset()
+                || (partedFrom(place, room, id)
+                        && !membersElsewhere(place.admin(), server, null).containsKey(id))) {
             AdminRoom.of(place.admin(), place.adminId()).setPassword(id, password);
             account = Accounts.login(place.nobody(), person, password);
         } else {
@@ -759,7 +754,6 @@ final class Lifecycle {
                     Exit.NOT_PERMITTED,
                     "'" + person + "' has an account already; --reset gives it a new password");
         }
-        final String room = place.room(options.project());
         admit(place.admin(), room, account, place.nobody());
 
         final boolean loopback = loopback(place.url());
@@ -792,6 +786,71 @@ final class Lifecycle {
                         + alias(options.project(), AdminRoom.server(place.adminId()))
                         + ". The password is shown once.");
         return answer;
+    }
+
+    /** Removes a person from this project, locking the account only if no other project uses it. */
+    private static ObjectNode part(
+            final Options options, final Settings settings, final Map<String, String> env)
+            throws Failure {
+        final String person = localPerson(options, settings);
+        final Place place = place(settings, env);
+        final String server = AdminRoom.server(place.adminId());
+        final String id = "@" + person + ":" + server;
+        final String room = place.room(options.project());
+        final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
+        final JsonNode member =
+                place.admin().find(path + "/state/m.room.member/" + MatrixClient.segment(id));
+        final String membership = member == null ? "" : member.path("membership").asText("");
+        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
+        if (!("join".equals(membership) || "invite".equals(membership))) {
+            return answer;
+        }
+        final String other = membersElsewhere(place.admin(), server, room).get(id);
+        // Locked before the kick: a run that fails between the two still finds the membership.
+        if (other == null) {
+            final String password = Accounts.password();
+            AdminRoom.of(place.admin(), place.adminId()).setPassword(id, password);
+            Accounts.logoutAll(place.nobody(), person, password);
+        }
+        place.admin().post(path + "/kick", MatrixClient.JSON.createObjectNode().put("user_id", id));
+        return other == null
+                ? answer.put("removed", id)
+                : answer.put("kept", id).put("why", "a member of " + other + " too");
+    }
+
+    /**
+     * Whether the administrator put {@code id} out of {@code room}, as {@code part} does. An
+     * account that left by itself - a retired task's, deactivated - is not one, so no person takes
+     * it over.
+     */
+    private static boolean partedFrom(final Place place, final String room, final String id)
+            throws Failure {
+        for (final JsonNode member :
+                place.admin()
+                        .get("/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/members")
+                        .path("chunk")) {
+            if (id.equals(member.path("state_key").asText(""))) {
+                return "leave".equals(member.path("content").path("membership").asText(""))
+                        && place.adminId().equals(member.path("sender").asText(""));
+            }
+        }
+        return false;
+    }
+
+    private static String localPerson(final Options options, final Settings settings)
+            throws Failure {
+        final String person = required(options.person(), "--person");
+        if (person.startsWith(ADMIN)) {
+            throw new Failure(
+                    Exit.USAGE,
+                    "a person's name must not begin with '"
+                            + ADMIN
+                            + "', which the machinery's accounts use");
+        }
+        if (settings.homeserver() != null) {
+            throw new Failure(Exit.NOT_PERMITTED, "people are managed at the homeserver itself");
+        }
+        return person;
     }
 
     // --- clear
@@ -965,10 +1024,12 @@ final class Lifecycle {
 
     /**
      * Who is joined or invited in another project's room than {@code room}, each with that room's
-     * alias: the rooms the administrator is in whose alias is a project's.
+     * alias: the rooms the administrator is in whose alias is a project's. A null {@code room}
+     * includes every project.
      */
     private static Map<String, String> membersElsewhere(
-            final MatrixClient admin, final String server, final String room) throws Failure {
+            final MatrixClient admin, final String server, @Nullable final String room)
+            throws Failure {
         final Map<String, String> members = new HashMap<>();
         for (final JsonNode joined :
                 admin.get("/_matrix/client/v3/joined_rooms").path("joined_rooms")) {
@@ -1394,6 +1455,7 @@ final class Lifecycle {
                     case "setup" -> task == null && person == null;
                     case "enroll", "retire" -> task != null && person == null;
                     case "join" -> person != null && task == null;
+                    case "part" -> person != null && task == null && machine == null;
                     case "clear" -> task == null && person == null;
                     default -> false;
                 };
@@ -1457,6 +1519,8 @@ final class Lifecycle {
                             case "retire" ->
                                     "retire --project <project> --task <task> [--machine <machine>]";
                             case "clear" -> "clear [--project <project>] [--machine <machine>]";
+                            case "part" ->
+                                    "part --project <project> --person <person> [--loopback-only]";
                             default ->
                                     "join --project <project> --person <person> [--reset] [--machine <machine>] [--loopback-only]";
                         });
