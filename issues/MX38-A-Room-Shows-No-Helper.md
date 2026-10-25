@@ -5,15 +5,14 @@
 
 **What must be true.** A person in the project's room sees only the people and the tasks among its members, never
 Porelo's administrator or a relay; tasks are enrolled and retired, people joined, and the room read for Porelo as
-today. [MX35](README.md#mx35) names the helpers in the meantime.
+today. Until then the helpers carry display names a person reads.
 
 ## Why
 
 - Today the room's members are the person, the tasks, `porelo` (the homeserver's administrator, which makes the room
   and invites every account) and `porelo-relay-<project>` (the account `poll --persons` reads the room with); neither
-  helper is a participant a person talks with, and without [MX35](README.md#mx35) a person cannot tell what they are
-  and a line mentioning only `porelo` wakes every task (`Person.java` strikes the relay from `to`, not the
-  administrator; `porelo` then finds `to` empty).
+  helper is a participant a person talks with. Only their display names say what they are, and a line naming only
+  them is marked `helpers` so that it wakes no task.
 
 ## Measured
 

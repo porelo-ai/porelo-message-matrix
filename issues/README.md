@@ -8,9 +8,6 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
-| <a id="mx34"></a>[MX34](MX34-The-Homeserver-Starts-On-A-Large-Machine.md) | S | - | The local homeserver starts, and `backup` and `restore` run, on a machine of any size: its pools, caches and container are bounded instead of growing with the cores |
-| <a id="mx37"></a>[MX37](MX37-The-Homeserver-Says-Why-It-Did-Not-Start.md) | XS | - | When `setup` gives up waiting for the local homeserver, a person reads why in Porelo's start from the homeserver's own words, never a secret; `describe` says what a start waits on, for porelo's [B268](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b268) |
-| <a id="mx35"></a>[MX35](MX35-A-Person-Knows-The-Rooms-Helpers.md) | M | - | A person reads the room's two helpers by name, and a line naming only them wakes no task: it is marked `helpers` for Porelo to answer |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 
 ## Backlog
@@ -38,6 +35,9 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx34"></a>[MX34](README.md#mx34) | The Homeserver Starts On A Large Machine | The local homeserver's container bounded to 512 processes, 1 GiB and 2 CPUs, with Tuwunel's database pool and caches capped, so it starts and backs up on a machine of any size |
+| <a id="mx35"></a>[MX35](README.md#mx35) | A Person Knows The Room's Helpers | The administrator and the relay carry display names a person reads, and a line naming only them is marked `helpers` for Porelo to answer, waking no task |
+| <a id="mx37"></a>[MX37](README.md#mx37) | The Homeserver Says Why It Did Not Start | A `setup` that gives up waiting prints the homeserver's own last error, never a secret, and `describe` says what a start waits on |
 | <a id="mx27"></a>[MX27](README.md#mx27) | The Homeserver Starts Without A Container | The integration tests start Tuwunel's own binary where `MATRIX_TEST_TUWUNEL` names it, so they run inside a Porelo task |
 | <a id="mx19"></a>[MX19](README.md#mx19) | Clear Leaves A Member Of Another Project | `clear --project` deactivates only the accounts of the project's room that are in no other project's room, and names each one it kept |
 | <a id="mx20"></a>[MX20](README.md#mx20) | The Local Homeserver Is Proven The Account's Own | A token for the account's own local homeserver goes only to a loopback listener of that account; another account's listener is refused with 78 |

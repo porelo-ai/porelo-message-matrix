@@ -26,6 +26,11 @@ and the journal says the name is in use.
 
 Two accounts on one machine each get their own homeserver, on their own port.
 
+The container is bounded whatever the machine's size: 512 processes, 1 GiB of memory and 2 CPUs, with
+Tuwunel's database pool and caches capped to fit. So the account's user manager must delegate the `cpu`,
+`memory` and `pids` controllers, as Ubuntu 26.04 does by default; where it does not, podman refuses the
+limits and the homeserver does not start.
+
 The first account registered is the server's administrator. It is Porelo's own, `@porelo`, which makes
 the project's room and an account per task, and deactivates a task's account when the task is removed.
 The image is pinned by digest in `homeserver/Dockerfile`; it is about 107 MB and is pulled at the first
