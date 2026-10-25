@@ -9,11 +9,6 @@ sequence.
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 | <a id="mx40"></a>[MX40](MX40-A-Person-Leaves-A-Projects-Room.md) | S | - | `part --project P --person N` takes a person out of the project's room and ends the account's sessions, keeping its place in another project's room, for `porelo talk remove`; `join` takes back an account `part` locked |
 
 ## Backlog

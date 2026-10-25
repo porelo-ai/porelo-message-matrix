@@ -1,6 +1,6 @@
 # MX40 — A Person Leaves A Project's Room
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one verb in `Lifecycle` and its tests, and one row of the contract `doc/transport.md`, agreed with `porelo`.
 
 **What must be true.** When a person is removed from a project's conversation, that person can no longer read or
