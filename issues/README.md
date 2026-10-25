@@ -24,6 +24,7 @@ sequence.
 
 | # | Size | Open questions | Blocked by | What it covers |
 |---|---|---|---|---|
+| <a id="mx40"></a>[MX40](MX40-A-Person-Leaves-A-Projects-Room.md) | S | 0 | - | `part --project P --person N` takes a person out of the project's room and ends the account's sessions, keeping its place in another project's room, for `porelo talk remove` |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | 0 | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
 
 ## Accepted
