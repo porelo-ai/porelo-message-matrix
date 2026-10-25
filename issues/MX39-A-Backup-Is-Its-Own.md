@@ -1,6 +1,6 @@
 # MX39 — A Backup Is Its Own
 
-**Status:** Analyzed.
+**Status:** Estimated.
 **Size:** S - one class, `Keep`, and its tests; no contract another repository reads.
 
 **What must be true.** A copy `backup <dir>` reports as made holds the homeserver's database and the poll positions

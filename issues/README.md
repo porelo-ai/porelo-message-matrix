@@ -9,7 +9,6 @@ sequence.
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
-| <a id="mx40"></a>[MX40](MX40-A-Person-Leaves-A-Projects-Room.md) | S | - | `part --project P --person N` takes a person out of the project's room and ends the account's sessions, keeping its place in another project's room, for `porelo talk remove`; `join` takes back an account `part` locked |
 
 ## Backlog
 
@@ -18,12 +17,6 @@ sequence.
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Analyzed
-
-| # | Size | Open questions | Blocked by | What it covers |
-|---|---|---|---|---|
-| <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | 0 | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
-
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
@@ -31,10 +24,17 @@ sequence.
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
+## Estimated
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
+
 ## Finished
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx40"></a>[MX40](README.md#mx40) | A Person Leaves A Project's Room | `part` takes a person out of a project's room and locks the account out of every session unless another project's room keeps it, and `join` takes such an account back without `--reset` |
 | <a id="mx34"></a>[MX34](README.md#mx34) | The Homeserver Starts On A Large Machine | The local homeserver's container bounded to 512 processes, 1 GiB and 2 CPUs, with Tuwunel's database pool and caches capped, so it starts and backs up on a machine of any size |
 | <a id="mx35"></a>[MX35](README.md#mx35) | A Person Knows The Room's Helpers | The administrator and the relay carry display names a person reads, and a line naming only them is marked `helpers` for Porelo to answer, waking no task |
 | <a id="mx37"></a>[MX37](README.md#mx37) | The Homeserver Says Why It Did Not Start | A `setup` that gives up waiting prints the homeserver's own last error, never a secret, and `describe` says what a start waits on |
