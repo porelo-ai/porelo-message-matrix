@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `df1a9687073cea82` · changed 2026-10-18T13:00Z
+> **BEGIN Shared Area** · sha256 `d03f2325cc348448` · changed 2026-10-26T16:25Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -46,9 +46,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   and is pushed only after the change it needs has built and published.
 - **A change is ready only when every step its build workflow runs - not only Maven - has passed
   locally.**
-- **Amend, squash or rebase only commits that are not pushed**, checked with
-  `git ls-remote origin refs/heads/main`, never with a cached `origin/main`. A pushed commit is
-  repaired by a new commit on the remote's tip, never by a force push.
+- **Amend, squash or rebase only when every affected commit is unpublished**, checked with
+  `git ls-remote origin refs/heads/main`, never with a cached `origin/main`; several local commits
+  are allowed. A pushed commit is repaired by a new commit on the remote's tip, never by a force push.
 - **A commit message is one line of at most 72 characters saying in words what changed**, never by a
   requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
   what they share, not each of them. Trailers may follow below a blank line, and nothing else.
@@ -61,6 +61,13 @@ and the UTC time that text last changed; change it in the channel first, never i
   under `[Unreleased]` and the heading of its kind. A change only to the CI's own workflows (an action's
   pin, a schedule, a job's steps) gets none: the changelog is for the people who use what ships. A
   generated changelog is changed only through its sources, never by hand.
+- **Signing and release-tag creation belong to the operator.** Hand over the release commit, next
+  snapshot, and exact signed-tag command; never request the signing passphrase.
+- **Before a push that requires a build, check that no skip instruction suppresses it.** Resolve
+  that instruction before relying on CI to verify the push.
+- **After an authorized push, follow the repository’s build through every job to its final result
+  and verify its `head_sha`.** Report the run ID and commit, with success or the failed step and
+  relevant error.
 
 ### Issues
 
@@ -151,6 +158,12 @@ and the UTC time that text last changed; change it in the channel first, never i
   break. The shared tools check that every number is such a link and that its anchor exists.
 - **Code, comments, test names and anything that ships never cite an issue number**; they state the
   constraint itself, since the issue is deleted once it is finished.
+- **A sprint-scoped instruction applies only to issues assigned to that sprint in the release
+  plan.** Check each issue’s assignment before changing its state or starting work under that
+  instruction.
+- **A requirement handover includes the text the receiving repository needs and the commit it came
+  from.** Identify a proposal as a proposal until the operator accepts it. Publish a new index row
+  before another repository links to it.
 
 ### Testing and machines
 
@@ -158,11 +171,12 @@ and the UTC time that text last changed; change it in the channel first, never i
   when the operator says so, and in the GitHub build on every push.** Which machines a setup has is
   defined in the optional `.AGENTS.md` or fed into every agent's context; machines are rented only
   through the shared tooling, and nothing else names a provider.
-- **The documents' checks run locally before every hand-over, and on GitHub once a day.** Every change is handed
-  over with `check-shared`, `check-citations`, `check-readmes`, `check-doc-site`, `check-actions` and the tests
-  that read documents green on the host, on the exact commit, and the code it changed read against the
-  repository's skills; the *Shared rules check* workflow runs on a daily schedule, on a pull request and by hand,
-  never on a push.
+- **The documents' checks run locally before every handover, and on GitHub once a day.** Every
+  change is handed over with `check-shared`, `check-citations`, `check-readmes`, `check-doc-site`,
+  `check-actions` and the tests that read documents green on the host, on the exact commit, and the
+  code it changed read against the repository's skills. The named *Shared rules check* workflow runs
+  on a daily schedule, on a pull request and by hand, never on a push; the required document checks
+  on push and pull request run in a suitable light workflow.
 - **How agents exchange files for a test on a local VM is defined in `.AGENTS.md`.** Where it says
   nothing, a test uses only the agent's own artifacts.
 - **A local VM is restarted only when agreed in the channel or asked of the operator.** A rented
@@ -200,7 +214,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   never edited so that a feature has something to show.
 - **A test depends on nothing outside itself**: not on the machine's configuration (a suite calling
   git runs with `GIT_CONFIG_GLOBAL=/dev/null`), not on wall-clock time, and not on a pinned version
-  written into it - it reads the version from the build.
+  written into it - it reads the version from the build. A test that calls git runs from a clone of
+  the tested commit, never an archive; transfer a git bundle when needed.
 - **Before a commit, the full suite runs as its own step and its result is read.** A commit is gated
   on the exit code, never on grepped output, and never chained onto the test run.
 - **A change handed over says which test levels actually ran** - unit tests, local VM, rented
@@ -213,6 +228,28 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A test result names every skipped test**, never just a count.
 - **A failing check prints what it asked and what it got, never a guessed cause**, and its failure
   path has been made to happen once and read.
+- **An operator test starts with one complete guide assembled from each repository’s checked
+  steps.** Include prerequisites, versions, commands, clicks, keys, accounts, tunnels, expected
+  results, failure signs, duration, and absolute paths.
+- **Every command or step in an operator test guide has an observed result or is labeled “not run”
+  in the guide itself.** Rehearse executable steps in the required installed environment or a clean
+  checkout, checking options and creating the state the test needs.
+- **A machine script is rehearsed with the same preparation as its target before an expensive run.**
+  Compare its options with the build workflow and verify each prerequisite’s effect before starting
+  dependent work.
+- **Detailed instructions are delivered when the operator should start, with later actions
+  introduced as their prerequisites are met.** Before then, report that the guide is ready.
+- **During an operator test, collect findings and the responsible repositories’ answers for
+  discussion together at the end.** Immediate replies stay brief and give a workaround when needed
+  to continue.
+- **Before a walk starts, have the responsible repositories prepare the operator’s test environment
+  with the newest intended snapshots and verify installed versions and adapter commits.** Keep an
+  ongoing walk stable.
+- **Budget each lease using its provider’s billing units at the current price.** Include every new
+  lease required for a rerun.
+- **An assigned isolated test environment’s test-only vault may be unlocked, reset, or recreated
+  without another approval once the test is agreed.** Consume its passphrase in that environment
+  through a passphrase command, without reading or printing it into the session.
 
 ### Claims and writing
 
@@ -226,11 +263,24 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Documentation and rules state what is true now**: no dates, no history, no stories, and nobody
   named, only roles. The shared blocks' markers are the one exception.
 - **Everything written is US English** - documentation, issues, comments, commit messages, the
-  channel. Replies to the operator are in the language the operator writes in.
+  channel.
 - **A finding worth keeping is committed** - in an issue, the documentation or a decision - never
   left only in a conversation or the channel.
 - **A finding taken from a third-party source is written as the finding, never naming the source**,
-  in anything committed.
+  in anything committed. Source and path references stay in the local review discussion; required
+  license or copyright attribution is not removed under this writing rule, and a conflict is decided
+  separately.
+- **Agents answer the operator in the language the operator writes in.** Porelo's own names stay as
+  they are in every language: Porelo-Vault, its passphrase the Vault-Passphrase, gate, task.
+- **A claim of absence requires a complete search with verified scope.** Read every match, and
+  confirm that an empty search finds something known in the same files before treating it as
+  evidence.
+- **Before every handover, scan tracked files for real machine names, addresses, accounts and home
+  paths, and take them out.** Examples use documentation addresses (`192.0.2.x`, `example.org`) and
+  fictional accounts.
+- **Replies to the operator after reading messages mention only what requires this role to act or
+  answer.** State the action or need without retelling other entries; unrelated reads produce no
+  summary, waiting update, or watcher acknowledgment.
 
 ### Security and tools
 
@@ -251,6 +301,17 @@ and the UTC time that text last changed; change it in the channel first, never i
   which holds everything back until the end and looks like a hang.
 - **`ssh -n host 'bash -s' <<EOF` runs nothing and exits 0**; a script sent on standard input goes
   without `-n`.
+- **A secret is never fed through a terminal recorder such as `script`.** Use a supported
+  secret-input method outside the recorder, and redact any potentially exposed output on its source
+  machine before reading it into a transcript.
+- **A refusal by the harness or a sub-agent is reported through the assigned communication route and
+  is never worked around.**
+- **Organization secrets and variables have separate repository access lists.** Before a repository
+  first publishes or runs rented acceptance legs, have the operator verify access to every required
+  value, including the publication credential.
+- **Provider credentials for development and CI are deliberately separate.** Never synchronize or
+  copy them between environments; check an authentication or quota failure against the credential
+  used in the failing environment.
 
 ### Skills
 
@@ -326,7 +387,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A push that changes only `.github/` starts no Build**; the next push with content builds with it.
 - **While it is developed, a repository may build against another Porelo repository's snapshot from
   Sonatype**, and its build may fail for a while when that snapshot moves; a release depends only on
-  releases, which the release build checks.
+  releases, which the release build checks. A release publishes dependencies before their consumers
+  and pins released dependencies before releasing a consumer. Hand over each repository's release
+  commit, operator-created tag, and next-snapshot commit for one push.
 - **Packages are built online**: offline, the CycloneDX bill of materials skips itself with only a
   warning, and the package ships without it.
 - **A publish is believed only once the published index shows the exact version**, probed with
@@ -334,8 +397,28 @@ and the UTC time that text last changed; change it in the channel first, never i
   index too.
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
+- **A shell function never changes `errexit` when its caller must handle a nonzero return.** Capture
+  expected failures explicitly, preserve command status through pipelines, and report unexpected
+  failures with their line and exit code.
+- **Maven Central deployments are published manually by the operator in the Sonatype portal, with
+  automatic publication disabled.** A green release run is reported as waiting for that publication.
+- **Small changes stay on snapshots, and a release gathers changes worth publishing together.**
+- **A new plain Java library uses `LGPL-3.0-or-later`; a library or plugin linked into a native
+  executable and shipped in a package uses `Apache-2.0`.** Keep existing product licenses unless a
+  license change is explicitly agreed.
 
-> **END Shared Area** · sha256 `df1a9687073cea82`
+### Estimates and handovers
+
+- **Before analysis or implementation, report `estimate=<min> velocity median=<min>` from the
+  relevant measured size median.** Explain departures, label a guess when measurements are
+  unavailable, and report the cause at once when elapsed time reaches one and a half times the
+  estimate.
+- **Timing starts with the first plan reading or brief and ends when the work is ready for handover,
+  including waits.** Keep the original estimate and starting size, record measured VM and sub-agent
+  times, count returns after first readiness as rework, and explain long waits or size growth. Count
+  shared time and token usage only once.
+
+> **END Shared Area** · sha256 `d03f2325cc348448`
 
 ## What this repository is
 
