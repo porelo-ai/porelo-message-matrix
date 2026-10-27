@@ -20,6 +20,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 | [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each machine acts only as the accounts it made, with passwords derived by HMAC-SHA256 from the machine's secret in `account`. |
 | [A task account of another project is refused, not renamed](#a-task-account-of-another-project-is-refused-not-renamed) | `enroll` and `retire` answer 78 for a task account in another project's room; an account's id stays its task's name. |
+| [The homeserver on the VPN: TLS by Tuwunel, a token per machine](#the-homeserver-on-the-vpn-tls-by-tuwunel-a-token-per-machine) | Tuwunel serves TLS on every listener with `dual_protocol`; each admitted machine gets a registration token of its own, removed when the machine is dropped. |
 
 ## The homeserver is Tuwunel
 
@@ -366,3 +367,25 @@ address Porelo keeps, for a case the names already prevent.
 
 **What would change the answer:** task names that two projects can share again, or several projects' tasks meant
 to act as one account.
+
+## The homeserver on the VPN: TLS by Tuwunel, a token per machine
+
+**Decided**, measured against Tuwunel 1.9.4:
+- **Tuwunel serves TLS itself, with `dual_protocol`.** Its TLS is one setting for every listener: without
+  `dual_protocol` the loopback listener refuses plain `http` too, so the local transport would need `https` and the
+  CA on loopback; with it every listener takes both. A second image in the pod that ends TLS for the VPN listener
+  alone would be one more image to pin, move and run.
+- **Each machine admitted to the account's homeserver gets a registration token of its own.** The token file takes
+  several tokens; one removed from it is refused once the homeserver re-reads the file on `SIGHUP`, while the
+  others still register.
+
+**Risk accepted:** the VPN listener also answers plain `http`. The transport on another machine takes a homeserver
+only over `https` with its `ca_file`, so it still authenticates the server before any token leaves it, and a plain
+answer to anything else on the VPN crosses only the VPN's own encryption.
+
+**Risk accepted:** whoever holds an admitted machine's token on the VPN can register any number of accounts until
+the token is removed, which happens when the machine is dropped. A rented host holds it only while it is rented.
+
+**What would change the answer:** Tuwunel serving TLS on one listener and plain `http` on another, which would drop
+`dual_protocol`; a registration token whose uses can be bounded, which would narrow the second risk; a machine
+admitted for longer than a rental.

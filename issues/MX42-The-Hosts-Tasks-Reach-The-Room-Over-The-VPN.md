@@ -1,6 +1,6 @@
 # MX42 — The Host's Tasks Reach The Room Over The VPN
 
-**Status:** Implementing; waits on the operator's answer to the two risks below; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
+**Status:** Implementing; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
 **Size:** L - crosses repositories (the unit and certificate here, the host's settings in porelo and porelo-host),
 with a design to decide first.
 
@@ -29,14 +29,13 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   listener at once: without `dual_protocol` the loopback listener refuses plain `http` too, and with it every
   listener takes both `http` and `https`. So either Tuwunel serves TLS with `dual_protocol`, and the VPN listener
   also answers plain `http`, or a second pinned image in the pod terminates TLS for the VPN listener alone, which
-  `PodmanUnit.image` and `ProcessUnit` then learn to take. The proposal is the first: the transport on the host takes
-  a homeserver elsewhere only over `https` with `ca_file`, so the server is authenticated either way, and the VPN
-  carries the plain answer encrypted.
+  `PodmanUnit.image` and `ProcessUnit` then learn to take. Decided: the first, with the risk accepted in
+  [the decisions](../doc/decisions.md#the-homeserver-on-the-vpn-tls-by-tuwunel-a-token-per-machine).
 - **A registration token per machine.** `registration_token_file` takes several tokens, separated by whitespace; a
   token in it registers any number of accounts, and one removed from the file is refused after the homeserver
   re-reads it on `SIGHUP`. So `admit` adds a token of the machine's own to the file and `HomeserverToken` keeps the
   local one first; dropping a machine removes its token. Whoever holds a machine's token on the VPN can register
-  accounts until it is removed: that exposure is the operator's to accept.
+  accounts until it is removed: accepted in the same decision.
 - **A certificate of the account's own** (a new `Certificate.java`): a CA made once, and a server certificate whose
   IP SAN is the published address. Both private keys are written `0600` before they are linked into place, as
   `HomeserverToken` writes the token. Only the server certificate and its key are mounted into the container,
