@@ -1,6 +1,6 @@
 # MX41 — The Agents Talk In The Project's Room
 
-**Status:** Analyzed; blocked by porelo [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300).
+**Status:** Implementing; needs porelo [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300).
 **Size:** M - new verbs and a contract change agreed with porelo, docs, and an acceptance on one machine.
 
 **What must be true.** An agent working on a machine, not in a task, reads, posts to and waits on the project's
@@ -79,6 +79,15 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
   session. Today `room` is an unknown verb (64) and `--token` an unknown option.
 - Files: `Main.java`, `Room.java`, `Lifecycle.java`, `LocalHomeserver.java` (`clear`), `RoomTest`, `RoomIT`,
   `LifecycleTest`, `LifecycleIT`, `doc/transport.md`, `doc/index.md`, `CHANGELOG.md`.
+- **Declined after the reading against the skills:**
+  - `join --token`'s other calls report a server's error text as every lifecycle verb does. The homeserver is
+    the account's own, which echoes no token; only `room`, whose output an agent's transcript keeps, drops it.
+  - `RoomIT` calls `Room` in the JVM with a stand-in credential helper, never the native executable. The
+    native `room` is shown by the acceptance, with the real helper the search path finds.
+  - A descendant the credential helper leaves behind keeps a reader thread of `room` blocked until it ends.
+    `room` is a process of its own whose threads end with it, and `porelo vault credential` starts none.
+  - Whether the helper's stderr survives a request pipe it closed early is not guarded by a test: a lost
+    explanation only reads worse, and the refusal is the same 78.
 
 ## Acceptance
 

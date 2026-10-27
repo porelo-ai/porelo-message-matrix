@@ -662,6 +662,7 @@ class LocalHomeserverTest {
                 "config/porelo/matrix/homeserver.conf",
                 "config/porelo/matrix/registration-token",
                 "state/porelo/transports/matrix/abc.since",
+                "state/porelo/transports/matrix/room/abc.since",
                 "state/porelo/matrix/backups/database/meta/3");
     }
 

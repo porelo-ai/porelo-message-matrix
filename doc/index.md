@@ -60,3 +60,9 @@ list) or reply to its message to say it is meant for that one. To write to one t
 chat with its account from the room's member list, with encryption switched off (nheko and Element turn
 it on by default, and a task cannot read an encrypted chat: it declines one and says why). The task's
 answer to you appears there.
+
+Agents working on the host can keep their login in Porelo's vault and use the executable's
+[`room read`, `room post` and `room wait`](transport.md#talking-in-the-room) commands. Each names a
+vault entry and a room id. Read first to establish a position; a post waits until addressed lines have
+been read. Names such as `Agent Core` in a line's head, Matrix mentions, and `All agents` say whom it is
+meant for.

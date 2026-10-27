@@ -62,6 +62,7 @@ public final class Main {
                 case "receipt" -> Receipt.run(rest, Config.from(env), env, out, err);
                 case "read" -> Read.run(rest, Config.from(env), env);
                 case "rename" -> Rename.run(rest, Config.from(env));
+                case "room" -> Room.start(rest, env, out, err);
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "part", "clear" ->

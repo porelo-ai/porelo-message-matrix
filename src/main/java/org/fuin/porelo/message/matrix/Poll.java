@@ -338,7 +338,7 @@ final class Poll {
      * The room's new events, oldest first. A sync may cut a busy timeline short; what it left out
      * is paged backwards down to where the last poll stopped, so nothing is skipped.
      */
-    private static List<JsonNode> timeline(
+    static List<JsonNode> timeline(
             final MatrixClient client,
             final String room,
             final JsonNode timeline,
@@ -463,13 +463,13 @@ final class Poll {
     }
 
     /** Where the last poll stopped, and the rooms the account was in then. */
-    private record Position(@Nullable String since, List<String> rooms) {}
+    record Position(@Nullable String since, List<String> rooms) {}
 
     /**
      * The first line is the position; each further line a room - absent in a file from before they
      * were kept.
      */
-    private static Position readPosition(final Path state) throws Failure {
+    static Position readPosition(final Path state) throws Failure {
         if (!Files.exists(state)) {
             return new Position(null, List.of());
         }

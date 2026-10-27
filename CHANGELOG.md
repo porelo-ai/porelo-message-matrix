@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `join --token [--display <name>]` returns a vault token with the user and room id, keeps the password
+  private, and logs out every earlier session of an existing account. A new account keeps its registration
+  session. `join --display` uses the same validation as `enroll`.
+- `room read [--all]`, `room post <file>`, and `room wait`, with `--entry <vault entry> --room <room id>`,
+  let a person or agent converse on the local homeserver with a login read only from Porelo's vault.
+  A line is meant for an agent its head names, by display name or pill, or for everybody (`All agents`,
+  `@room`, or nobody named); an agent reads and wakes only for those, and they hold its post until read.
+  Positions are per person and room, truncated timelines are paged so no line is lost, edits are not
+  new lines, and a backup neither waits on nor refuses a room command. The login is read through the
+  `porelo` the search path finds first, so an account's own install is the one asked.
 - `part --project P --person N [--loopback-only]` removes a person from the project's room, keeping the
   account's password and sessions when another project uses it; otherwise it replaces the password and
   logs out every session without deactivating the account. `join` takes an account `part` locked back

@@ -552,7 +552,7 @@ final class LocalHomeserver {
                 for (final Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
                     Files.delete(path);
                 }
-                report.removed("every poll position and reference, " + state);
+                report.removed("every poll and room position and reference, " + state);
             } catch (final IOException ex) {
                 report.kept(state.toString(), ex.getMessage());
             }

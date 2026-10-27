@@ -268,7 +268,7 @@ final class Send {
         return line.substring(0, line.offsetByCodePoints(0, codePoints));
     }
 
-    private static int size(final ObjectNode content) {
+    static int size(final ObjectNode content) {
         try {
             return MatrixClient.JSON.writeValueAsBytes(content).length;
         } catch (final JacksonException ex) {
@@ -280,7 +280,7 @@ final class Send {
      * A JSON string holds text only; bytes that are not UTF-8 are refused rather than silently
      * replaced.
      */
-    private static String utf8(final byte[] message, final String what) throws Failure {
+    static String utf8(final byte[] message, final String what) throws Failure {
         try {
             return StandardCharsets.UTF_8
                     .newDecoder()

@@ -47,6 +47,7 @@ final class Lifecycle {
             @Nullable String task,
             @Nullable String person,
             boolean reset,
+            boolean token,
             boolean loopbackOnly,
             @Nullable String display,
             @Nullable String machine) {}
@@ -748,13 +749,26 @@ final class Lifecycle {
                 || (partedFrom(place, room, id)
                         && !membersElsewhere(place.admin(), server, null).containsKey(id))) {
             AdminRoom.of(place.admin(), place.adminId()).setPassword(id, password);
-            account = Accounts.login(place.nobody(), person, password);
+            account =
+                    options.token()
+                            ? Accounts.alone(place.nobody(), person, password)
+                            : Accounts.login(place.nobody(), person, password);
         } else {
             throw new Failure(
                     Exit.NOT_PERMITTED,
                     "'" + person + "' has an account already; --reset gives it a new password");
         }
+        if (options.display() != null) {
+            displayName(place.nobody(), account, options.display());
+        }
         admit(place.admin(), room, account, place.nobody());
+
+        if (options.token()) {
+            final ObjectNode answer = MatrixClient.JSON.createObjectNode();
+            answer.putObject("login").put("user", account.userId()).put("room", room);
+            answer.putObject("secrets").put(Config.ACCESS_TOKEN, account.accessToken());
+            return answer;
+        }
 
         final boolean loopback = loopback(place.url());
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
@@ -1419,6 +1433,7 @@ final class Lifecycle {
         String task = null;
         String person = null;
         boolean reset = false;
+        boolean token = false;
         boolean loopbackOnly = false;
         String display = null;
         String machine = null;
@@ -1426,6 +1441,10 @@ final class Lifecycle {
             final String arg = args.get(i);
             if ("--reset".equals(arg) && "join".equals(verb)) {
                 reset = true;
+                continue;
+            }
+            if ("--token".equals(arg) && "join".equals(verb) && !token) {
+                token = true;
                 continue;
             }
             if ("--loopback-only".equals(arg) && !"retire".equals(verb) && !"clear".equals(verb)) {
@@ -1442,7 +1461,7 @@ final class Lifecycle {
                 case "--person" -> person = name(value, "--person");
                 case "--machine" -> machine = machine(value);
                 case "--display" -> {
-                    if (!"enroll".equals(verb) || display != null) {
+                    if (!("enroll".equals(verb) || "join".equals(verb)) || display != null) {
                         throw usage(verb);
                     }
                     display = display(value);
@@ -1462,7 +1481,7 @@ final class Lifecycle {
         if (project == null || !ok) {
             throw usage(verb);
         }
-        return new Options(project, task, person, reset, loopbackOnly, display, machine);
+        return new Options(project, task, person, reset, token, loopbackOnly, display, machine);
     }
 
     static String display(final String value) throws Failure {
@@ -1522,7 +1541,7 @@ final class Lifecycle {
                             case "part" ->
                                     "part --project <project> --person <person> [--loopback-only]";
                             default ->
-                                    "join --project <project> --person <person> [--reset] [--machine <machine>] [--loopback-only]";
+                                    "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--machine <machine>] [--loopback-only]";
                         });
     }
 

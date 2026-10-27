@@ -835,6 +835,111 @@ class LifecycleIT {
         assertThat(status(url(), task.path(Config.ACCESS_TOKEN).asText())).isEqualTo(401);
     }
 
+    /** Guards against printing a password or extra secrets when Porelo stores a token. */
+    @Test
+    void tokenJoinReturnsOnlyTheLoginAndVaultSecret() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode answer =
+                run(
+                        kept,
+                        "join",
+                        "--project",
+                        PROJECT,
+                        "--person",
+                        "core",
+                        "--token",
+                        "--display",
+                        "Agent Core");
+        assertThat(answer.properties())
+                .as("only the vault answer is returned")
+                .extracting(Map.Entry::getKey)
+                .containsExactly("login", "secrets");
+        assertThat(answer.path("login"))
+                .as("login uses the real room id and has no password")
+                .isEqualTo(
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("user", "@core:" + SERVER_NAME)
+                                .put("room", setup.path("conversation").asText()));
+        assertThat(answer.path("secrets").properties())
+                .as("the token is the only secret")
+                .extracting(Map.Entry::getKey)
+                .containsExactly(Config.ACCESS_TOKEN);
+        assertThat(status(url(), answer.path("secrets").path(Config.ACCESS_TOKEN).asText()))
+                .as("the kept session works")
+                .isEqualTo(200);
+        assertThat(displayName("@core:" + SERVER_NAME))
+                .as("join uses enroll's display name")
+                .isEqualTo("Agent Core");
+    }
+
+    /** A token join must leave one device and revoke the device replaced by a reset. */
+    @Test
+    void tokenJoinKeepsOneDeviceOnCreationAndReset() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode joined =
+                run(kept, "join", "--project", PROJECT, "--person", "core", "--token");
+        final String earlier = joined.path("secrets").path(Config.ACCESS_TOKEN).asText();
+        final MatrixClient person =
+                new MatrixClient(new Config(URI.create(url()), earlier, null, true));
+        final JsonNode first = person.get("/_matrix/client/v3/devices").path("devices");
+        assertThat(first.isArray()).as("the device list is returned").isTrue();
+        assertThat(first.size()).as("registration leaves exactly its one device").isEqualTo(1);
+
+        final JsonNode reset =
+                run(kept, "join", "--project", PROJECT, "--person", "core", "--token", "--reset");
+        final String current = reset.path("secrets").path(Config.ACCESS_TOKEN).asText();
+        final JsonNode devices =
+                person.as(current).get("/_matrix/client/v3/devices").path("devices");
+        assertThat(devices.isArray()).as("the replacement device list is returned").isTrue();
+        assertThat(devices.size()).as("reset leaves exactly the replacement device").isEqualTo(1);
+        assertThat(status(url(), earlier)).as("the earlier access token is revoked").isEqualTo(401);
+    }
+
+    /** Guards against an earlier client retaining access when an account is taken back. */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void tokenJoinRevokesEarlierSessionsOnResetAndAfterPart(final boolean parted) throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode login =
+                run(kept, "join", "--project", PROJECT, "--person", "core").path("login");
+        final MatrixClient nobody = new MatrixClient(new Config(URI.create(url()), "", null, true));
+        if (parted) {
+            run(kept, "part", "--project", PROJECT, "--person", "core");
+            AdminRoom.of(nobody.as(kept.get(Config.ADMIN_TOKEN)), "@porelo:" + SERVER_NAME)
+                    .setPassword(login.path("user").asText(), "TemporaryFixturePassword");
+        }
+        final Accounts.Session earlier =
+                Accounts.login(
+                        nobody,
+                        "core",
+                        parted ? "TemporaryFixturePassword" : login.path("password").asText());
+        final JsonNode answer =
+                parted
+                        ? run(kept, "join", "--project", PROJECT, "--person", "core", "--token")
+                        : run(
+                                kept,
+                                "join",
+                                "--project",
+                                PROJECT,
+                                "--person",
+                                "core",
+                                "--reset",
+                                "--token");
+        assertThat(status(url(), earlier.accessToken()))
+                .as("every earlier session is logged out")
+                .isEqualTo(401);
+        assertThat(status(url(), answer.path("secrets").path(Config.ACCESS_TOKEN).asText()))
+                .as("the sole new session works")
+                .isEqualTo(200);
+    }
+
     @Test
     @DisplayName(
             "A person joins once, with a login shown once; a second join needs --reset, which gives a new password")

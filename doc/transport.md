@@ -15,7 +15,7 @@ From the environment, never from an argument:
 | `PORELO_MATRIX_ACCESS_TOKEN` | The account the transport acts as: a task's, or for `poll` the project's relay |
 | `PORELO_MATRIX_CA_FILE` | PEM certificates trusted besides the built-in authorities |
 | `PORELO_MATRIX_TLS_VERIFY` | `on` (default) or `off`, for development only; `off` warns on stderr at every start |
-| `XDG_STATE_HOME`, else `HOME` | Where `poll` keeps its position: `…/porelo/transports/matrix/` |
+| `XDG_STATE_HOME`, else `HOME` | Where `poll` keeps its position: `…/porelo/transports/matrix/`; people's room positions are under `room/` |
 
 - **No redirect is followed** (76), so the token reaches no other server.
 - **A plain-`http` loopback port another uid listens on is 78**, before any request, so no other account of the
@@ -35,7 +35,7 @@ its environment; each prints one JSON object.
 | `setup --project P [--machine M] [--loopback-only]` | On the account's own homeserver: starts the local homeserver (on a start timeout, the last stderr line gives the last `Error: ` summary, else the last `ERROR` message, else `the homeserver's unit is <state>`; after ANSI and control stripping, a whole message may contain only ASCII letters, digits, space and ``. , : ; ( ) [ ] { } ` ' " _ - / ! ?``, no run of at least 8 `[A-Za-z0-9_-]` characters containing both a letter and a digit, no credential words, and no 8-character window of a known secret (the whole secret when shorter) across composed stripping, whitespace removal, URL decoding, JSON unescaping and NFKC normalization, or it is withheld as `the homeserver's last error was withheld: it held a secret`; diagnostics including parsing and filtering take at most four seconds, each command has a three-second budget and a 1 MiB output cap with oversized reads discarded, messages over 4096 characters are skipped whole, and safe causes are limited to 300 characters). Even a secret-free line containing `token` is withheld to fail closed; the journal holds the full line. Registers `@porelo`, the administrator; makes the room `#porelo-<P>` (invite-only, unlisted) and the relay `@porelo-relay-<P>`. On a central homeserver (`--machine M` required): registers `@porelo.<M>`; once a person has invited `@porelo.<M>` into `room`, joins it and admits the relay `@porelo-relay-<P>.<M>` | `account` (on the account's own homeserver: the administrator's token; on a central one: `@porelo.<M>`'s token, the machine's secret as `PORELO_MATRIX_MACHINE_SECRET`, and `PORELO_MATRIX_MACHINE`), `secrets` (the relay's environment, for `poll`), `conversation` (the room id), `reaches` (a JSON array of `"host:port"`, e.g. `["127.0.0.1:8008"]`); on a central homeserver also `machine` (`"M"`) and `admitted` (`false`, with no `secrets`, `conversation` or `reaches`, until a person invites `@porelo.<M>`) |
 | `enroll --project P --task T [--display N] [--machine M] [--loopback-only]` | On the account's own homeserver, the account `@<T>` in the room; on a central homeserver, `@<T>.<M>`, invited by `@porelo.<M>`. Shown as the nickname `N` (1 to 64 characters, no control characters, `@` or `:`) or else as `T`; enrolled again with another, renamed, its id kept. A task account in another project's room is refused (78) and left as it is | `secrets` (the task's environment), `address` (its user id) |
 | `retire --project P --task T [--machine M]` | On the account's own homeserver, deactivates `@<T>`; on a central homeserver, `@<T>.<M>` leaves the room and logs out every session, so the name can be used again. One in another project's room is refused (78) and left active | `{}` |
-| `join --project P --person N [--reset] [--machine M] [--loopback-only]` | On the account's own homeserver: a person's account in the room, with a new password. An existing account is refused (77) without `--reset`, except one `part` took out of this project's room that is joined or invited in no project's room: it is taken back without `--reset`. An account that left by itself, such as a retired task's, never is. On a central homeserver: refused (77); people are managed at the homeserver itself | `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once |
+| `join --project P --person N [--reset] [--token] [--display N] [--machine M] [--loopback-only]` | On the account's own homeserver: a person's account in the room, with a new password. An existing account is refused (77) without `--reset`, except one `part` took out of this project's room that is joined or invited in no project's room: it is taken back without `--reset`. An account that left by itself, such as a retired task's, never is. `--display` sets the display name with the same validation as `enroll`. `--token` logs out every earlier session, including on reset and when taking back a parted account, and keeps the password private. On a central homeserver: refused (77); people are managed at the homeserver itself | Without `--token`: `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once. With `--token`: exactly `{"login":{"user":"@N:server","room":"!room-id"},"secrets":{"PORELO_MATRIX_ACCESS_TOKEN":"<token>"}}`; no password or `shown`, and no other secret |
 | `part --project P --person N [--loopback-only]` | On the account's own homeserver: the administrator kicks a joined or invited person out of the project's room. In no other project's room, the account gets a fresh password nobody is shown and logs out every session through the client API; it is never deactivated, so `join` without `--reset` can take it back. In another project's room too, its password and sessions stay valid. No account or no membership: nothing to do. On a central homeserver: refused (77) | `{"removed":"@N:server"}` when locked; `{"kept":"@N:server","why":"a member of #porelo-Q:server too"}` when another project keeps it; `{}` when nothing was done; exit 0 in all three |
 | `clear --project P [--machine M]` | On the account's own homeserver: deactivates every account in the project's room (its tasks', its relay's, its people's) that is in no other project's room, deletes the room with its alias, and forgets the relay's poll position. On a central homeserver: this machine's relay `@porelo-relay-<P>.<M>` and its tasks `@<T>.<M>` in the room leave the room and log out every session, so their names can be used again, and the relay's poll position is forgotten; `@porelo.<M>`, the room, people and other machines' accounts stay. An account in another project's room too stays active there and is named in `kept` | `removed` (what went) and `kept` (each `what` and `why`) |
 | `clear [--machine M]` | The account's own homeserver once no project uses it: stops and disables it, removes its container and database, its port and registration token, and every poll position. The machine's name is taken and changes nothing. Reads no settings | the same |
@@ -44,7 +44,7 @@ its environment; each prints one JSON object.
 - **Settings:** `homeserver` (a central homeserver; requires `room`), `room` (an alias `#local:server` or a room id,
   required with `homeserver` and refused without it), `ca_file` (absolute), `tls_verify` (`on`/`off`),
   `registration_token_file` (absolute, only with `homeserver`). Anything else is refused (78).
-- **The printed `secrets` always name `PORELO_MATRIX_CA_FILE` and `PORELO_MATRIX_TLS_VERIFY`**, so an
+- **The printed `secrets` from `setup` and `enroll` name `PORELO_MATRIX_CA_FILE` and `PORELO_MATRIX_TLS_VERIFY`**, so an
   inherited value never outweighs what the project configured.
 - **Run again, each keeps what exists.** `part` twice is harmless: the second prints `{}`. `retire` twice
   is harmless, and so is `clear`: it says what it removed and what it could not, with why, exits 0,
@@ -68,6 +68,52 @@ its environment; each prints one JSON object.
 - Names — a project's, a task's, a machine's or a person's — are lower-case letters, digits and `. _ = -`;
   a person's may not begin with `porelo`. A machine's is a host name, so `--machine` is taken without regard to
   case: its ASCII letters are folded to lower case.
+
+## Talking in the room
+
+For a person or an agent working on the host, the executable has a `room` group. Porelo does not run it,
+and `describe` does not list it. Each command takes `--entry <vault entry> --room <room id>`; a room alias
+or a user id is refused. It acts only in that room on the account's own homeserver.
+
+| Command | What it does |
+|---|---|
+| `room read [--all] --entry <entry> --room <!room-id>` | Prints new lines meant for this account, or with `--all` every other member's text, then moves the position past everything. Each line is `## <UTC yyyy-MM-ddTHH:mmZ> — <display name>`, a newline, the body, and a blank line. The first read establishes a position and prints no history |
+| `room post <file> --entry <entry> --room <!room-id>` | Syncs without saving. Refuses with 75 while any unread line is meant for this account, naming the count; another agent's lines never hold a post. Otherwise sends the file's exact UTF-8 text as one `m.text` event. A retry from the same position with the same text is the same event; a later read allows the same text to be posted again |
+| `room wait --entry <entry> --room <!room-id>` | Syncs with a 30-second timeout per request, keeping its progress in memory. Other agents' lines and empty wakes keep waiting. Returns 0 with the headings of the meant-for lines when they arrive, leaving the saved position untouched |
+
+- **Credentials come only from the vault:** the command runs `porelo vault credential --entry <entry>
+  get` with the `porelo` its search path finds first, so an account's own install is the one asked, writes `protocol=http\nhost=127.0.0.1:<port>\n\n` to its stdin, and reads the `password=`
+  field over its stdout pipe. The answer ends at its first empty line or EOF and is accepted only after
+  the helper exits successfully; a descendant retaining a pipe cannot invalidate a completed answer.
+  The token stays in memory. Up to 64 KiB of the helper's stderr passes
+  through unchanged, with excess discarded; inherited pipes cannot hold the caller past its deadline.
+  A failed or malformed answer is 78, naming only the entry. An early exit that breaks the request pipe
+  still passes on the helper's stderr before failing. Its stdout and parser snippets never appear
+  in a diagnostic. Any setting of `PORELO_MATRIX_ACCESS_TOKEN`, `PORELO_MATRIX_ADMIN_TOKEN`,
+  `PORELO_MATRIX_REGISTRATION_TOKEN`, or `PORELO_MATRIX_MACHINE_SECRET`, even empty, is refused with 78.
+- **The homeserver is fixed:** `http://127.0.0.1:<port>`, read from the account's `homeserver.conf`.
+  The listener must belong to this account before any token is sent. Environment homeserver and TLS
+  settings do not select another destination.
+- **Whom a line addresses:** its head is the first line before its first `:`, when that colon is within
+  the first 300 code points; without such a colon the line is prose with no head. A member's display
+  name of the form `Agent <Word>` names that member when it occurs as a whole phrase, case-sensitive:
+  `Agent Core` matches `(cc Agent Core)` and
+  `Agent Smith, Agent Core`, and never `Agent Corey` or the body. A member listed in `m.mentions.user_ids`
+  is named too. The writer never counts as named: a signature or self-mention alone names nobody else.
+  A head containing the whole phrase `All agents` in any case, `m.mentions.room: true`, or a line naming
+  nobody is for everybody. An account's own lines never address it. Posts add the head's named members,
+  excluding the writer, to `m.mentions.user_ids`, and `room: true` for `All agents`.
+- **Only text in the named room counts:** events must be `m.room.message` with `msgtype: m.text`.
+  Edits are skipped. A message without an event id is a protocol failure (76), leaving the position
+  untouched. Truncated timelines are paged back before reading or counting unread lines.
+- **One position per person and room** lives under `…/porelo/transports/matrix/room/`, keyed by the
+  homeserver, user id and room id. A position is rewritten atomically after a read succeeds; `wait` and
+  `post` require a first read (78 otherwise). A position belonging to an earlier database is refused
+  with 78. Clearing the account's homeserver removes these positions with the poll positions.
+  Room positions are independent of backups: room read and post continue during a backup, and a
+  restored account with no room position starts fresh on its first read.
+- **A post must fit whole:** invalid UTF-8 or serialized content over 64,512 bytes, including JSON
+  escaping and mentions, is refused with 65. It is never cut.
 
 ## Keeping the conversation
 
@@ -141,7 +187,7 @@ tries again; every other code refuses it.
 | 0 | Done |
 | 64 | Arguments not in the contract's shape |
 | 65 | The message cannot be carried: not UTF-8, or too large |
-| 75 | Temporary: the homeserver unreachable or busy, another poll running, or a backup copying the positions |
+| 75 | Temporary: the homeserver unreachable or busy, another poll or room read/post running, a backup copying the positions, or unread addressed room lines holding a post |
 | 76 | An answer the transport does not understand, or a redirect |
 | 77 | Refused by the homeserver: the token, or a room the account is not in |
 | 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver, a loopback port another uid listens on; or a machine that will not keep the tokens from the account's other processes |
