@@ -24,9 +24,11 @@ jobs:
         # GitHub's default is six hours, every minute of it paid; the checks and the tagged tests take a few.
         timeout-minutes: 10
         steps:
+            # Every commit, so the scheduled run reads main's last day without a second fetch.
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
+                  fetch-depth: 0
 
             - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
@@ -74,7 +76,8 @@ jobs:
             # A pull request's own commits held to the shared rule on commit messages. One from outside - from another
             # repository, or opened by someone not a member - also carries its author's Signed-off-by: on each commit,
             # the Developer Certificate of Origin; Dependabot's and GitHub's own commits are exempt by the author and
-            # committer they record.
+            # committer they record. The repository's own workflow opens its pull requests from a branch only a holder
+            # of write access can push, so those are from inside, though GitHub names their author a contributor.
             - name: The pull request's commit messages
               if: github.event_name == 'pull_request'
               env:
@@ -82,17 +85,27 @@ jobs:
                   PR_HEAD: ${{ github.event.pull_request.head.sha }}
                   PR_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
                   PR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+                  PR_AUTHOR: ${{ github.event.pull_request.user.login }}
               run: |
                   set -eu
-                  # The checkout holds the merge commit alone; the range needs the history of both its sides.
-                  if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
-                      git fetch --no-tags --quiet --unshallow origin "$PR_BASE" "$PR_HEAD"
-                  else
-                      git fetch --no-tags --quiet origin "$PR_BASE" "$PR_HEAD"
-                  fi
+                  # The checkout holds every commit, both sides of the merge among them, so nothing is fetched again.
                   outside=--outside
                   if [ "$PR_REPOSITORY" = "$GITHUB_REPOSITORY" ]; then
                       case "$PR_ASSOCIATION" in OWNER | MEMBER) outside= ;; esac
+                      if [ "$PR_AUTHOR" = 'github-actions[bot]' ]; then
+                          outside=
+                      fi
                   fi
                   java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
                       check-commits "$PR_BASE..$PR_HEAD" $outside
+
+            # A push the Build never starts, of [skip ci] commits or of documents alone, meets no check of its own, so
+            # each day main's commits of the last 26 hours are read, with two hours over the schedule's own day.
+            - name: Main's commits of the last day
+              if: github.event_name == 'schedule'
+              run: |
+                  set -eu
+                  # A repository younger than that is read whole, its first commit too.
+                  start=$(git rev-list -1 --before='26 hours ago' HEAD)
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
+                      check-commits "${start:+$start..}HEAD"

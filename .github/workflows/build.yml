@@ -29,9 +29,11 @@ jobs:
         # About three times a measured run (7.4 min, run 37057573257), with the index check's own wait.
         timeout-minutes: 25
         steps:
+            # Every commit, so the push's own range can be read.
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
+                  fetch-depth: 0
 
             - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
@@ -98,6 +100,31 @@ jobs:
             - name: Build, test against the native executable, and package
               timeout-minutes: 20
               run: ./mvnw -B -ntp -s settings.xml -Pnative verify ${{ steps.channel.outputs.args }}
+
+            # A direct push to main never meets the pull request's check, so the push's own range is read here. A tag
+            # checks the commit it names. A new branch or a branch pushed over has no start this checkout holds, so its
+            # range starts at main; main itself cannot be pushed over.
+            - name: The pushed commits' messages
+              if: github.event_name == 'push'
+              env:
+                  PUSH_BEFORE: ${{ github.event.before }}
+              run: |
+                  set -eu
+                  case "$PUSH_BEFORE" in
+                      '') echo "::error::the push names no commit it started from"; exit 1 ;;
+                  esac
+                  start=$PUSH_BEFORE
+                  if [ "$GITHUB_REF_TYPE" = tag ]; then
+                      start="$GITHUB_SHA~1"
+                  elif ! git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+                      if [ "$GITHUB_REF" = refs/heads/main ]; then
+                          echo "::error::main moved from $PUSH_BEFORE, a commit this checkout does not hold"
+                          exit 1
+                      fi
+                      start=origin/main
+                  fi
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
+                      check-commits "$start..$GITHUB_SHA"
 
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
