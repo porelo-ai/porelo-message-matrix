@@ -1,6 +1,6 @@
 # MX42 — The Host's Tasks Reach The Room Over The VPN
 
-**Status:** Analyzed.
+**Status:** Backlog; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
 **Size:** L - crosses repositories (the unit and certificate here, the host's settings in porelo and porelo-host),
 with a design to decide first.
 
@@ -30,10 +30,13 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
 - **A certificate of the account's own** (a new `Certificate.java`): a CA made once, and a server certificate whose
   IP SAN is the published address. Both private keys are written `0600` before they are linked into place, as
   `HomeserverToken` writes the token. Only the server certificate and its key are mounted into the container,
-  never the CA's key. The CA certificate is what the host names as `ca_file`.
-- **The host as one more machine:** its project settings name `homeserver`, `room` and `ca_file`, with a
-  registration token. A new `admit --project P --machine M` lets the local administrator invite `@porelo.<M>` into
-  the project's room, so no person has to.
+  never the CA's key. The CA certificate is what the host names as `ca_file`. The server certificate holds for one
+  year, and `setup` makes a new one within its last 30 days.
+- **The host as one more machine:** its own settings name `homeserver`, `room` and `ca_file`, with a registration
+  token, over the project file's, which keep this machine's homeserver its own; porelo's
+  [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304) lets a machine's settings differ
+  from the project file's. A new `admit --project P --machine M` lets the local administrator invite
+  `@porelo.<M>` into the project's room, so no person has to.
 - **`clear`, `backup` and `restore`:** `clear` removes the certificates and keys with the rest. `backup` keeps them;
   `restore` onto another machine drops `PORELO_MATRIX_PUBLISH` and the server certificate, which name this
   machine's address.
@@ -50,22 +53,12 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
 - Nothing listens on any address of this machine but loopback and the VPN's (`ss -ltn`).
 - Seen to fail first: the handshake without the CA.
 
-## Open questions
-
-- **QM35:** One project file names one homeserver for every machine, and the host must name this machine's as
-  elsewhere while this machine keeps it as its own. Either (a) porelo lets a machine's settings differ from the
-  project file's, or (b) this machine too names its homeserver as a central one, which also needs `setup` to start
-  the local homeserver on that path, and makes the local agents people the operator manages at the homeserver.
-  Recommended: (a).
-- **QM36:** The certificate's lifetime: until the room moves to the host, renewed by `setup`, or a year.
-  Recommended: 90 days, renewed by `setup` within the last 30.
-
 ## To be checked
 
 - Whether Tuwunel serves TLS on one listener and plain `http` on another.
 - Whether Tuwunel issues a registration token per machine. If not, the host gets the account's one token, and
   whoever holds it on the VPN can register accounts: that exposure goes to the operator then.
-- QM35 (a)'s shape with porelo's agent: which settings a machine may set for itself.
+- The shape of a machine's own settings with porelo's agent: which settings a machine may set for itself.
 - How this relates to [MX29](README.md#mx29), the homeserver behind a unix socket, which a TCP listener on the VPN
   does not replace.
 - That the host's Porelo reaches this machine's VPN address from the host itself, as read in porelo-host: the
