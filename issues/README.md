@@ -9,12 +9,7 @@ sequence.
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | porelo's [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300) | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
+| <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | - | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
 
 ## Backlog
 

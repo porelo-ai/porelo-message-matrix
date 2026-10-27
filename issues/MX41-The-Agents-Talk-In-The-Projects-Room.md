@@ -1,6 +1,6 @@
 # MX41 — The Agents Talk In The Project's Room
 
-**Status:** Implementing; needs porelo [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300).
+**Status:** Review; its display-name checks run again on porelo's snapshot with [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300)'s `--display`.
 **Size:** M - new verbs and a contract change agreed with porelo, docs, and an acceptance on one machine.
 
 **What must be true.** An agent working on a machine, not in a task, reads, posts to and waits on the project's
