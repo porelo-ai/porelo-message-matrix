@@ -77,7 +77,9 @@ jobs:
             # repository, or opened by someone not a member - also carries its author's Signed-off-by: on each commit,
             # the Developer Certificate of Origin; Dependabot's and GitHub's own commits are exempt by the author and
             # committer they record. The repository's own workflow opens its pull requests from a branch only a holder
-            # of write access can push, so those are from inside, though GitHub names their author a contributor.
+            # of write access can push, so those are from inside, though GitHub names their author a contributor. The
+            # host's forge names no author association at all; there too only write access pushes a branch of the same
+            # repository, and only the person's approval merges it, so such a pull request is from inside.
             - name: The pull request's commit messages
               if: github.event_name == 'pull_request'
               env:
@@ -86,6 +88,7 @@ jobs:
                   PR_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
                   PR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
                   PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+                  PR_SERVER: ${{ github.server_url }}
               run: |
                   set -eu
                   # The checkout holds every commit, both sides of the merge among them, so nothing is fetched again.
@@ -93,6 +96,9 @@ jobs:
                   if [ "$PR_REPOSITORY" = "$GITHUB_REPOSITORY" ]; then
                       case "$PR_ASSOCIATION" in OWNER | MEMBER) outside= ;; esac
                       if [ "$PR_AUTHOR" = 'github-actions[bot]' ]; then
+                          outside=
+                      fi
+                      if [ "$PR_SERVER" != 'https://github.com' ]; then
                           outside=
                       fi
                   fi
