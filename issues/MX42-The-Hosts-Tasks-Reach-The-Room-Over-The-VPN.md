@@ -1,6 +1,6 @@
 # MX42 — The Host's Tasks Reach The Room Over The VPN
 
-**Status:** Backlog; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
+**Status:** Implementing; waits on the operator's answer to the two risks below; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
 **Size:** L - crosses repositories (the unit and certificate here, the host's settings in porelo and porelo-host),
 with a design to decide first.
 
@@ -25,8 +25,18 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   port, e.g. `192.0.2.2:8448`). The unit publishes it only when set, never a wildcard address. The address exists
   only while a host is rented and its tunnel is up, so a VPN that is down must not keep the loopback listener down:
   how the unit waits for the address is decided in the build.
-- **TLS on that listener**: by Tuwunel itself if it serves TLS on one listener and plain `http` on another;
-  otherwise by a second pinned image in the pod, which `PodmanUnit.image` and `ProcessUnit` then learn to take.
+- **TLS on that listener.** The pinned Tuwunel serves TLS itself (`[global.tls]`, `certs` and `key`), but for every
+  listener at once: without `dual_protocol` the loopback listener refuses plain `http` too, and with it every
+  listener takes both `http` and `https`. So either Tuwunel serves TLS with `dual_protocol`, and the VPN listener
+  also answers plain `http`, or a second pinned image in the pod terminates TLS for the VPN listener alone, which
+  `PodmanUnit.image` and `ProcessUnit` then learn to take. The proposal is the first: the transport on the host takes
+  a homeserver elsewhere only over `https` with `ca_file`, so the server is authenticated either way, and the VPN
+  carries the plain answer encrypted.
+- **A registration token per machine.** `registration_token_file` takes several tokens, separated by whitespace; a
+  token in it registers any number of accounts, and one removed from the file is refused after the homeserver
+  re-reads it on `SIGHUP`. So `admit` adds a token of the machine's own to the file and `HomeserverToken` keeps the
+  local one first; dropping a machine removes its token. Whoever holds a machine's token on the VPN can register
+  accounts until it is removed: that exposure is the operator's to accept.
 - **A certificate of the account's own** (a new `Certificate.java`): a CA made once, and a server certificate whose
   IP SAN is the published address. Both private keys are written `0600` before they are linked into place, as
   `HomeserverToken` writes the token. Only the server certificate and its key are mounted into the container,
@@ -55,9 +65,8 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
 
 ## To be checked
 
-- Whether Tuwunel serves TLS on one listener and plain `http` on another.
-- Whether Tuwunel issues a registration token per machine. If not, the host gets the account's one token, and
-  whoever holds it on the VPN can register accounts: that exposure goes to the operator then.
+- Whether Tuwunel's admin command that issues a registration token can bound its uses, which would narrow the
+  exposure of a machine's token.
 - The shape of a machine's own settings with porelo's agent: which settings a machine may set for itself.
 - How this relates to [MX29](README.md#mx29), the homeserver behind a unix socket, which a TCP listener on the VPN
   does not replace.

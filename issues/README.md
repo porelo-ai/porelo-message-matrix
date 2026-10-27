@@ -11,11 +11,16 @@ sequence.
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | - | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
 
-## Backlog
+## Implementing
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx42"></a>[MX42](MX42-The-Hosts-Tasks-Reach-The-Room-Over-The-VPN.md) | L | porelo's [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304) | The account's own homeserver also served over `https` on this machine's VPN address, with a certificate of its own, so the rented host's tasks talk in the same room |
+
+## Backlog
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
