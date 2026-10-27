@@ -39,7 +39,20 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
     the file's text as one `m.text`. Refused (65) when not UTF-8 or when the event, as serialized, is over
     `Send.CONTENT_BYTES`, measured as `Send.size` does. No heading: the sender and the server's time are the event's.
   - `room wait`: blocks, syncing from the position in memory without saving it, and returns 0 with the headings once
-    a line by anybody else arrives; a wake with nothing such, as Tuwunel gives on any activity, waits on.
+    a line by anybody else arrives that is meant for the waiter (below); any other line, and a wake with nothing in
+    it, as Tuwunel gives on any activity, waits on. `read` still shows every line.
+- **Whom a line is meant for**, decided by the operator (QM33):
+  - **Its head** is the text of its first line before the first `:`, at most 300 characters; a first line with no
+    `:` has no head.
+  - **A name** is a room member's display name, `Agent <Word>`, found in the head as a whole phrase, case and all,
+    so `Agent Core` is named by `Agent Core:`, `(cc Agent Core)` and `Agent Smith, Agent Core:` alike, never by
+    `Agent Corey` or by the body. A member whose id the event's `m.mentions` lists is named too, so a pill from a
+    Matrix client counts.
+  - **For everybody** is a line whose head holds `All agents` (any case), or `@room` in `m.mentions`, or one that
+    names nobody: no head, or a head without a member's name and no `m.mentions` ids.
+  - **Meant for the waiter** is a line that names the waiter or is for everybody. The waiter's own lines never are.
+  - `room post` writes the names it finds in the head into `m.mentions`, and `@room` for `All agents`, so a Matrix
+    client highlights the line for whom it names.
   - With no position yet, `read` takes one from a first sync and prints nothing older; `wait` and `post` refuse
     (78) until a `read` has.
   - A truncated batch is paged back as `Poll.timeline` does, so neither `read` nor `post`'s count misses a line.
@@ -54,7 +67,8 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 - **The machine's helpers keep their names**: local wrappers `porelo-channel-read|post|wait --name 'Agent X'` call
   `room` with the agent's entry. They are this machine's, in `.AGENTS.md`, not in a repository.
 - **Red first:** `RoomIT` against Tuwunel: a post while another account's line is unread is refused; a wait returns
-  on a new line and not on the waiter's own; a second read prints nothing; a malformed answer from the credential
+  on a line naming the waiter, in its head or as a pill, and on one for everybody, but not on the waiter's own nor
+  on one naming only another agent or naming the waiter only in its body; a second read prints nothing; a malformed answer from the credential
   helper puts no part of it on stderr. `LifecycleIT`: `join --token` answers no password and logs out an earlier
   session. Today `room` is an unknown verb (64) and `--token` an unknown option.
 - Files: `Main.java`, `Room.java`, `Lifecycle.java`, `LocalHomeserver.java` (`clear`), `RoomTest`, `RoomIT`,
@@ -71,8 +85,6 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 
 ## Open questions
 
-- **QM33:** Does `room wait` wake on every line, as the channel watcher does today, or only on a line that names the
-  agent or everybody? Recommended: every line until the first move, then decided again with Porelo's wake.
 - **QM34:** Is the room's history the channel file, kept read-only and not imported? Recommended: yes.
 
 ## To be checked

@@ -21,7 +21,7 @@ sequence.
 
 | # | Size | Blocked by | Open questions | What it covers |
 |---|---|---|---|---|
-| <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | porelo's [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300) | 2 | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
+| <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | porelo's [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300) | 1 | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
 | <a id="mx42"></a>[MX42](MX42-The-Hosts-Tasks-Reach-The-Room-Over-The-VPN.md) | L | - | 2 | The account's own homeserver also served over `https` on this machine's VPN address, with a certificate of its own, so the rented host's tasks talk in the same room |
 
 ## Accepted
