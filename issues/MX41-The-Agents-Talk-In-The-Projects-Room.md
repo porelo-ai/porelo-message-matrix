@@ -10,7 +10,8 @@ vault.
 From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59): the room replaces the
 channel file before the first move. The room is the conversation of the project `porelo`, whose `project.yml`
 already names a person's peer at `matrix:` beside `mail.transports.matrix: {}`; the agents join as people and need
-no peer lines of their own.
+no peer lines of their own. The room starts empty: the channel file stays as a read-only archive and is not
+imported (QM34).
 
 ## Why
 
@@ -87,10 +88,6 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 - `porelo vault list` shows each agent's entry; no file of the account outside the homeserver's own configuration,
   state and database, and the vault, holds the token.
 - Seen to fail first: the `RoomIT` and `LifecycleIT` cases above.
-
-## Open questions
-
-- **QM34:** Is the room's history the channel file, kept read-only and not imported? Recommended: yes.
 
 ## To be checked
 
