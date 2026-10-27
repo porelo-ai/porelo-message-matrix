@@ -51,6 +51,12 @@ final class LocalHomeserver {
 
     static final String SERVER_NAME = "PORELO_MATRIX_SERVER_NAME";
 
+    /**
+     * The address and port the homeserver is also served on, over TLS, for another machine: a VPN
+     * address of this machine, never a wildcard. Unset, it is served on loopback alone.
+     */
+    static final String PUBLISH = "PORELO_MATRIX_PUBLISH";
+
     /** The server name the unit gives the homeserver when its file names none. */
     private static final String DEFAULT_SERVER_NAME = "localhost";
 
@@ -96,9 +102,14 @@ final class LocalHomeserver {
     private LocalHomeserver() {}
 
     static Path directory(final Map<String, String> env) throws Failure {
+        return configHome(env).resolve("porelo").resolve("matrix");
+    }
+
+    /** {@code $XDG_CONFIG_HOME}, else {@code ~/.config}. */
+    static Path configHome(final Map<String, String> env) throws Failure {
         final String xdg = env.get("XDG_CONFIG_HOME");
         if (xdg != null && Path.of(xdg).isAbsolute()) {
-            return Path.of(xdg, "porelo", "matrix");
+            return Path.of(xdg);
         }
         final String home = env.get("HOME");
         if (home == null || !Path.of(home).isAbsolute()) {
@@ -106,7 +117,7 @@ final class LocalHomeserver {
                     Exit.CONFIG,
                     "neither XDG_CONFIG_HOME nor HOME names the account's configuration directory");
         }
-        return Path.of(home, ".config", "porelo", "matrix");
+        return Path.of(home, ".config");
     }
 
     static Running ensure(final Map<String, String> env, final Unit unit) throws Failure {
@@ -130,7 +141,9 @@ final class LocalHomeserver {
     static String registrationToken(final Map<String, String> env) throws Failure {
         final Path file = directory(env).resolve("registration-token");
         try {
-            final String token = Files.readString(file, StandardCharsets.US_ASCII).strip();
+            // The machines' tokens follow this machine's own, which is first.
+            final String token =
+                    MachineTokens.local(Files.readString(file, StandardCharsets.US_ASCII));
             if (token.isEmpty()) {
                 throw new Failure(Exit.CONFIG, file + " is empty");
             }
@@ -496,6 +509,19 @@ final class LocalHomeserver {
                 }
             }
         }
+        // The published address goes with the homeserver: nothing may listen for it any more.
+        final boolean published = Files.exists(Publish.dropIn(env));
+        boolean closed = true;
+        if (published) {
+            closed = Publish.Systemd.closeSocket();
+            if (closed) {
+                report.removed("the homeserver's published address: " + Publish.SOCKET + " closed");
+            } else {
+                report.kept(
+                        "the socket " + Publish.SOCKET,
+                        "systemctl --user disable --now " + Publish.SOCKET + " failed");
+            }
+        }
         try {
             // Only the unit's own container, by the id podman gave it: one somebody else named so
             // is not ours.
@@ -541,6 +567,10 @@ final class LocalHomeserver {
                             + ", "
                             + dir.resolve(file));
         }
+        forgetPublished(env, report, closed);
+        if (published) {
+            systemctl("daemon-reload");
+        }
         try {
             Files.deleteIfExists(dir);
         } catch (final IOException ex) {
@@ -560,7 +590,55 @@ final class LocalHomeserver {
         return report;
     }
 
-    private static void delete(final Path file, final Lifecycle.Report report, final String what) {
+    /**
+     * What publishing made, once the socket is closed: its address, the CA and its key, the server
+     * certificate and its key, and the TLS settings. Files only, so a run again finds nothing.
+     */
+    static void forgetPublished(
+            final Map<String, String> env, final Lifecycle.Report report, final boolean closed)
+            throws Failure {
+        final Path dropIn = Publish.dropIn(env);
+        // A socket still open keeps its address, so the next clear knows to close it.
+        if (closed) {
+            delete(dropIn, report, "the socket's address, " + dropIn);
+        }
+        try {
+            final @Nullable Path dropIns = dropIn.getParent();
+            if (dropIns != null) {
+                Files.deleteIfExists(dropIns);
+            }
+        } catch (final IOException ex) {
+            // Somebody else's drop-in is in it, which is not the transport's to remove.
+        }
+        final Path dir = directory(env);
+        for (final String file :
+                List.of(
+                        Certificate.CA_CERTIFICATE,
+                        "ca.key",
+                        Publish.TLS_ENV,
+                        ".certificate.lock",
+                        ".tokens.lock")) {
+            delete(
+                    dir.resolve(file),
+                    report,
+                    "the homeserver's " + file + ", " + dir.resolve(file));
+        }
+        MachineTokens.forget(env, report);
+        final Path tls = dir.resolve(Certificate.TLS);
+        for (final String file : List.of(Certificate.SERVER_CERTIFICATE, Certificate.SERVER_KEY)) {
+            delete(
+                    tls.resolve(file),
+                    report,
+                    "the homeserver's " + file + ", " + tls.resolve(file));
+        }
+        try {
+            Files.deleteIfExists(tls);
+        } catch (final IOException ex) {
+            report.kept(tls.toString(), ex.getMessage());
+        }
+    }
+
+    static void delete(final Path file, final Lifecycle.Report report, final String what) {
         try {
             if (Files.deleteIfExists(file)) {
                 report.removed(what);

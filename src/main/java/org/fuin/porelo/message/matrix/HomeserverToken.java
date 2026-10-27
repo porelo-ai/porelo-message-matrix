@@ -15,9 +15,10 @@ import java.util.Set;
 
 /**
  * {@code homeserver-token}: makes the local homeserver's registration token once, before its first
- * start. Not a verb of Porelo's transport contract - the homeserver's unit runs it. The token is a
- * file readable by this account alone: the homeserver reads it to let accounts register, and Porelo
- * reads it to register the accounts of its tasks, so it exists in one place.
+ * start, and its TLS settings before every start. Not a verb of Porelo's transport contract - the
+ * homeserver's unit runs it. The token is a file readable by this account alone: the homeserver
+ * reads it to let accounts register, and Porelo reads it to register the accounts of its tasks, so
+ * it exists in one place.
  */
 final class HomeserverToken {
 
@@ -36,6 +37,11 @@ final class HomeserverToken {
             throw new Failure(Exit.USAGE, "usage: homeserver-token");
         }
         backups(env);
+        token(env);
+        Publish.prepare(env);
+    }
+
+    private static void token(final Map<String, String> env) throws Failure {
         final Path file = file(env);
         try {
             if (Files.exists(file)) {
@@ -74,6 +80,7 @@ final class HomeserverToken {
             } finally {
                 Files.deleteIfExists(draft);
             }
+            MachineTokens.include(env);
         } catch (final FileAlreadyExistsException ex) {
             // Another start made it between the check and the link: that one is the token.
             return;

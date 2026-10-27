@@ -1,0 +1,14 @@
+# The account's own homeserver on an address of this machine another machine reaches it on, a VPN's.
+# Shipped disabled and without an address: `porelo-message-transport-matrix publish --address A:P` writes
+# the address into a drop-in under $XDG_CONFIG_HOME/systemd/user and enables it, `publish --off` removes
+# both. FreeBind binds the address before the VPN's tunnel gives it to the machine, so a tunnel that is
+# down never stops this socket or the homeserver behind it.
+[Unit]
+Description=The Matrix homeserver Porelo's transport talks to, on the address another machine reaches
+
+[Socket]
+FreeBind=yes
+NoDelay=yes
+
+[Install]
+WantedBy=sockets.target

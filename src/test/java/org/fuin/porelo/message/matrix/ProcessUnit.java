@@ -210,12 +210,36 @@ final class ProcessUnit implements Unit, AutoCloseable {
             settings.put("TUWUNEL_ALLOW_REGISTRATION", "true");
             settings.put("TUWUNEL_REGISTRATION_TOKEN_FILE", HomeserverToken.file(env).toString());
             settings.put("TUWUNEL_ADMIN_SIGNAL_EXECUTE", "[\"server backup-database\"]");
+            settings.putAll(tls());
         } else {
             settings.put("TUWUNEL_ALLOW_REGISTRATION", "false");
         }
         environment.putAll(settings);
         environment.putAll(secrets);
         return builder;
+    }
+
+    /** As podman's {@code --env-file} gives them, with the container's mount as this directory. */
+    private Map<String, String> tls() throws Failure {
+        final Path dir = LocalHomeserver.directory(env);
+        final Map<String, String> settings = new HashMap<>();
+        try {
+            for (final String line :
+                    Files.readAllLines(dir.resolve(Publish.TLS_ENV), StandardCharsets.US_ASCII)) {
+                if (!line.isBlank()) {
+                    final int equals = line.indexOf('=');
+                    settings.put(
+                            line.substring(0, equals),
+                            line.substring(equals + 1)
+                                    .replace(
+                                            Publish.MOUNT + "/",
+                                            dir.resolve(Certificate.TLS) + "/"));
+                }
+            }
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read " + Publish.TLS_ENV, ex);
+        }
+        return settings;
     }
 
     @Override

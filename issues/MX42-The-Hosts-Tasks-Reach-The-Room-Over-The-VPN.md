@@ -56,6 +56,12 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   `PodmanUnit.java`, `ProcessUnit.java`, `Keep.java`, `LocalHomeserverIT`, `LifecycleIT`, `KeepIT`,
   `doc/homeserver.md`, `doc/transport.md`, `CHANGELOG.md`; porelo-host's VPN and the host's project settings.
 
+- **Declined after the reading:** two writers of `homeserver.conf` at once. `port()` writes the file only while it
+  has no port, and `publish` writes the port itself first, so only a first `setup` racing a first `publish` could
+  meet. They are run by different actors at different times, and a lost published address shows at once in
+  `publish`'s answer. A file that already names its own `PORELO_MATRIX_PUBLISH` keeps it on `restore`: that is the
+  restoring machine's own address, not the copy's.
+
 ## Acceptance
 
 - A task on the host posts in the room, and a local agent's `room wait` ([MX41](README.md#mx41)) returns with it.

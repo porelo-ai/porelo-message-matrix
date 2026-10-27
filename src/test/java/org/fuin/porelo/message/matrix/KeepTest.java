@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -275,6 +276,119 @@ class KeepTest {
                 .as("the foreign lock is never restored")
                 .doesNotExist();
         assertThat(unit.runs).as("the refused copy never reaches the homeserver").isZero();
+        assertNothingMade();
+    }
+
+    /** Harm guarded: the copy hands the CA's key to every account that can read the copy. */
+    @Test
+    @DisplayName("A backup copies the account's CA, its key readable by its owner alone")
+    void aBackupCopiesTheCaToItsOwner() throws Exception {
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        Certificate.ensure(
+                LocalHomeserver.directory(env),
+                java.net.InetAddress.ofLiteral("192.0.2.2"),
+                Instant.now());
+        final StandIn answering =
+                new StandIn() {
+                    @Override
+                    public void signalBackup() throws Failure {
+                        try {
+                            Files.writeString(Keep.backups(env).resolve("meta/1"), "snapshot");
+                        } catch (final IOException failure) {
+                            throw new Failure(
+                                    Exit.CONFIG, "cannot make the test snapshot", failure);
+                        }
+                    }
+                };
+        answering.active = true;
+        final Path into = Files.createDirectory(dir.resolve("into"));
+
+        Keep.backup(into, env, answering, Duration.ofSeconds(1));
+
+        assertThat(into.resolve("ca.crt"))
+                .as("the CA other machines trust")
+                .hasSameTextualContentAs(LocalHomeserver.directory(env).resolve("ca.crt"));
+        assertThat(
+                        java.nio.file.attribute.PosixFilePermissions.toString(
+                                Files.getPosixFilePermissions(into.resolve("ca.key"))))
+                .as("the CA's key in the copy is its owner's alone")
+                .isEqualTo("rw-------");
+        assertThat(into.resolve("tls")).as("the server certificate stays behind").doesNotExist();
+    }
+
+    /**
+     * Harm guarded: the restored machine claims the address of the one it was copied from, or
+     * leaves the CA's key readable.
+     */
+    @Test
+    @DisplayName(
+            "A restore keeps the copy's CA, its owner's alone, and drops the address it was published on")
+    void restoreKeepsTheCaAndDropsTheAddress() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(
+                copy.resolve("homeserver.conf"),
+                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.2:8448\n",
+                StandardCharsets.UTF_8);
+        Files.writeString(copy.resolve("ca.crt"), "the CA's certificate");
+        Files.writeString(copy.resolve("ca.key"), "the CA's key");
+
+        Keep.restore(copy, env, unit);
+
+        assertThat(conf())
+                .as("the port kept, the other machine's address dropped")
+                .hasContent("PORELO_MATRIX_PORT=8008");
+        assertThat(conf().resolveSibling("ca.crt")).hasContent("the CA's certificate");
+        assertThat(
+                        java.nio.file.attribute.PosixFilePermissions.toString(
+                                Files.getPosixFilePermissions(conf().resolveSibling("ca.key"))))
+                .as("the restored key is its owner's alone")
+                .isEqualTo("rw-------");
+    }
+
+    /** Harm guarded: a restored certificate is paired with a key that does not sign for it. */
+    @Test
+    @DisplayName("A restore refuses half a CA, in the copy or on this account, and makes nothing")
+    void restoreRefusesHalfACa() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(copy.resolve("ca.crt"), "the copy's CA");
+        Files.writeString(copy.resolve("ca.key"), "its key");
+        Files.createDirectories(conf().getParent());
+        Files.writeString(conf().resolveSibling("ca.key"), "a stray key of this account's");
+
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .as("this account's stray key is never paired with the copy's certificate")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
+        assertThat(conf().resolveSibling("ca.crt")).as("no certificate copied in").doesNotExist();
+        assertNothingMade();
+
+        Files.delete(conf().resolveSibling("ca.key"));
+        Files.delete(copy.resolve("ca.key"));
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .as("a copy with a certificate and no key is refused")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
+        assertNothingMade();
+    }
+
+    /** Harm guarded: a restore silently swaps the CA the other machines trust. */
+    @Test
+    @DisplayName(
+            "A restore refuses a copy with another CA than the account's own, and makes nothing")
+    void restoreRefusesAnotherCa() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(copy.resolve("ca.crt"), "the copy's CA");
+        Files.writeString(copy.resolve("ca.key"), "its key");
+        Files.createDirectories(conf().getParent());
+        Files.writeString(conf().resolveSibling("ca.crt"), "this account's CA");
+
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
+        assertThat(conf().resolveSibling("ca.crt")).hasContent("this account's CA");
         assertNothingMade();
     }
 

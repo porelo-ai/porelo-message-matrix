@@ -9,5 +9,7 @@ Provides: porelo-homeserver
 Homepage: https://github.com/porelo-ai/porelo-message-matrix
 Description: The local Matrix homeserver for Porelo's transport
  A systemd user unit that runs the homeserver Porelo's Matrix transport talks
- to, in rootless podman, on loopback only, for the account that enables it:
+ to, in rootless podman, on loopback, and over TLS on one address of this
+ machine once it is published for another machine, for the account that
+ enables it:
  systemctl --user enable --now porelo-matrix-homeserver

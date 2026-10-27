@@ -181,6 +181,9 @@ afterwards, by the receiving host.
 - **On one machine the exposure adds nothing.** The homeserver runs in podman beside Porelo, published on
   loopback only, with federation off - measured: the machine's own address gets no answer, and the
   federation API refuses. The messages stay on the host, where Porelo's own mailboxes already hold them.
+  Published for another machine of the operator's on a VPN, the homeserver is reached there only over TLS with
+  the account's own CA, by machines admitted with a registration token of their own, and the messages reach
+  only those machines' tasks, which are the project's peers already.
 - **Authenticity never rested on Matrix.** Porelo signs every message and verifies it against the key
   listed for the peer; what arrives unverified is held, whatever the room says. So a homeserver can read
   messages but cannot forge one - room membership is not authorization.

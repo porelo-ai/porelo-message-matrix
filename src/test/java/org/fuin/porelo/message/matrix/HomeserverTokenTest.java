@@ -85,8 +85,9 @@ class HomeserverTokenTest {
                 .isEqualTo("rw-------");
         try (var left = Files.list(token().getParent())) {
             assertThat(left.map(p -> p.getFileName().toString()).toList())
-                    .as("what is left in the directory")
-                    .containsExactly("registration-token");
+                    .as("what is left in the directory: no draft beside the token")
+                    .containsExactlyInAnyOrder(
+                            "registration-token", Publish.TLS_ENV, Certificate.TLS);
         }
     }
 

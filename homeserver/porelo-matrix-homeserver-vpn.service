@@ -1,0 +1,16 @@
+# Started by porelo-matrix-homeserver-vpn.socket: forwards each connection to the homeserver's loopback
+# port, where it serves TLS beside plain http. It forwards bytes only; TLS ends in the homeserver.
+[Unit]
+Description=Forwards the published address to the Matrix homeserver's loopback port
+# Wants, not Requires: a restart of the homeserver must not start this forwarder without its socket, which then
+# fails; each connection reaches the homeserver anew, so a forwarder that runs outlives a restart.
+Wants=porelo-matrix-homeserver.service
+After=porelo-matrix-homeserver.service
+# Stopped and restarted with its socket: it holds the listening socket, which must not outlive the address.
+PartOf=porelo-matrix-homeserver-vpn.socket
+
+[Service]
+Environment=PORELO_MATRIX_PORT=8008
+EnvironmentFile=-%E/porelo/matrix/homeserver.conf
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:${PORELO_MATRIX_PORT}
+NoNewPrivileges=yes
