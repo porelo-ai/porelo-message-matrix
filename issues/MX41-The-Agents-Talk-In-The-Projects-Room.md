@@ -33,15 +33,21 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 - **Three verbs of a person's own** (a new `Room.java`), in the transport's executable and not listed by
   `describe`, as `backup` is. Each takes `--entry <vault entry>` and `--room <room id>`; it acts in that room alone,
   never in a direct chat.
-  - `room read`: everything said in the room since the person's position, by anybody else, printed as
-    `## <UTC> — <display name>` and the text; then the position moves past what was printed.
-  - `room post <file>`: refused (75) while anything by anybody else is past the position, naming how many; otherwise
-    the file's text as one `m.text`. Refused (65) when not UTF-8 or when the event, as serialized, is over
-    `Send.CONTENT_BYTES`, measured as `Send.size` does. No heading: the sender and the server's time are the event's.
+  - `room read`: the lines since the person's position that are meant for it (below), printed as
+    `## <UTC> — <display name>` and the text; then the position moves past every line, the others unseen.
+    `room read --all` prints every line by anybody else since the position, and moves it the same way.
+  - `room post <file>`: refused (75) while a line meant for the poster is past the position, naming how many; lines
+    meant for others never hold a post. Otherwise the file's text as one `m.text`. Refused (65) when not UTF-8 or
+    when the event, as serialized, is over `Send.CONTENT_BYTES`, measured as `Send.size` does. No heading: the
+    sender and the server's time are the event's.
   - `room wait`: blocks, syncing from the position in memory without saving it, and returns 0 with the headings once
-    a line by anybody else arrives that is meant for the waiter (below); any other line, and a wake with nothing in
-    it, as Tuwunel gives on any activity, waits on. `read` still shows every line.
-- **Whom a line is meant for**, decided by the operator (QM33):
+    a line meant for the waiter arrives; any other line, and a wake with nothing in it, as Tuwunel gives on any
+    activity, waits on.
+  - With no position yet, `read` takes one from a first sync and prints nothing older; `wait` and `post` refuse
+    (78) until a `read` has.
+  - A truncated batch is paged back as `Poll.timeline` does, so neither `read` nor `post`'s count misses a line.
+- **Whom a line is meant for**, decided by the operator (QM33), for reading as for waking, to save each agent the
+  lines that are not its own:
   - **Its head** is the text of its first line before the first `:`, at most 300 characters; a first line with no
     `:` has no head.
   - **A name** is a room member's display name, `Agent <Word>`, found in the head as a whole phrase, case and all,
@@ -50,12 +56,9 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
     Matrix client counts.
   - **For everybody** is a line whose head holds `All agents` (any case), or `@room` in `m.mentions`, or one that
     names nobody: no head, or a head without a member's name and no `m.mentions` ids.
-  - **Meant for the waiter** is a line that names the waiter or is for everybody. The waiter's own lines never are.
+  - **Meant for an agent** is a line that names it or is for everybody. Its own lines never are.
   - `room post` writes the names it finds in the head into `m.mentions`, and `@room` for `All agents`, so a Matrix
     client highlights the line for whom it names.
-  - With no position yet, `read` takes one from a first sync and prints nothing older; `wait` and `post` refuse
-    (78) until a `read` has.
-  - A truncated batch is paged back as `Poll.timeline` does, so neither `read` nor `post`'s count misses a line.
 - **The login read from porelo's vault over a pipe**: `room` runs `porelo vault credential --entry <entry> get`,
   git's credential protocol, and keeps the `password=` line in memory only. A shut vault stops it with porelo's
   own words. Any of the transport's secret variables in its environment is refused (78). No error of `room`
@@ -66,10 +69,12 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
   A position from an earlier database is refused as `poll` refuses one, and `clear` removes them with the rest.
 - **The machine's helpers keep their names**: local wrappers `porelo-channel-read|post|wait --name 'Agent X'` call
   `room` with the agent's entry. They are this machine's, in `.AGENTS.md`, not in a repository.
-- **Red first:** `RoomIT` against Tuwunel: a post while another account's line is unread is refused; a wait returns
-  on a line naming the waiter, in its head or as a pill, and on one for everybody, but not on the waiter's own nor
-  on one naming only another agent or naming the waiter only in its body; a second read prints nothing; a malformed answer from the credential
-  helper puts no part of it on stderr. `LifecycleIT`: `join --token` answers no password and logs out an earlier
+- **Red first:** `RoomIT` against Tuwunel, with lines naming the agent in the head, as a pill, only in the body,
+  naming only another agent, for everybody, and the agent's own:
+  - `wait` returns on the first two and on the one for everybody, and on none of the others;
+  - `read` prints exactly those three, `read --all` every line but the agent's own, and a second `read` nothing;
+  - `post` is refused while one of those three is unread, and not for a line naming only another agent;
+  - a malformed answer from the credential helper puts no part of it on stderr. `LifecycleIT`: `join --token` answers no password and logs out an earlier
   session. Today `room` is an unknown verb (64) and `--token` an unknown option.
 - Files: `Main.java`, `Room.java`, `Lifecycle.java`, `LocalHomeserver.java` (`clear`), `RoomTest`, `RoomIT`,
   `LifecycleTest`, `LifecycleIT`, `doc/transport.md`, `doc/index.md`, `CHANGELOG.md`.
@@ -77,7 +82,7 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 ## Acceptance
 
 - On this machine, two agents joined as people: a post by one ends the other's wait within seconds, and the second's
-  post is refused until it has read.
+  post is refused until it has read. A line naming only a third agent wakes neither and shows only in `read --all`.
 - The operator reads the same lines in a Matrix client, under the agents' display names.
 - `porelo vault list` shows each agent's entry; no file of the account outside the homeserver's own configuration,
   state and database, and the vault, holds the token.
@@ -89,7 +94,5 @@ The person's side lives in this repository, and porelo keeps the login: porelo a
 
 ## To be checked
 
-- With porelo's agent, for [B300](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b300): the entry holds the access token from `secrets` as the value `vault credential
-  --entry` reads, not the `login` object, so `room` needs no porelo verb beyond the join.
 - How a moved agent's task takes the local agents' lines: as a person's words, and whether the filter holds them.
   This only matters at the first move.
