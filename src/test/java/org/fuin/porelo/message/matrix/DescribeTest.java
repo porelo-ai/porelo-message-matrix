@@ -67,8 +67,18 @@ class DescribeTest {
                         });
         assertThat(description.path("hosts").isArray()).isTrue();
         assertThat(description.path("lifecycle"))
+                .as("the lifecycle verbs Porelo may run")
                 .extracting(JsonNode::asText)
-                .containsExactly("setup", "enroll", "retire", "join", "part", "clear", "settings");
+                .containsExactly(
+                        "setup",
+                        "enroll",
+                        "retire",
+                        "join",
+                        "part",
+                        "admit",
+                        "dismiss",
+                        "clear",
+                        "settings");
         assertThat(description.path("takes"))
                 .as("central lifecycle verbs take --machine")
                 .extracting(JsonNode::asText)

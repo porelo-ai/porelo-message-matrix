@@ -57,6 +57,9 @@ final class LocalHomeserver {
      */
     static final String PUBLISH = "PORELO_MATRIX_PUBLISH";
 
+    /** The host name the published address is also reached by, which its certificate names. */
+    static final String PUBLISH_NAME = "PORELO_MATRIX_PUBLISH_NAME";
+
     /** The server name the unit gives the homeserver when its file names none. */
     private static final String DEFAULT_SERVER_NAME = "localhost";
 

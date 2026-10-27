@@ -240,4 +240,72 @@ class PublishTest {
                 .extracting(failure -> ((Failure) failure).exitCode())
                 .isEqualTo(Exit.USAGE);
     }
+
+    /** Harm guarded: a name that is no host name lands in the certificate and the settings. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "Matrix.Porelo.Internal",
+                "matrix..internal",
+                "-matrix.internal",
+                "matrix",
+                "matrix.internal/x"
+            })
+    void refusesANameThatIsNoHostName(final String name) {
+        assertThatThrownBy(() -> publish("--address", "192.0.2.2:8011", "--name", name))
+                .as("%s is refused", name)
+                .isInstanceOf(Failure.class)
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(dropIn()).as("nothing is published").doesNotExist();
+    }
+
+    /** Harm guarded: the name a machine reaches the homeserver by is lost at the next start. */
+    @Test
+    void keepsThePublishedName() throws Exception {
+        final JsonNode answer =
+                publish("--address", "192.0.2.2:8011", "--name", "matrix.porelo.internal");
+        final java.security.cert.X509Certificate server =
+                (java.security.cert.X509Certificate)
+                        java.security.cert.CertificateFactory.getInstance("X.509")
+                                .generateCertificate(
+                                        Files.newInputStream(
+                                                matrix().resolve(Certificate.TLS)
+                                                        .resolve(Certificate.SERVER_CERTIFICATE)));
+        assertThat(server.getSubjectAlternativeNames())
+                .as("the certificate publish made names the name")
+                .contains(List.of(2, "matrix.porelo.internal"));
+
+        assertThat(Files.readString(matrix().resolve("homeserver.conf")))
+                .as("the next start makes the certificate for the name too")
+                .contains("PORELO_MATRIX_PUBLISH_NAME=matrix.porelo.internal\n");
+        assertThat(answer.path("name").asText())
+                .as("the answer names it")
+                .isEqualTo("matrix.porelo.internal");
+
+        publish("--off");
+        assertThat(Files.readString(matrix().resolve("homeserver.conf")))
+                .as("off, the name goes with the address")
+                .doesNotContain("PORELO_MATRIX_PUBLISH");
+    }
+
+    /**
+     * Harm guarded: one URL is to reach the homeserver on both machines, and the published port
+     * differs from the loopback one, so one of them reaches nothing.
+     */
+    @Test
+    void refusesANameOnAnotherPortThanTheHomeserversOwn() {
+        assertThatThrownBy(
+                        () ->
+                                publish(
+                                        "--address",
+                                        "192.0.2.2:8448",
+                                        "--name",
+                                        "matrix.porelo.internal"))
+                .as("with a name, the published port is the homeserver's loopback port, 8011 here")
+                .isInstanceOf(Failure.class)
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(dropIn()).as("nothing is published").doesNotExist();
+    }
 }

@@ -41,11 +41,12 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   `HomeserverToken` writes the token. Only the server certificate and its key are mounted into the container,
   never the CA's key. The CA certificate is what the host names as `ca_file`. The server certificate holds for one
   year, and `setup` makes a new one within its last 30 days.
-- **The host as one more machine:** its own settings name `homeserver`, `room` and `ca_file`, with a registration
-  token, over the project file's, which keep this machine's homeserver its own; porelo's
-  [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304) lets a machine's settings differ
-  from the project file's. A new `admit --project P --machine M` lets the local administrator invite
-  `@porelo.<M>` into the project's room, so no person has to.
+- **The host as one more machine:** the signed settings name the homeserver by the name it is published under, which
+  this machine counts as its own and every other machine reaches as a central one. `admit --project P --machine M`
+  gives the host a registration token of its own and invites `@porelo.<M>` into the project's room, so no person has
+  to; `dismiss` bans its accounts and revokes the token; porelo's
+  [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304) runs both. While a machine is
+  admitted, its name ending `.<M>` is its own on this homeserver.
 - **`clear`, `backup` and `restore`:** `clear` removes the certificates and keys with the rest. `backup` keeps them;
   `restore` onto another machine drops `PORELO_MATRIX_PUBLISH` and the server certificate, which name this
   machine's address.
@@ -60,7 +61,16 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   has no port, and `publish` writes the port itself first, so only a first `setup` racing a first `publish` could
   meet. They are run by different actors at different times, and a lost published address shows at once in
   `publish`'s answer. A file that already names its own `PORELO_MATRIX_PUBLISH` keeps it on `restore`: that is the
-  restoring machine's own address, not the copy's.
+  restoring machine's own address, not the copy's. `settings` skipping its readability warning for a `~/` `ca_file` has no test: a
+  wrong warning only reads wrong.
+
+- **For the move (operator, the variant):** porelo-project's signed `project.yml` names
+  `homeserver: https://matrix.porelo.internal:<port>` with the room, the CA as `ca_certificate` and
+  `registration_token_file: ~/.config/porelo/matrix/host-registration-token`. The desktop resolves the name to loopback
+  and keeps its own homeserver's path by the rule above, and the host resolves it to the desktop's VPN address. After
+  the last move the project goes back to `{}`, with a new room on the host's own homeserver; the desktop's room and
+  its homeserver data for the project are cleared then with `clear --project porelo` and `clear`, as the
+  coordinator's move does.
 
 ## Acceptance
 

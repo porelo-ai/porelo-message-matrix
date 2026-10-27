@@ -50,4 +50,27 @@ class RegistrationTokenFileTest {
                     .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
         }
     }
+
+    /**
+     * Harm guarded: a token file the homeserver reads holds several tokens, and the transport sends
+     * them all as one, which registers nothing.
+     */
+    @Test
+    void readsTheFirstTokenOfSeveral() throws Exception {
+        assertThat(
+                        RegistrationTokenFile.read(
+                                file("several", "first\nsecond third\n", "rw-------")))
+                .as("the first token, as the homeserver's own file holds this machine's first")
+                .isEqualTo("first");
+    }
+
+    /** Harm guarded: a file whose first line is empty hands on another machine's token. */
+    @Test
+    void refusesAnEmptyFirstLine() throws Exception {
+        final Path file = file("blank", "\nanother-machines-token\n", "rw-------");
+
+        assertThatThrownBy(() -> RegistrationTokenFile.read(file))
+                .as("no token is taken from a line after an empty first one")
+                .isInstanceOf(Failure.class);
+    }
 }

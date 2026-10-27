@@ -85,8 +85,10 @@ final class Publish {
         if (args.equals(List.of("--off"))) {
             off(env, control);
             answer.putNull("published");
-        } else if (args.size() == 2 && "--address".equals(args.getFirst())) {
+        } else if ((args.size() == 2 || args.size() == 4 && "--name".equals(args.get(2)))
+                && "--address".equals(args.getFirst())) {
             final Address address = address(args.get(1));
+            final @Nullable String name = args.size() == 4 ? hostName(args.get(3)) : null;
             if (address.ip().isLoopbackAddress()) {
                 throw new Failure(
                         Exit.CONFIG,
@@ -102,20 +104,27 @@ final class Publish {
                                 + FIRST_UNPRIVILEGED_PORT
                                 + " on");
             }
-            on(env, address, control);
+            on(env, address, name, control);
             answer.put("published", address.text());
+            if (name != null) {
+                answer.put("name", name);
+            }
             answer.put(
                     "ca_file",
                     LocalHomeserver.directory(env).resolve(Certificate.CA_CERTIFICATE).toString());
         } else {
             throw new Failure(
-                    Exit.USAGE, "usage: publish --address <address>:<port> | publish --off");
+                    Exit.USAGE,
+                    "usage: publish --address <address>:<port> [--name <host name>] | publish --off");
         }
         out.println(answer);
     }
 
     private static void on(
-            final Map<String, String> env, final Address address, final Control control)
+            final Map<String, String> env,
+            final Address address,
+            final @Nullable String name,
+            final Control control)
             throws Failure {
         final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
         // The port a project's setup chose and the homeserver runs on; a new one would move it
@@ -132,7 +141,22 @@ final class Publish {
         } catch (final IOException ex) {
             throw new Failure(Exit.CONFIG, "cannot read " + conf + ": " + ex.getMessage(), ex);
         }
-        setting(conf, address.text());
+        if (name != null) {
+            try {
+                if (!Integer.toString(address.port())
+                        .equals(LocalHomeserver.setting(conf, LocalHomeserver.PORT))) {
+                    throw new Failure(
+                            Exit.CONFIG,
+                            "published by a name, one URL reaches the homeserver from every machine,"
+                                    + " so the published port must be its loopback port "
+                                    + LocalHomeserver.setting(conf, LocalHomeserver.PORT));
+                }
+            } catch (final IOException ex) {
+                throw new Failure(Exit.CONFIG, "cannot read " + conf + ": " + ex.getMessage(), ex);
+            }
+        }
+        setting(conf, LocalHomeserver.PUBLISH, address.text());
+        setting(conf, LocalHomeserver.PUBLISH_NAME, name);
         prepare(env);
         write(dropIn(env), "[Socket]\nListenStream=\nListenStream=" + address.text() + "\n");
         control.reload();
@@ -151,7 +175,8 @@ final class Publish {
         control.reload();
         final Path dir = LocalHomeserver.directory(env);
         if (Files.exists(dir.resolve("homeserver.conf"))) {
-            setting(dir.resolve("homeserver.conf"), null);
+            setting(dir.resolve("homeserver.conf"), LocalHomeserver.PUBLISH, null);
+            setting(dir.resolve("homeserver.conf"), LocalHomeserver.PUBLISH_NAME, null);
         }
         Certificate.removeServer(dir);
         prepare(env);
@@ -171,16 +196,17 @@ final class Publish {
     }
 
     /** {@code homeserver.conf} with its published address set, or removed for null. */
-    private static void setting(final Path conf, final @Nullable String value) throws Failure {
+    private static void setting(final Path conf, final String key, final @Nullable String value)
+            throws Failure {
         try {
             final List<String> lines = new ArrayList<>();
             for (final String line : Files.readAllLines(conf, StandardCharsets.UTF_8)) {
-                if (!line.strip().startsWith(LocalHomeserver.PUBLISH + "=")) {
+                if (!line.strip().startsWith(key + "=")) {
                     lines.add(line);
                 }
             }
             if (value != null) {
-                lines.add(LocalHomeserver.PUBLISH + "=" + value);
+                lines.add(key + "=" + value);
             }
             write(conf, String.join("\n", lines) + "\n");
         } catch (final IOException ex) {
@@ -297,6 +323,35 @@ final class Publish {
         return new Address(ip, port);
     }
 
+    /** A host name in lower case, two labels at least, as a certificate names it. */
+    private static final Pattern HOST_NAME =
+            Pattern.compile(
+                    "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+");
+
+    static String hostName(final String value) throws Failure {
+        if (!HOST_NAME.matcher(value).matches() || value.length() > 253) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "--name must be a host name in lower case, such as matrix.example.org, not '"
+                            + value
+                            + "'");
+        }
+        return value;
+    }
+
+    /** The name the homeserver is published under in {@code homeserver.conf}, or null. */
+    static @Nullable String name(final Path conf) throws Failure {
+        try {
+            final @Nullable String value =
+                    Files.exists(conf)
+                            ? LocalHomeserver.setting(conf, LocalHomeserver.PUBLISH_NAME)
+                            : null;
+            return value == null || value.isEmpty() ? null : hostName(value);
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read " + conf + ": " + ex.getMessage(), ex);
+        }
+    }
+
     /** The published address in {@code homeserver.conf}, or null when it names none. */
     static @Nullable Address published(final Path conf) throws Failure {
         try {
@@ -322,7 +377,8 @@ final class Publish {
         if (address == null) {
             settings = "";
         } else {
-            Certificate.ensure(dir, address.ip(), Instant.now());
+            Certificate.ensure(
+                    dir, address.ip(), name(dir.resolve("homeserver.conf")), Instant.now());
             settings =
                     "TUWUNEL_TLS__CERTS="
                             + MOUNT

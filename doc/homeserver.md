@@ -76,7 +76,10 @@ VPN they share, over `https` with the account's own certificate:
 
     porelo-message-transport-matrix publish --address 192.0.2.2:8448
 
-- **It answers** `{"published": "192.0.2.2:8448", "ca_file": "<path of ca.crt>"}`. The other machine names that CA
+- **`--name <host name>`**, beside the address, names the host name the other machine reaches it by in the server
+  certificate too, such as `matrix.example.org`, which that machine resolves to the published address and this one to
+  loopback. One URL then serves both, so the published port is the homeserver's loopback port then.
+- **It answers** `{"published": "192.0.2.2:8448", "ca_file": "<path of ca.crt>"}`, with `"name"` when one is given. The other machine names that CA
   file as its `ca_file`, and `https://192.0.2.2:8448` as its homeserver.
 - **The address** is one literal address of this machine, IPv6 in brackets, with a port from 1024 on. A wildcard, a
   name, loopback or multicast is refused before anything changes, and so is a homeserver no project has set up yet:
@@ -89,6 +92,9 @@ VPN they share, over `https` with the account's own certificate:
   `systemd-socket-proxyd`, which forwards it to the homeserver's loopback port. It binds the address before the VPN's
   tunnel gives it to the machine (`FreeBind`), so a tunnel that is down keeps neither the socket nor the homeserver
   down.
+- **A registration token per machine:** `admit` ([the contract](transport.md#the-lifecycle)) gives each other machine
+  a token of its own, kept under `machine-tokens/<machine>` beside the token file, which holds this machine's own
+  token first. Tuwunel reads the file at every registration, so `dismiss` refuses a machine's token at once.
 - **`publish --off`** closes the socket and removes its address, `PORELO_MATRIX_PUBLISH` and the server certificate,
   then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file.
 

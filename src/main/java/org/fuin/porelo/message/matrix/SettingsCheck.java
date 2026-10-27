@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code settings}: a project's settings for this transport, checked as a draft before anybody
@@ -26,12 +28,19 @@ final class SettingsCheck {
 
     static void run(final List<String> args, final InputStream in, final PrintStream out)
             throws Failure {
-        if (!args.isEmpty()) {
-            throw new Failure(Exit.USAGE, "usage: settings < <the project's settings as JSON>");
+        final boolean loopbackOnly = args.equals(List.of("--loopback-only"));
+        if (!args.isEmpty() && !loopbackOnly) {
+            throw new Failure(
+                    Exit.USAGE,
+                    "usage: settings [--loopback-only] < <the project's settings as JSON>");
         }
         final List<String> refused = new ArrayList<>();
         final List<String> warnings = new ArrayList<>();
-        check(read(in, refused), refused, warnings);
+        final JsonNode node = read(in, refused);
+        check(node, refused, warnings);
+        if (loopbackOnly) {
+            offline(node, refused);
+        }
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         refused.forEach(answer.putArray("refused")::add);
         warnings.forEach(answer.putArray("warnings")::add);
@@ -57,6 +66,29 @@ final class SettingsCheck {
         } catch (final IOException ex) {
             refused.add("the settings are not JSON: " + ex.getMessage());
             return MatrixClient.JSON.createObjectNode();
+        }
+    }
+
+    /** Whether tls_verify is off; a value that is neither is said once, by its own check. */
+    private static boolean off(final JsonNode node) {
+        try {
+            return !Settings.verify(node.path("tls_verify"));
+        } catch (final Failure failure) {
+            return false;
+        }
+    }
+
+    /** An offline project reaches this machine's loopback alone, as setup holds it to. */
+    private static void offline(final JsonNode node, final List<String> refused) {
+        try {
+            final @Nullable URI homeserver = Settings.homeserver(node.path("homeserver"));
+            if (homeserver != null && !Lifecycle.loopback(homeserver)) {
+                refused.add(
+                        "the project may reach only this machine's loopback, and its homeserver is "
+                                + homeserver);
+            }
+        } catch (final Failure failure) {
+            // Said already by the general check.
         }
     }
 
@@ -115,7 +147,7 @@ final class SettingsCheck {
         }
         try {
             final Path caFile = Settings.caFile(node.path("ca_file"));
-            if (caFile != null && !Files.isReadable(caFile)) {
+            if (caFile != null && caFile.isAbsolute() && !Files.isReadable(caFile)) {
                 warnings.add(
                         "the ca_file "
                                 + caFile
@@ -130,8 +162,21 @@ final class SettingsCheck {
             if (tokenFile != null) {
                 if (node.path("homeserver").isMissingNode() || node.path("homeserver").isNull()) {
                     refused.add(Settings.TOKEN_FILE_WITHOUT_HOMESERVER);
-                } else {
+                } else if (tokenFile.isAbsolute()) {
+                    // A path in the home is each account's own: this check reads no environment.
                     tokenFileOnThisMachine(tokenFile, warnings);
+                }
+            }
+        } catch (final Failure failure) {
+            refused.add(failure.getMessage());
+        }
+        try {
+            if (Settings.caCertificate(node.path("ca_certificate")) != null) {
+                if (!node.path("ca_file").isMissingNode() && !node.path("ca_file").isNull()) {
+                    refused.add(Settings.TWO_CAS);
+                }
+                if (off(node)) {
+                    refused.add(Settings.TEXT_CONTRADICTION);
                 }
             }
         } catch (final Failure failure) {

@@ -157,9 +157,30 @@ final class MachineTokens {
         }
     }
 
+    /** The machines admitted now, by name. */
+    static List<String> admitted(final Map<String, String> env) throws Failure {
+        final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.map(file -> file.getFileName().toString())
+                    .filter(name -> MACHINE.matcher(name).matches())
+                    .sorted()
+                    .toList();
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot read the admitted machines in " + dir + ": " + ex.getMessage(),
+                    ex);
+        }
+    }
+
     /** The token the local token file holds first, which is this machine's own. */
     static String local(final String content) {
-        return WHITESPACE.split(content.strip(), 2)[0];
+        // The first line, even an empty one: a token after it is another machine's.
+        final String first = content.lines().findFirst().orElse("").strip();
+        return WHITESPACE.split(first, 2)[0];
     }
 
     /** The local token first, then every machine's, written whole over the homeserver's file. */

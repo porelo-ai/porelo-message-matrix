@@ -38,6 +38,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The account's own certificates for its homeserver's listener on another address: a CA made once,
@@ -108,16 +109,26 @@ final class Certificate {
      */
     static boolean ensure(final Path dir, final InetAddress address, final Instant now)
             throws Failure {
+        return ensure(dir, address, null, now);
+    }
+
+    /** As {@link #ensure(Path, InetAddress, Instant)}, naming {@code name} beside the address. */
+    static boolean ensure(
+            final Path dir,
+            final InetAddress address,
+            final @Nullable String name,
+            final Instant now)
+            throws Failure {
         try {
             directory(dir);
             directory(dir.resolve(TLS));
             try (FileChannel channel = lock(dir);
                     FileLock lock = channel.lock()) {
                 final Authority ca = authority(dir, now);
-                if (current(dir.resolve(TLS), ca, address, now)) {
+                if (current(dir.resolve(TLS), ca, address, name, now)) {
                     return false;
                 }
-                server(dir.resolve(TLS), ca, address, now);
+                server(dir.resolve(TLS), ca, address, name, now);
                 return true;
             }
         } catch (final IOException | GeneralSecurityException ex) {
@@ -233,7 +244,11 @@ final class Certificate {
     }
 
     private static boolean current(
-            final Path tls, final Authority ca, final InetAddress address, final Instant now) {
+            final Path tls,
+            final Authority ca,
+            final InetAddress address,
+            final @Nullable String name,
+            final Instant now) {
         final Path certificate = tls.resolve(SERVER_CERTIFICATE);
         final Path key = tls.resolve(SERVER_KEY);
         try {
@@ -248,28 +263,36 @@ final class Certificate {
                     || server.getNotBefore().toInstant().isAfter(now)) {
                 return false;
             }
-            return names(server, address) && fits(privateKey(key), server.getPublicKey());
+            return names(server, address, name) && fits(privateKey(key), server.getPublicKey());
         } catch (final IOException | GeneralSecurityException | RuntimeException | Failure ex) {
             // A server certificate or key that cannot be read or checked is made anew.
             return false;
         }
     }
 
-    private static boolean names(final X509Certificate server, final InetAddress address)
+    /** Exactly the address and, where one is published, the name: no other, none missing. */
+    private static boolean names(
+            final X509Certificate server, final InetAddress address, final @Nullable String name)
             throws GeneralSecurityException {
         final Collection<List<?>> names = server.getSubjectAlternativeNames();
         if (names == null) {
             return false;
         }
-        for (final List<?> name : names) {
-            // 7 is iPAddress.
-            if (Integer.valueOf(7).equals(name.get(0))
-                    && name.get(1) instanceof String value
+        boolean ip = false;
+        boolean dns = name == null;
+        for (final List<?> entry : names) {
+            // 7 is iPAddress, 2 dNSName.
+            if (Integer.valueOf(7).equals(entry.get(0))
+                    && entry.get(1) instanceof String value
                     && InetAddress.ofLiteral(value).equals(address)) {
-                return names.size() == 1;
+                ip = true;
+            } else if (Integer.valueOf(2).equals(entry.get(0)) && entry.get(1).equals(name)) {
+                dns = true;
+            } else {
+                return false;
             }
         }
-        return false;
+        return ip && dns;
     }
 
     private static boolean fits(final PrivateKey key, final PublicKey publicKey)
@@ -287,7 +310,11 @@ final class Certificate {
     }
 
     private static void server(
-            final Path tls, final Authority ca, final InetAddress address, final Instant now)
+            final Path tls,
+            final Authority ca,
+            final InetAddress address,
+            final @Nullable String name,
+            final Instant now)
             throws IOException, GeneralSecurityException {
         final KeyPair pair = keyPair();
         final byte[] der =
@@ -307,7 +334,15 @@ final class Certificate {
                                 extension(
                                         SUBJECT_ALT_NAME,
                                         false,
-                                        sequence(tag(0x87, address.getAddress()))),
+                                        name == null
+                                                ? sequence(tag(0x87, address.getAddress()))
+                                                : sequence(
+                                                        tag(0x87, address.getAddress()),
+                                                        tag(
+                                                                0x82,
+                                                                name.getBytes(
+                                                                        StandardCharsets
+                                                                                .US_ASCII)))),
                                 extension(SUBJECT_KEY_ID, false, octets(keyId(pair.getPublic()))),
                                 extension(
                                         AUTHORITY_KEY_ID,

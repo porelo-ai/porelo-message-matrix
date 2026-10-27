@@ -7,13 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `publish --address <address>:<port>` serves the account's own homeserver for another machine on one address of
+- `publish --address <address>:<port> [--name <host name>]` serves the account's own homeserver for another machine on one address of
   this machine's VPN, over `https` with a CA of the account's own; `publish --off` takes it back. The answer names
   the CA file the other machine trusts. The new socket `porelo-matrix-homeserver-vpn` listens on the address even
   while the VPN is down and forwards to the loopback port, where Tuwunel serves TLS beside plain `http`; the server
   certificate holds one year and is renewed within its last 30 days at the homeserver's start. A wildcard, a name,
   loopback, multicast or a privileged port is refused. `backup` carries the CA and `restore` drops the published
   address; `clear` removes all of it.
+- `admit --project P --machine M` gives another machine a registration token of its own for the published homeserver
+  and invites `@porelo.<M>` into the project's room; it answers the homeserver's address, the room, the CA's
+  certificate, and the token under `secrets`. `dismiss --project P --machine M` refuses that token at once and bans
+  the machine's accounts, `@porelo.<M>` and every `@<name>.<M>`, from the room; while a machine is admitted, no person,
+  task or other machine of this machine's may take a name ending so.
+- The settings take `ca_certificate`, a CA's certificate as PEM text, which the transport keeps as a file of its own;
+  `settings` takes `--loopback-only` for an offline project.
+- A project that names `registration_token_file` while `PORELO_MATRIX_REGISTRATION_TOKEN` is set is refused, since
+  which token was meant cannot be told.
 - `join --token [--display <name>]` returns a vault token with the user and room id, keeps the password
   private, and logs out every earlier session of an existing account. A new account keeps its registration
   session. `join --display` uses the same validation as `enroll`.

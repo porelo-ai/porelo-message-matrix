@@ -327,7 +327,8 @@ class KeepTest {
         final Path copy = copy("8008");
         Files.writeString(
                 copy.resolve("homeserver.conf"),
-                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.2:8448\n",
+                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.2:8448\n"
+                        + "PORELO_MATRIX_PUBLISH_NAME=matrix.example.org\n",
                 StandardCharsets.UTF_8);
         Files.writeString(copy.resolve("ca.crt"), "the CA's certificate");
         Files.writeString(copy.resolve("ca.key"), "the CA's key");

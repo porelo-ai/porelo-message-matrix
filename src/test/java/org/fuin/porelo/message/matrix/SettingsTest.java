@@ -192,4 +192,117 @@ class SettingsTest {
                     .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
         }
     }
+
+    @org.junit.jupiter.api.io.TempDir private java.nio.file.Path home;
+
+    /** A CA certificate as another machine's admit answers it. */
+    private String pem() throws Exception {
+        Certificate.ensure(
+                home.resolve("ca"),
+                java.net.InetAddress.ofLiteral("192.0.2.2"),
+                java.time.Instant.now());
+        return java.nio.file.Files.readString(
+                home.resolve("ca").resolve(Certificate.CA_CERTIFICATE));
+    }
+
+    private static String json(final String key, final String value) {
+        return MatrixClient.JSON
+                .createObjectNode()
+                .put("homeserver", "https://192.0.2.2:8448")
+                .put("room", "!room:localhost")
+                .put(key, value)
+                .toString();
+    }
+
+    /**
+     * Harm guarded: the CA another machine's admit gave never reaches the transport's checks, and
+     * the homeserver is trusted on the platform's authorities or not at all.
+     */
+    @Test
+    void aCaCertificateBecomesTheFileTheVerbsTrust() throws Exception {
+        final String pem = pem();
+        final Map<String, String> env =
+                Map.of("HOME", home.toString(), "XDG_STATE_HOME", home.resolve("state").toString());
+
+        final Settings settings = settings(json("ca_certificate", pem)).materialized(env);
+
+        org.assertj.core.api.Assertions.assertThat(settings.caFile())
+                .as("the CA is a file of the transport's own")
+                .isNotNull()
+                .startsWith(home.resolve("state"))
+                .hasContent(pem.strip());
+        org.assertj.core.api.Assertions.assertThat(settings.environment(URL, "token"))
+                .as("the verbs after setup are handed that file")
+                .containsEntry(Config.CA_FILE, String.valueOf(settings.caFile()));
+    }
+
+    /**
+     * Harm guarded: a CA that is no certificate is taken, and every connection is refused later.
+     */
+    @Test
+    void aCaCertificateThatIsNoneIsRefused() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                settings(
+                                        json(
+                                                "ca_certificate",
+                                                "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")))
+                .as("text that holds no certificate is refused at once")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                org.assertj.core.api.Assertions.assertThat(failure.exitCode())
+                                        .as("a configuration fault")
+                                        .isEqualTo(Exit.CONFIG));
+    }
+
+    /** Harm guarded: one of two CAs is trusted, and nobody can tell which was meant. */
+    @Test
+    void aCaFileAndACaCertificateAreRefusedTogether() throws Exception {
+        final String both =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("homeserver", "https://192.0.2.2:8448")
+                        .put("room", "!room:localhost")
+                        .put("ca_file", "/etc/ssl/ca.crt")
+                        .put("ca_certificate", pem())
+                        .toString();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> settings(both))
+                .as("which CA was meant cannot be told")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("ca_certificate");
+    }
+
+    /**
+     * Harm guarded: the signed settings name one token file for every machine, which only a path in
+     * each account's own home can be, and the transport refuses it or reads another account's.
+     */
+    @Test
+    void aTokenFileInTheHomeIsTheRunningAccounts() throws Exception {
+        final Settings settings =
+                settings(
+                                json(
+                                        "registration_token_file",
+                                        "~/.config/porelo/matrix/host-registration-token"))
+                        .materialized(Map.of("HOME", home.toString()));
+
+        org.assertj.core.api.Assertions.assertThat(settings.registrationTokenFile())
+                .as("~/ is this account's home")
+                .isEqualTo(home.resolve(".config/porelo/matrix/host-registration-token"));
+    }
+
+    /** Harm guarded: a path named in the home leads out of it to another account's file. */
+    @Test
+    void aPathInTheHomeStaysInIt() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> settings(json("registration_token_file", "~/../other/.config/token")))
+                .as("~/.. leaves the home")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                org.assertj.core.api.Assertions.assertThat(failure.exitCode())
+                                        .as("refused")
+                                        .isEqualTo(Exit.CONFIG));
+    }
 }

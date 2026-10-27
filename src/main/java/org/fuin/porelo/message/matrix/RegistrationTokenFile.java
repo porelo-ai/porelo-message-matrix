@@ -30,7 +30,9 @@ final class RegistrationTokenFile {
                                 + " is readable by other accounts; make it readable by this"
                                 + " account alone (chmod 600)");
             }
-            final String token = Files.readString(file, StandardCharsets.UTF_8).strip();
+            // A file the homeserver reads holds this machine's token first, others after it.
+            final String token =
+                    MachineTokens.local(Files.readString(file, StandardCharsets.UTF_8));
             if (token.isEmpty()) {
                 throw new Failure(
                         Exit.CONFIG, "the project's registration_token_file " + file + " is empty");

@@ -383,7 +383,11 @@ final class Keep {
      */
     private static List<String> unpublished(final Path conf) throws IOException {
         return Files.readAllLines(conf, StandardCharsets.UTF_8).stream()
-                .filter(line -> !line.strip().startsWith(LocalHomeserver.PUBLISH + "="))
+                .filter(
+                        line ->
+                                !line.strip().startsWith(LocalHomeserver.PUBLISH + "=")
+                                        && !line.strip()
+                                                .startsWith(LocalHomeserver.PUBLISH_NAME + "="))
                 .toList();
     }
 

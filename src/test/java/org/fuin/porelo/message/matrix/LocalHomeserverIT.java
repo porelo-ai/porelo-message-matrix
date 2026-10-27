@@ -195,6 +195,408 @@ class LocalHomeserverIT {
                 .startsWith("@worker:");
     }
 
+    /**
+     * Harm guarded: another machine cannot reach the room it was admitted to, or a machine
+     * dismissed keeps registering accounts and keeps its place in the room.
+     */
+    @Test
+    @DisplayName(
+            "Admitted, another machine sets up in this machine's room over TLS; dismissed, its token registers nobody and its accounts are out")
+    void anotherMachineIsAdmittedAndDismissed() throws Exception {
+        final Path conf = Files.createDirectories(LocalHomeserver.directory(env));
+        Files.writeString(
+                conf.resolve("homeserver.conf"),
+                LocalHomeserver.PUBLISH + "=127.0.0.1:8448\n",
+                StandardCharsets.UTF_8);
+        final JsonNode setup = lifecycle("setup", "--project", "demo");
+        keep(env, setup.path("account"));
+        keep(env, setup.path("secrets"));
+        final int port = LocalHomeserver.port(conf.resolve("homeserver.conf"));
+
+        final JsonNode admitted = lifecycle("admit", "--project", "demo", "--machine", "hostb");
+        final JsonNode admission = admitted.path("admission");
+        final String token = admitted.path("secrets").path("registration_token").asText();
+        assertThat(admission.path("room").asText())
+                .as("the room is the project's")
+                .isEqualTo(setup.path("conversation").asText());
+        assertThat(admission.path("machine").asText())
+                .as("the machine admitted")
+                .isEqualTo("hostb");
+        assertThat(admission.path("homeserver").asText())
+                .as("the published address, over https")
+                .isEqualTo("https://127.0.0.1:8448");
+        assertThat(
+                        lifecycle("admit", "--project", "demo", "--machine", "hostb")
+                                .path("secrets")
+                                .path("registration_token")
+                                .asText())
+                .as("admitted again, the same token")
+                .isEqualTo(token);
+        assertThat(admitted.path("admission").has("registration_token"))
+                .as("the token is only among the secrets")
+                .isFalse();
+
+        // The other machine, as Porelo sets it up there: the homeserver over TLS on this port
+        // (the published address is the socket's), the CA's text as a setting, the token in the
+        // environment.
+        final Path other = Files.createDirectories(dir.resolve("hostb"));
+        final Map<String, String> hostb = new HashMap<>();
+        hostb.put("HOME", other.resolve("home").toString());
+        hostb.put("XDG_CONFIG_HOME", other.resolve("config").toString());
+        hostb.put("XDG_STATE_HOME", other.resolve("state").toString());
+        hostb.put(Config.REGISTRATION_TOKEN, token);
+        final String settings =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("homeserver", "https://127.0.0.1:" + port)
+                        .put("room", admission.path("room").asText())
+                        .put("ca_certificate", admission.path("ca_certificate").asText())
+                        .toString();
+        final JsonNode first =
+                lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
+        keep(hostb, first.path("account"));
+        final JsonNode second =
+                lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
+        assertThat(second.path("admitted").asBoolean(false))
+                .as("the admitted machine's second setup joins the room")
+                .isTrue();
+        keep(hostb, second.path("account"));
+        lifecycle(
+                hostb,
+                settings,
+                "enroll",
+                "--project",
+                "demo",
+                "--task",
+                "worker",
+                "--machine",
+                "hostb");
+        // Renamed, the task is still the machine's: its name says so, and nothing else can.
+        lifecycle(
+                hostb,
+                settings,
+                "enroll",
+                "--project",
+                "demo",
+                "--task",
+                "worker",
+                "--display",
+                "Grace",
+                "--machine",
+                "hostb");
+        assertThat(
+                        lifecycle("admit", "--project", "demo", "--machine", "hostb")
+                                .path("secrets")
+                                .path("registration_token")
+                                .asText())
+                .as(
+                        "admitted again while its accounts are in the room, the machine keeps its token")
+                .isEqualTo(token);
+        // While hostb is admitted, no name of this machine's may end as its accounts do.
+        for (final String[] taken :
+                List.of(
+                        new String[] {"join", "--project", "demo", "--person", "carol.hostb"},
+                        new String[] {"enroll", "--project", "demo", "--task", "job.hostb"},
+                        new String[] {"admit", "--project", "demo", "--machine", "sub.hostb"},
+                        new String[] {"setup", "--project", "demo.hostb"})) {
+            assertThatThrownBy(() -> lifecycle(taken))
+                    .as("%s is refused while hostb is admitted", String.join(" ", taken))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure ->
+                                    assertThat(failure.exitCode())
+                                            .as("a name that would be taken for the machine's")
+                                            .isEqualTo(Exit.CONFIG));
+        }
+        // A person parted from the room whom the machine invited back: not the machine's.
+        lifecycle("join", "--project", "demo", "--person", "dave");
+        lifecycle("part", "--project", "demo", "--person", "dave");
+        new MatrixClient(
+                        new Config(
+                                URI.create("https://127.0.0.1:" + port),
+                                hostb.get(Config.ADMIN_TOKEN),
+                                Settings.read(
+                                                new ByteArrayInputStream(
+                                                        settings.getBytes(StandardCharsets.UTF_8)))
+                                        .materialized(hostb)
+                                        .caFile(),
+                                true))
+                .post(
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(admission.path("room").asText())
+                                + "/invite",
+                        MatrixClient.JSON.createObjectNode().put("user_id", "@dave:localhost"));
+
+        final JsonNode dismissed = lifecycle("dismiss", "--project", "demo", "--machine", "hostb");
+
+        assertThat(dismissed.path("removed"))
+                .as("the token and exactly the machine's own accounts in the room")
+                .extracting(JsonNode::asText)
+                .containsExactlyInAnyOrder(
+                        "the registration token of hostb",
+                        "@porelo.hostb:localhost",
+                        "@porelo-relay-demo.hostb:localhost",
+                        "@worker.hostb:localhost");
+        final MatrixClient nobody =
+                new MatrixClient(
+                        new Config(URI.create("http://127.0.0.1:" + port), "", null, true));
+        assertThat(members(nobody, admission.path("room").asText()))
+                .as(
+                        "the machine's accounts are banned from the room, so none invites another back;"
+                                + " this machine's people and relay stay")
+                .containsEntry("@porelo.hostb:localhost", "ban")
+                .containsEntry("@porelo-relay-demo.hostb:localhost", "ban")
+                .containsEntry("@worker.hostb:localhost", "ban")
+                .containsEntry("@dave:localhost", "invite")
+                .containsEntry("@porelo-relay-demo:localhost", "join");
+        assertThatThrownBy(() -> lifecycle("join", "--project", "demo", "--person", "worker.hostb"))
+                .as("a dismissed task's account is no person's to take without --reset")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("an existing account")
+                                        .isEqualTo(Exit.NOT_PERMITTED));
+        assertThatThrownBy(() -> Accounts.register(nobody, "intruder", Accounts.password(), token))
+                .as("the dismissed machine's token registers nobody")
+                .isInstanceOf(Failure.class);
+        assertThat(lifecycle("dismiss", "--project", "demo", "--machine", "hostb").path("removed"))
+                .as("dismissed again, nothing is left")
+                .isEmpty();
+
+        lifecycle("admit", "--project", "demo", "--machine", "hostb");
+        assertThat(members(nobody, admission.path("room").asText()))
+                .as("admitted again, the machine's accounts may come back")
+                .containsEntry("@porelo.hostb:localhost", "invite")
+                .containsEntry("@worker.hostb:localhost", "leave");
+        lifecycle("dismiss", "--project", "demo", "--machine", "hostb");
+        assertThatThrownBy(() -> lifecycle("join", "--project", "demo", "--person", "worker.hostb"))
+                .as(
+                        "a ban lifted and the machine dismissed again: still no person's account to take")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("an existing account")
+                                        .isEqualTo(Exit.NOT_PERMITTED));
+
+        lifecycle("admit", "--project", "demo", "--machine", "hostb");
+        assertThat(lifecycle("clear", "--project", "demo").path("kept"))
+                .as(
+                        "clearing the project leaves the admitted machine's accounts for its other projects")
+                .anyMatch(
+                        kept ->
+                                kept.path("what")
+                                                .asText()
+                                                .equals("the account @porelo.hostb:localhost")
+                                        && kept.path("why")
+                                                .asText()
+                                                .equals(
+                                                        "an account of the admitted machine hostb"));
+    }
+
+    /**
+     * Harm guarded: a machine is admitted under a name a person or task of this machine already
+     * ends with, and dismissing it later puts them out.
+     */
+    @Test
+    @DisplayName(
+            "A first admit is refused while a member of the room ends as the machine's accounts would")
+    void aMachineWhoseNameIsTakenIsRefused() throws Exception {
+        final Path conf = Files.createDirectories(LocalHomeserver.directory(env));
+        Files.writeString(
+                conf.resolve("homeserver.conf"),
+                LocalHomeserver.PUBLISH + "=127.0.0.1:8448\n",
+                StandardCharsets.UTF_8);
+        final JsonNode setup = lifecycle("setup", "--project", "demo");
+        keep(env, setup.path("account"));
+        keep(env, setup.path("secrets"));
+        lifecycle("join", "--project", "demo", "--person", "erin.hostc");
+
+        assertThatThrownBy(() -> lifecycle("admit", "--project", "demo", "--machine", "hostc"))
+                .as("erin.hostc would be taken for one of hostc's accounts")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("the name is taken")
+                                        .isEqualTo(Exit.CONFIG));
+        assertThat(LocalHomeserver.directory(env).resolve("machine-tokens/hostc"))
+                .as("no token is made for it")
+                .doesNotExist();
+        assertThat(lifecycle("dismiss", "--project", "demo", "--machine", "hostc").path("removed"))
+                .as("a machine never admitted has nothing here to dismiss")
+                .isEmpty();
+        assertThat(members(nobody(), setup.path("conversation").asText()))
+                .as("the person whose name ends so stays")
+                .containsEntry("@erin.hostc:localhost", "join");
+
+        // In another project's room too, a name taken blocks the first admission.
+        lifecycle("setup", "--project", "q");
+        lifecycle("join", "--project", "q", "--person", "erin.hoste");
+        assertThatThrownBy(() -> lifecycle("admit", "--project", "demo", "--machine", "hoste"))
+                .as("erin.hoste in project q would be taken for hoste's")
+                .isInstanceOf(Failure.class);
+
+        // Nested names either way round: y.hostd admitted, hostd is refused.
+        lifecycle("admit", "--project", "demo", "--machine", "y.hostd");
+        assertThatThrownBy(() -> lifecycle("admit", "--project", "demo", "--machine", "hostd"))
+                .as("y.hostd's accounts end as hostd's would")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("the machine y.hostd is admitted already");
+    }
+
+    /**
+     * Harm guarded: the machine that serves the room, named in the signed settings by its own
+     * published name, takes the central path and loses its administrator for every project.
+     */
+    @Test
+    @DisplayName(
+            "Settings that name the account's own published homeserver keep its own path, administrator and room")
+    void theOwnPublishedNameIsTheOwnHomeserver() throws Exception {
+        final Path conf = Files.createDirectories(LocalHomeserver.directory(env));
+        Files.writeString(
+                conf.resolve("homeserver.conf"),
+                LocalHomeserver.PUBLISH
+                        + "=127.0.0.1:8448\n"
+                        + LocalHomeserver.PUBLISH_NAME
+                        + "=matrix.porelo.internal\n",
+                StandardCharsets.UTF_8);
+        final JsonNode local = lifecycle("setup", "--project", "demo");
+        keep(env, local.path("account"));
+        keep(env, local.path("secrets"));
+        final int port = LocalHomeserver.port(conf.resolve("homeserver.conf"));
+        final String settings =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("homeserver", "https://matrix.porelo.internal:" + port)
+                        .put("room", local.path("conversation").asText())
+                        .put(
+                                "ca_certificate",
+                                Files.readString(conf.resolve(Certificate.CA_CERTIFICATE)))
+                        .toString();
+
+        final JsonNode named =
+                lifecycle(
+                        env,
+                        settings.replace("matrix.porelo.internal", "Matrix.Porelo.Internal"),
+                        "setup",
+                        "--project",
+                        "demo");
+
+        assertThat(named.path("conversation").asText())
+                .as("the same room")
+                .isEqualTo(local.path("conversation").asText());
+        assertThat(named.path("account").path(Config.ADMIN_TOKEN).asText())
+                .as("the same administrator, not a machine account")
+                .isEqualTo(local.path("account").path(Config.ADMIN_TOKEN).asText());
+        assertThat(named.has("admitted")).as("no central setup").isFalse();
+        assertThat(
+                        lifecycle(
+                                        env,
+                                        settings,
+                                        "join",
+                                        "--project",
+                                        "demo",
+                                        "--person",
+                                        "ada",
+                                        "--token")
+                                .path("login")
+                                .path("room")
+                                .asText())
+                .as("people are still signed on here")
+                .isEqualTo(local.path("conversation").asText());
+        for (final String wrong :
+                List.of(
+                        settings.replace(local.path("conversation").asText(), "!another:localhost"),
+                        settings.replace(":" + port + "\"", ":" + (port + 1) + "\""))) {
+            assertThatThrownBy(() -> lifecycle(env, wrong, "setup", "--project", "demo"))
+                    .as("another room or port than this homeserver's for the project is refused")
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure ->
+                                    assertThat(failure.exitCode())
+                                            .as("a configuration fault")
+                                            .isEqualTo(Exit.CONFIG));
+        }
+        // Published by its name with no port of its own kept, nothing can tell which URL is its.
+        Files.writeString(
+                conf.resolve("homeserver.conf"),
+                LocalHomeserver.PUBLISH
+                        + "=127.0.0.1:8448\n"
+                        + LocalHomeserver.PUBLISH_NAME
+                        + "=matrix.porelo.internal\n",
+                StandardCharsets.UTF_8);
+        assertThatThrownBy(
+                        () ->
+                                lifecycle(
+                                        env,
+                                        settings.replace(":" + port + "\"", "\""),
+                                        "setup",
+                                        "--project",
+                                        "demo"))
+                .as("a URL without a port is not taken for a homeserver whose port is unknown")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure ->
+                                assertThat(failure.exitCode())
+                                        .as("refused, never guessed")
+                                        .isEqualTo(Exit.CONFIG));
+        // A name kept without its address publishes nothing: the settings' homeserver is another's.
+        Files.writeString(
+                conf.resolve("homeserver.conf"),
+                LocalHomeserver.PORT
+                        + "="
+                        + port
+                        + "\n"
+                        + LocalHomeserver.PUBLISH_NAME
+                        + "=matrix.porelo.internal\n",
+                StandardCharsets.UTF_8);
+        assertThatThrownBy(() -> lifecycle(env, settings, "setup", "--project", "demo"))
+                .as(
+                        "without a published address this machine takes the central path, which needs its name")
+                .hasMessageContaining(Config.MACHINE + " is not set");
+    }
+
+    private MatrixClient nobody() throws Failure {
+        final int port =
+                LocalHomeserver.port(LocalHomeserver.directory(env).resolve("homeserver.conf"));
+        return new MatrixClient(new Config(URI.create("http://127.0.0.1:" + port), "", null, true));
+    }
+
+    private Map<String, String> members(final MatrixClient nobody, final String room)
+            throws Failure {
+        final Map<String, String> members = new HashMap<>();
+        for (final JsonNode member :
+                nobody.as(env.get(Config.ADMIN_TOKEN))
+                        .get("/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/members")
+                        .path("chunk")) {
+            members.put(
+                    member.path("state_key").asText(),
+                    member.path("content").path("membership").asText());
+        }
+        return members;
+    }
+
+    private static void keep(final Map<String, String> into, final JsonNode values) {
+        values.properties().forEach(entry -> into.put(entry.getKey(), entry.getValue().asText()));
+    }
+
+    private JsonNode lifecycle(
+            final Map<String, String> on, final String settings, final String... args)
+            throws Failure, IOException {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Lifecycle.run(
+                args[0],
+                List.of(args).subList(1, args.length),
+                on,
+                new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8)),
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(OutputStream.nullOutputStream()),
+                unit);
+        return MatrixClient.JSON.readTree(out.toByteArray());
+    }
+
     private JsonNode lifecycle(final String... args) throws Failure, IOException {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         Lifecycle.run(

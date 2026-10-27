@@ -341,4 +341,36 @@ class CertificateTest {
                                 .replaceAll("\\s", "")
                                 .getBytes(StandardCharsets.US_ASCII));
     }
+
+    /**
+     * Harm guarded: a machine that reaches the homeserver by its name refuses the certificate, or
+     * one for an older name is served on.
+     */
+    @Test
+    @DisplayName(
+            "The server certificate names the published name beside the address, and is made anew when it changes")
+    void namesThePublishedName() throws Exception {
+        Certificate.ensure(dir, VPN, "matrix.porelo.internal", NOW);
+
+        assertThat(server().getSubjectAlternativeNames())
+                .as("the address and the name")
+                .containsExactlyInAnyOrder(
+                        List.of(7, "192.0.2.2"), List.of(2, "matrix.porelo.internal"));
+        assertThat(Certificate.ensure(dir, VPN, "matrix.porelo.internal", NOW))
+                .as("the same name keeps it")
+                .isFalse();
+        assertThat(Certificate.ensure(dir, VPN, null, NOW))
+                .as("without the name it is made anew")
+                .isTrue();
+        assertThat(Certificate.ensure(dir, VPN, "matrix.porelo.internal", NOW))
+                .as("a name published later makes it anew with the name")
+                .isTrue();
+        assertThat(Certificate.ensure(dir, VPN, "matrix.example.org", NOW))
+                .as("another name makes it anew")
+                .isTrue();
+        assertThat(server().getSubjectAlternativeNames())
+                .as("the new name alone")
+                .containsExactlyInAnyOrder(
+                        List.of(7, "192.0.2.2"), List.of(2, "matrix.example.org"));
+    }
 }

@@ -44,6 +44,40 @@ class SettingsCheckTest {
         return check(settings, Map.of());
     }
 
+    private JsonNode offline(final String settings) throws IOException {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        exit =
+                Main.run(
+                        new String[] {"settings", "--loopback-only"},
+                        Map.of(),
+                        new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8)),
+                        new PrintStream(out, true, StandardCharsets.UTF_8),
+                        new PrintStream(OutputStream.nullOutputStream()));
+        return MatrixClient.JSON.readTree(out.toByteArray());
+    }
+
+    /** Harm guarded: an offline project's draft passes with a homeserver beyond this machine. */
+    @Test
+    @DisplayName(
+            "For an offline project, a homeserver that is not loopback is refused in the draft")
+    void offlineRefusesAHomeserverElsewhere() throws IOException {
+        final JsonNode elsewhere =
+                offline(
+                        "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#p:example.org\"}");
+
+        assertThat(exit).as("a draft's faults are findings, not a failure").isEqualTo(Exit.OK);
+        assertThat(texts(elsewhere.path("refused")))
+                .as("the homeserver beyond loopback is refused")
+                .anyMatch(text -> text.contains("only this machine's loopback"));
+        assertThat(
+                        texts(
+                                offline(
+                                                "{\"homeserver\":\"http://127.0.0.1:8008\",\"room\":\"#p:localhost\"}")
+                                        .path("refused")))
+                .as("a loopback homeserver passes")
+                .noneMatch(text -> text.contains("only this machine's loopback"));
+    }
+
     private static List<String> texts(final JsonNode array) {
         return array.valueStream().map(JsonNode::asText).toList();
     }
