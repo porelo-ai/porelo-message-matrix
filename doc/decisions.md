@@ -376,8 +376,8 @@ to act as one account.
   CA on loopback; with it every listener takes both. A second image in the pod that ends TLS for the VPN listener
   alone would be one more image to pin, move and run.
 - **Each machine admitted to the account's homeserver gets a registration token of its own.** The token file takes
-  several tokens; one removed from it is refused once the homeserver re-reads the file on `SIGHUP`, while the
-  others still register.
+  several tokens, and the homeserver reads it at every registration: one removed from it is refused at once,
+  without a signal or a restart, while the others still register.
 
 **Risk accepted:** the VPN listener also answers plain `http`. The transport on another machine takes a homeserver
 only over `https` with its `ca_file`, so it still authenticates the server before any token leaves it, and a plain

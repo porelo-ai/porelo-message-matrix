@@ -32,9 +32,9 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
   `PodmanUnit.image` and `ProcessUnit` then learn to take. Decided: the first, with the risk accepted in
   [the decisions](../doc/decisions.md#the-homeserver-on-the-vpn-tls-by-tuwunel-a-token-per-machine).
 - **A registration token per machine.** `registration_token_file` takes several tokens, separated by whitespace; a
-  token in it registers any number of accounts, and one removed from the file is refused after the homeserver
-  re-reads it on `SIGHUP`. So `admit` adds a token of the machine's own to the file and `HomeserverToken` keeps the
-  local one first; dropping a machine removes its token. Whoever holds a machine's token on the VPN can register
+  token in it registers any number of accounts, and the homeserver reads the file at every registration, so one
+  removed from it is refused at once. So `admit` adds a token of the machine's own to the file (`MachineTokens`),
+  which keeps the local one first; dropping a machine removes its token. Whoever holds a machine's token on the VPN can register
   accounts until it is removed: accepted in the same decision.
 - **A certificate of the account's own** (a new `Certificate.java`): a CA made once, and a server certificate whose
   IP SAN is the published address. Both private keys are written `0600` before they are linked into place, as
