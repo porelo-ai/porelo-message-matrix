@@ -7,7 +7,28 @@ contract, for whoever works on Porelo or on the transport.
 
 ## Configuration
 
-From the environment, never from an argument:
+On stdin, never from an argument. A Porelo whose transport's `describe` says `"secrets": "input"` hands every
+verb it gives secrets or settings one JSON object on stdin and closes it:
+
+    {"settings": {...}, "secrets": {...}}
+
+- **`secrets`** is the whole map the transport printed under `secrets` and Porelo kept, key for key, those below
+  that are no secrets included; none of them is then in the environment, which the kernel shows in
+  `/proc/<pid>/environ` from the moment of `exec`, before the transport can make itself unreadable.
+- **`settings`** comes to the lifecycle verbs and `settings`; a lifecycle verb without it has empty settings.
+- **Read by** the lifecycle verbs, `settings`, `check`, `send`, `poll`, `read`, `receipt` and `rename`, to its end,
+  at most 1 MiB, before the first step, so a stdin left open makes the verb wait. A terminal on stdin is not read:
+  there a person runs a verb by hand, with the environment. `describe`, `room`, `homeserver-token`, `publish`,
+  `backup` and `restore` read nothing there.
+- **No mixing:** with `secrets` on stdin, no `PORELO_MATRIX_*` variable of the environment is read, not even one
+  stdin lacks. A key of `secrets` that does not start with `PORELO_MATRIX_`, a value that is not a string, a key
+  twice, or another shape is refused (78; `check` answers 2), naming the key and never the value.
+- **A Porelo of the old way** hands the bare settings on stdin and the secrets as the environment. That works as
+  before: anything on stdin but an object with `settings` or `secrets` is the old way's, the bare settings for a
+  lifecycle verb and ignored by the others, and leaves the environment as it is. An object with either beside any
+  other key, or that does not parse strictly, is refused (78), with where it broke and never what.
+
+The keys, on stdin or in the old way's environment:
 
 | Variable | What |
 |---|---|
@@ -15,7 +36,7 @@ From the environment, never from an argument:
 | `PORELO_MATRIX_ACCESS_TOKEN` | The account the transport acts as: a task's, or for `poll` the project's relay |
 | `PORELO_MATRIX_CA_FILE` | PEM certificates trusted besides the built-in authorities |
 | `PORELO_MATRIX_TLS_VERIFY` | `on` (default) or `off`, for development only; `off` warns on stderr at every start |
-| `XDG_STATE_HOME`, else `HOME` | Where `poll` keeps its position: `…/porelo/transports/matrix/`; people's room positions are under `room/` |
+| `XDG_STATE_HOME`, else `HOME` | From the environment, in either way: where `poll` keeps its position: `…/porelo/transports/matrix/`; people's room positions are under `room/` |
 
 - **No redirect is followed** (76), so the token reaches no other server.
 - **A plain-`http` loopback port another uid listens on is 78**, before any request, so no other account of the
@@ -27,8 +48,8 @@ From the environment, never from an argument:
 ## The lifecycle
 
 Porelo runs these to make a project's conversation, and keeps what they print without reading it. Each
-takes the project's settings (`mail.transports.matrix`) as JSON on stdin, and the secrets Porelo kept as
-its environment; each prints one JSON object.
+takes the project's settings (`mail.transports.matrix`) and the secrets Porelo kept on stdin, as
+[Configuration](#configuration) says; each prints one JSON object.
 
 | Verb | What it does | What it prints |
 |---|---|---|
@@ -151,7 +172,7 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
 
 | Verb | What it does |
 |---|---|
-| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `waitsOn: "the room's homeserver"` (one line, at most 80 characters), `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, `takes: ["machine"]`, its credential and its lifecycle verbs |
+| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `waitsOn: "the room's homeserver"` (one line, at most 80 characters), `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, `takes: ["machine"]`, `secrets: "input"`, its credential and its lifecycle verbs |
 | `check` | Whether it could work now: the configuration complete, the homeserver answering, the token accepted. 0 usable, 2 not |
 | `send <file> <sig> --to <room id \| @user:server> [--shown <line>] [--mention @user:server]...` | To a person's user id: into the acting account's direct chat with them, opened (invite-only, marked direct) if there is none. One `m.text` event: the message in `org.fuin.porelo.message`, the signature in `org.fuin.porelo.signature`, and as its `body`, what a client shows, the line `--shown` names. In a room, each `--mention` is named in `m.mentions` and shown as a pill, by the name that person's or task's account shows, before the line, so that person's client highlights it; without one, `m.mentions` is empty and the message notifies nobody. In a direct chat nobody is mentioned. Prints `{"reference":"<event id>"}`. A retry is the same event |
 | `rename --display <nickname>` | Run with a task's token: the name its account shows in the room and its direct chats becomes the nickname. Its id, its token and every address stay. Prints nothing |

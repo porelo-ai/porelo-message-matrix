@@ -28,8 +28,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The verbs by which Porelo has the transport make what a project's conversation needs - {@code
  * setup}, {@code enroll}, {@code retire}, {@code join} and {@code part} - and take it away again,
- * {@code clear}. Porelo hands each the project's settings on stdin and the secrets it kept as the
- * environment, and keeps what it prints without reading it: all that is Matrix is here.
+ * {@code clear}. Porelo hands each the project's settings and the secrets it kept on stdin, which
+ * {@link Input} turns into the settings and the environment read here, and keeps what it prints
+ * without reading it: all that is Matrix is here.
  */
 final class Lifecycle {
 

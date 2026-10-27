@@ -10,9 +10,10 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
 /**
- * Keeps the running transport's tokens from the account's other processes. Porelo hands them over
- * as the environment, and a fresh executable is dumpable whatever started it: until this runs, any
- * process of the account reads them from {@code /proc/<pid>/environ}. Not dumpable, the process's
+ * Keeps the running transport's tokens from the account's other processes. A fresh executable is
+ * dumpable whatever started it: until this runs, any process of the account reads its {@code
+ * /proc/<pid>/environ}, which holds the tokens of a Porelo that hands them as the environment, and
+ * its memory, which holds those read from stdin once they are read. Not dumpable, the process's
  * {@code /proc} files and memory belong to root.
  *
  * <p>The flag is read back, since a call that returns 0 proves nothing. In the native executable

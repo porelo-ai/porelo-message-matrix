@@ -13,6 +13,8 @@ class MainTest {
 
     private final ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
 
+    private final ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+
     private final PrintStream err = new PrintStream(errBytes, true, StandardCharsets.UTF_8);
 
     @Test
@@ -31,6 +33,78 @@ class MainTest {
 
         assertThat(exit).isEqualTo(Exit.USAGE);
         assertThat(stderr()).contains("unknown verb 'deliver-anywhere'");
+    }
+
+    /** Harm guarded: a person running a verb by hand waits on a terminal for input never given. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "/dev/pts/3, true",
+        "/dev/tty1, true",
+        "pipe:[123456], false",
+        "/tmp/transport-1.in, false",
+        "/dev/null, false"
+    })
+    @DisplayName("A terminal on stdin is told from the pipe or file Porelo hands")
+    void tellsATerminalOnStdin(
+            final String target,
+            final boolean terminal,
+            @org.junit.jupiter.api.io.TempDir final java.nio.file.Path dir)
+            throws java.io.IOException {
+        final java.nio.file.Path link =
+                java.nio.file.Files.createSymbolicLink(
+                        dir.resolve("0"), java.nio.file.Path.of(target));
+
+        assertThat(Main.isTerminal(link)).isEqualTo(terminal);
+    }
+
+    @Test
+    @DisplayName("A stdin that is no link, or none, is not a terminal")
+    void noLinkIsNoTerminal(@org.junit.jupiter.api.io.TempDir final java.nio.file.Path dir) {
+        assertThat(Main.isTerminal(dir.resolve("absent"))).isFalse();
+    }
+
+    private int runWithInput(final String input, final String... args) {
+        return Main.run(
+                args,
+                Map.of(Config.HOMESERVER, "http://127.0.0.1:1"),
+                new java.io.ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)),
+                new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                err);
+    }
+
+    /** Harm guarded: a lifecycle verb reads the homeserver of the old way beside the input's. */
+    @Test
+    @DisplayName(
+            "A lifecycle verb takes the homeserver Porelo kept from its input over the"
+                    + " environment's")
+    void aLifecycleVerbReadsItsSecretsFromTheInput() {
+        final int exit =
+                runWithInput(
+                        "{\"settings\":{},\"secrets\":{\""
+                                + Config.HOMESERVER
+                                + "\":\"https://matrix.example.org\"}}",
+                        "enroll",
+                        "--project",
+                        "p",
+                        "--task",
+                        "t",
+                        "--loopback-only");
+
+        assertThat(exit).as(stderr()).isEqualTo(Exit.CONFIG);
+        assertThat(stderr())
+                .as("the input's homeserver, refused for an offline project")
+                .contains("its homeserver is https://matrix.example.org");
+    }
+
+    /** Harm guarded: a draft handed the new way is checked as something else. */
+    @Test
+    @DisplayName("settings reads the draft from the new way's object")
+    void settingsReadsTheDraftFromTheInput() throws java.io.IOException {
+        final int exit = runWithInput("{\"settings\":{\"tls_verify\":\"sometimes\"}}", "settings");
+
+        assertThat(exit).as("a draft's faults are findings").isEqualTo(Exit.OK);
+        assertThat(MatrixClient.JSON.readTree(outBytes.toByteArray()).path("refused").toString())
+                .contains("tls_verify");
     }
 
     private String stderr() {

@@ -16,12 +16,12 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx42"></a>[MX42](MX42-The-Hosts-Tasks-Reach-The-Room-Over-The-VPN.md) | L | porelo's [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304) | The account's own homeserver also served over `https` on this machine's VPN address, with a certificate of its own, so the rented host's tasks talk in the same room |
+| <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206), built together | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | porelo's [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206) | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
 ## Accepted

@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -704,6 +706,117 @@ class LifecycleIT {
                 .isEqualTo(Exit.OK);
         assertThat(run(alice, "receipt", reference, "--by", by).path("state").asText())
                 .isEqualTo("read");
+    }
+
+    /**
+     * Runs a verb as a Porelo that hands its secrets on the input does: one object on stdin, and an
+     * environment with a stale token of the old way in it that must not be read.
+     */
+    private JsonNode runOnInput(
+            final Map<String, String> base, final JsonNode secrets, final String... args)
+            throws Exception {
+        final ObjectNode input = MatrixClient.JSON.createObjectNode();
+        if (Lifecycle.VERBS.contains(args[0])) {
+            input.set("settings", MatrixClient.JSON.readTree(settings));
+        }
+        input.set("secrets", secrets);
+        final Map<String, String> env = new HashMap<>(base);
+        env.put(Config.ACCESS_TOKEN, "syt_stale_token_of_the_old_way");
+        env.put(Config.ADMIN_TOKEN, "syt_stale_token_of_the_old_way");
+        final String stdin = MatrixClient.JSON.writeValueAsString(input);
+        if (!Lifecycle.VERBS.contains(args[0])) {
+            final Transport.Result result = Transport.runWithInput(env, stdin, args);
+            assertThat(result.exit())
+                    .as("%s: %s", String.join(" ", args), result.err())
+                    .isEqualTo(Exit.OK);
+            return result.out().isBlank()
+                    ? MatrixClient.JSON.createObjectNode()
+                    : MatrixClient.JSON.readTree(result.out());
+        }
+        final Input resolved =
+                Input.resolve(
+                        new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)), env);
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Lifecycle.run(
+                args[0],
+                List.of(args).subList(1, args.length),
+                resolved.env(),
+                resolved.settings(),
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(OutputStream.nullOutputStream()),
+                unit);
+        return MatrixClient.JSON.readTree(out.toString(StandardCharsets.UTF_8));
+    }
+
+    /** Both kept maps as one, as Porelo hands them on the input. */
+    private static ObjectNode merged(final JsonNode... maps) {
+        final ObjectNode merged = MatrixClient.JSON.createObjectNode();
+        for (final JsonNode map : maps) {
+            map.properties().forEach(entry -> merged.set(entry.getKey(), entry.getValue()));
+        }
+        return merged;
+    }
+
+    /** Harm guarded: a token only found where another process of the account reads it. */
+    @Test
+    @DisplayName(
+            "With every secret on the input and a stale token in the environment, tasks are"
+                    + " enrolled and talk: send, poll by the relay, receipt")
+    void tasksTalkWithTheirSecretsOnTheInput() throws Exception {
+        final JsonNode setup =
+                runOnInput(
+                        firstRun(),
+                        MatrixClient.JSON.createObjectNode(),
+                        "setup",
+                        "--project",
+                        PROJECT);
+        final ObjectNode lifecycle = merged(setup.path("account"), setup.path("secrets"));
+        final JsonNode alice =
+                runOnInput(
+                                firstRun(),
+                                lifecycle,
+                                "enroll",
+                                "--project",
+                                PROJECT,
+                                "--task",
+                                "porelo-demo-alice")
+                        .path("secrets");
+        runOnInput(
+                firstRun(), lifecycle, "enroll", "--project", PROJECT, "--task", "porelo-demo-bob");
+
+        final Path message =
+                Files.writeString(
+                        dir.resolve("m.json"), "{\"to\":\"bob\"}", StandardCharsets.UTF_8);
+        final Path sig = Files.write(dir.resolve("m.json.sig"), new byte[] {1, 2, 3});
+        final String reference =
+                runOnInput(
+                                firstRun(),
+                                alice,
+                                "send",
+                                message.toString(),
+                                sig.toString(),
+                                "--to",
+                                setup.path("conversation").asText())
+                        .path("reference")
+                        .asText();
+        final Path inbound = Files.createDirectories(dir.resolve("in"));
+        runOnInput(firstRun(), setup.path("secrets"), "poll", "--into", inbound.toString());
+        try (Stream<Path> files = Files.list(inbound)) {
+            assertThat(files.map(f -> f.getFileName().toString()))
+                    .as("the relay polled with its token from the input")
+                    .anyMatch(name -> name.endsWith(".json"));
+        }
+        assertThat(
+                        runOnInput(
+                                        firstRun(),
+                                        alice,
+                                        "receipt",
+                                        reference,
+                                        "--by",
+                                        "@porelo-demo-bob:" + SERVER_NAME)
+                                .path("state")
+                                .asText())
+                .isEqualTo("delivered");
     }
 
     @Test

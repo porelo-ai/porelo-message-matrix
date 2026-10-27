@@ -65,6 +65,9 @@ class DescribeTest {
                                     .isEqualTo(Config.ACCESS_TOKEN);
                             assertThat(credential.path("as").asText()).isEqualTo("env");
                         });
+        assertThat(description.path("secrets").asText())
+                .as("the secrets are taken on the input")
+                .isEqualTo("input");
         assertThat(description.path("hosts").isArray()).isTrue();
         assertThat(description.path("lifecycle"))
                 .as("the lifecycle verbs Porelo may run")

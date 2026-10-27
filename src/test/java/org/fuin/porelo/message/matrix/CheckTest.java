@@ -49,6 +49,78 @@ class CheckTest {
         return check(Map.of(Config.HOMESERVER, homeserver.url(), Config.ACCESS_TOKEN, TOKEN));
     }
 
+    private int checkWithInput(final Map<String, String> env, final String input) {
+        return Main.run(
+                new String[] {"check"},
+                env,
+                new java.io.ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)),
+                new PrintStream(OutputStream.nullOutputStream()),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8));
+    }
+
+    /** Harm guarded: a token only found where another process of the account reads it. */
+    @Test
+    @DisplayName("With the token on its input alone, the homeserver is asked with it")
+    void takesItsTokenOnItsInput() {
+        homeserver.answer(200, "{\"user_id\":\"@bob:matrix.test\"}");
+
+        assertThat(
+                        checkWithInput(
+                                Map.of(),
+                                "{\"secrets\":{\""
+                                        + Config.HOMESERVER
+                                        + "\":\""
+                                        + homeserver.url()
+                                        + "\",\""
+                                        + Config.ACCESS_TOKEN
+                                        + "\":\""
+                                        + TOKEN
+                                        + "\"}}"))
+                .as(stderr())
+                .isEqualTo(Exit.OK);
+        assertThat(homeserver.requests())
+                .singleElement()
+                .satisfies(
+                        request ->
+                                assertThat(request.authorization()).isEqualTo("Bearer " + TOKEN));
+    }
+
+    /** Harm guarded: a stale token in the environment is sent beside the input's secrets. */
+    @Test
+    @DisplayName(
+            "With secrets on its input, a token in its environment is not used: 2, nothing asked")
+    void readsNoTokenFromTheEnvironmentBesideTheInput() {
+        assertThat(
+                        checkWithInput(
+                                Map.of(Config.ACCESS_TOKEN, TOKEN),
+                                "{\"secrets\":{\""
+                                        + Config.HOMESERVER
+                                        + "\":\""
+                                        + homeserver.url()
+                                        + "\"}}"))
+                .isEqualTo(Check.NOT_USABLE);
+        assertThat(stderr()).contains(Config.ACCESS_TOKEN + " is not set");
+        assertThat(homeserver.requests()).isEmpty();
+    }
+
+    /** Harm guarded: Porelo reads an answer the contract does not know for check. */
+    @Test
+    @DisplayName("Input it cannot take is 2, as every reason check is not usable")
+    void refusedInputIsNotUsable() {
+        assertThat(checkWithInput(Map.of(), "{\"secrets\":{\"PATH\":\"/tmp\"}}"))
+                .isEqualTo(Check.NOT_USABLE);
+        assertThat(homeserver.requests()).isEmpty();
+    }
+
+    /** Harm guarded: development's switch, given the new way, is used without its warning. */
+    @Test
+    @DisplayName("TLS_VERIFY=off on the input warns as it does from the environment")
+    void warnsOfVerifyOffOnTheInput() {
+        checkWithInput(Map.of(), "{\"secrets\":{\"" + Config.TLS_VERIFY + "\":\"off\"}}");
+
+        assertThat(stderr()).contains(Config.VERIFY_OFF_WARNING);
+    }
+
     private String stderr() {
         return errBytes.toString(StandardCharsets.UTF_8);
     }

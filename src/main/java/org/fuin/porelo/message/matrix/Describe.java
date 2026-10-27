@@ -55,6 +55,9 @@ final class Describe {
                         // changes it with the task's
                         // own token: the name the room and the direct chat show for the task.
                         .put("display", true);
+        // Porelo hands every secret on stdin, so none is in the environment, where /proc shows it
+        // from the moment of exec; a Porelo that does not read this still hands them as below.
+        description.put("secrets", "input");
         // One environment variable per credential, named per credential.
         description
                 .putArray("credentials")

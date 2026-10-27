@@ -7,8 +7,9 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Where the homeserver is and the account's token, from the environment - never from an argument,
- * which every process on the machine can read.
+ * Where the homeserver is and the account's token, from the environment {@link Input} resolved -
+ * the secrets Porelo handed on stdin, or the environment of a Porelo of the old way - never from an
+ * argument, which every process on the machine can read.
  */
 record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean verifyTls) {
 

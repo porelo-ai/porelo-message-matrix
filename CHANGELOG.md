@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Every verb that takes a token reads the secrets Porelo kept from stdin, as `{"settings": {...}, "secrets": {...}}`,
+  and `describe` says so with `"secrets": "input"`. A token handed so is never in the transport's environment, which
+  another process of the account could read in `/proc` in the moment before the transport makes itself unreadable.
+  With secrets on stdin, no `PORELO_MATRIX_*` variable of the environment is read. A Porelo that still hands the
+  bare settings on stdin and the secrets as the environment works as before.
 - `publish --address <address>:<port> [--name <host name>]` serves the account's own homeserver for another machine on one address of
   this machine's VPN, over `https` with a CA of the account's own; `publish --off` takes it back. The answer names
   the CA file the other machine trusts. The new socket `porelo-matrix-homeserver-vpn` listens on the address even
