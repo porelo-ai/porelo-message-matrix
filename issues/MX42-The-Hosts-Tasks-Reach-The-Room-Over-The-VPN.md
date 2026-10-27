@@ -22,8 +22,9 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
 ## Plan
 
 - **A second listener, on the VPN's address only.** `homeserver.conf` gains `PORELO_MATRIX_PUBLISH` (an address and
-  port, e.g. `192.0.2.2:8448`). The unit publishes it only when set, never a wildcard address. A VPN that is not up
-  yet must not keep the loopback listener down: how the unit waits for the address is decided in the build.
+  port, e.g. `192.0.2.2:8448`). The unit publishes it only when set, never a wildcard address. The address exists
+  only while a host is rented and its tunnel is up, so a VPN that is down must not keep the loopback listener down:
+  how the unit waits for the address is decided in the build.
 - **TLS on that listener**: by Tuwunel itself if it serves TLS on one listener and plain `http` on another;
   otherwise by a second pinned image in the pod, which `PodmanUnit.image` and `ProcessUnit` then learn to take.
 - **A certificate of the account's own** (a new `Certificate.java`): a CA made once, and a server certificate whose
@@ -67,4 +68,5 @@ From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.
 - QM35 (a)'s shape with porelo's agent: which settings a machine may set for itself.
 - How this relates to [MX29](README.md#mx29), the homeserver behind a unix socket, which a TCP listener on the VPN
   does not replace.
-- This machine's VPN address, and that the host reaches it, with porelo-host's agent.
+- That the host's Porelo reaches this machine's VPN address from the host itself, as read in porelo-host: the
+  transport runs on the host, so no task needs a route to the homeserver. Measured once a host is rented.
