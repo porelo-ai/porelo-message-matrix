@@ -19,6 +19,17 @@ sequence.
 |---|---|---|---|
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
+## Analyzed
+
+| # | Size | Blocked by | Open questions | What it covers |
+|---|---|---|---|---|
+| <a id="mx46"></a>[MX46](MX46-A-Machines-Token-Holds-At-Once.md) | S | - | 0 | A machine admitted or dismissed while the homeserver runs is taken or refused at once: the unit mounts the tokens' directory, not the single file a rename leaves stale (seen in 6i) |
+| <a id="mx49"></a>[MX49](MX49-Clear-On-A-Central-Homeserver-Says-What-Stopped-It.md) | S | - | 0 | `clear` on a central homeserver answers 75 when it cannot reach it and 0 when the homeserver has let the machine go, instead of 78 "not valid" for both (6i's give-back) |
+| <a id="mx47"></a>[MX47](MX47-A-Central-Setup-Joins-When-Already-Invited.md) | XS | - | 0 | A machine `admit` invited before it registered joins at its first `setup`, not only at the second |
+| <a id="mx48"></a>[MX48](MX48-Not-Yet-Admitted-Names-Its-Account-And-Room.md) | XS | - | 0 | A not yet admitted central `setup` answers `address` and `room`, as porelo's contract has it, so the person reads whom to let in |
+| <a id="mx50"></a>[MX50](MX50-Setup-Takes-The-Port-The-Homeserver-Runs-On.md) | S | - | 0 | A first `setup` restarts an already running homeserver onto the port it writes, instead of waiting 180 s on a port nothing listens on (6i-M0.2) |
+| <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | 0 | `setup`, `publish`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s |
+
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
