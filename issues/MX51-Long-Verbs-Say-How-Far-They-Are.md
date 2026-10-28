@@ -1,6 +1,8 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Estimated by the operator on 2026-10-28.
+**Status:** Backlog, the operator's word on 2026-10-28: planned for a later round. It needs porelo to show a
+transport's stderr while the verb runs, which Agent Core files as a B-issue; until then the lines reach a person only
+when the transport runs directly.
 **Size:** S - stderr lines in `LocalHomeserver.awaitUp`, `Keep` and `Publish`, with their tests; stdout's contract is
 unchanged.
 
@@ -26,8 +28,3 @@ the restart).
 
 - A `setup` waiting on a slow start prints the phase and a line every 10 s, and stdout is unchanged.
 - `backup` and `restore` name each phase as it starts.
-
-## To be checked
-
-- Whether porelo passes a transport's stderr through while the verb runs (`porelo talk join`, the task start's
-  *Joining the project's conversation*), or only on failure. Ask Agent Core.
