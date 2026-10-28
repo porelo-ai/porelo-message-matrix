@@ -9,8 +9,6 @@ sequence.
 |---|---|---|---|
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host, as [PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45) plans; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
-| <a id="mx41"></a>[MX41](MX41-The-Agents-Talk-In-The-Projects-Room.md) | M | - | The agents on this machine read, post to and wait on the project's room as people, `room read`, `post` and `wait` with the login read from porelo's vault over a pipe, replacing the channel file before the first move of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) |
-| <a id="mx42"></a>[MX42](MX42-The-Hosts-Tasks-Reach-The-Room-Over-The-VPN.md) | L | - | The account's own homeserver also served over `https` on this machine's VPN address, with a certificate of its own, so the rented host's tasks talk in the same room |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 
 ## Backlog
@@ -46,6 +44,8 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx41"></a>[MX41](README.md#mx41) | The Agents Talk In The Project's Room | `room read`, `post` and `wait` let an agent on this machine read, post to and wait on the project's room as a person, with its login read from porelo's vault over a pipe, and `join --token` makes such an account |
+| <a id="mx42"></a>[MX42](README.md#mx42) | The Host's Tasks Reach The Room Over The VPN | `publish` serves the account's own homeserver over `https` on this machine's VPN address with a certificate of its own, and `admit`/`dismiss` give another machine a registration token of its own and a place in the project's room |
 | <a id="mx46"></a>[MX46](README.md#mx46) | A Machine's Token Holds At Once | The registration tokens moved into a `tokens` directory the homeserver's unit mounts, so a machine admitted or dismissed while it runs is taken or refused at once; an earlier token file moves there on the next start |
 | <a id="mx47"></a>[MX47](README.md#mx47) | A Central Setup Joins When Already Invited | A machine invited before it registered, as `admit` does, joins at its first `setup`; a first setup that cannot be admitted keeps the secret it made and answers not admitted |
 | <a id="mx48"></a>[MX48](README.md#mx48) | Not Yet Admitted Names Its Account And Room | A central `setup` not yet admitted answers `address` and `room`, so Porelo names the account to let in and the room |

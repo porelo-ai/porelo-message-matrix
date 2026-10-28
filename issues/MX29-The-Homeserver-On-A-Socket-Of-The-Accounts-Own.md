@@ -22,3 +22,8 @@ such window: the filesystem decides who may connect, at every connection.
   answer, which names the homeserver's loopback port.
 - **porelo-frontend:** its *Join* forwards that port over ssh to the person's computer, so a Matrix client there
   reaches `localhost:<port>`; it would forward the socket to a local port of its own choosing and show that port.
+
+## To be checked
+
+- How the socket relates to the listener published for another machine on the VPN, which stays TCP and which a
+  socket under `$XDG_RUNTIME_DIR` does not replace.
