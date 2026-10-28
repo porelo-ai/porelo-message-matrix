@@ -10,7 +10,12 @@ with a certificate the rented host trusts, so the host's tasks talk in the same 
 
 From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59), before the first move.
 
-## Why
+**What [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78) changes (2026-10-28,
+nothing reworked):** the account's own homeserver on the laptop, published on the VPN with `admit`/`dismiss`, serves
+the move from the laptop ([HO41](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho41)) and is not
+the model for a prepared host. There one shared homeserver of the host serves every person in central mode, published
+with this issue's `publish --name` and TLS under the host admin's CA; its tokens come from [MX44](README.md#mx44) and
+its rooms from [MX45](README.md#mx45). ## Why
 
 - The unit publishes Tuwunel on `127.0.0.1` alone (`-p 127.0.0.1:${PORELO_MATRIX_PORT}:8008`), plain `http`.
 - The transport takes a homeserver elsewhere only over `https`, with `ca_file`, and as a central homeserver: `room`
