@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `d03f2325cc348448` · changed 2026-10-26T16:25Z
+> **BEGIN Shared Area** · sha256 `48d70cbc5e50cafe` · changed 2026-10-28T06:34Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -234,6 +234,14 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every command or step in an operator test guide has an observed result or is labeled “not run”
   in the guide itself.** Rehearse executable steps in the required installed environment or a clean
   checkout, checking options and creating the state the test needs.
+- **An operator test guide gives each action as its own numbered step**, one action per step, its
+  command in its own block and the expected result right under it; explanations stand before or
+  after the steps, never between them.
+- **A command for the operator is one short line; several commands in a row become a script run as
+  `bash <script>`**, which stops at the first failure and names the guide's step that failed.
+- **Every command for the operator says where to run it**: in the agent's session prefixed with `!`
+  when it asks for nothing, or in a separate terminal when it asks for anything (a password, a
+  passphrase, an unlock, a browser sign-in, any prompt).
 - **A machine script is rehearsed with the same preparation as its target before an expensive run.**
   Compare its options with the build workflow and verify each prerequisite’s effect before starting
   dependent work.
@@ -418,7 +426,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   times, count returns after first readiness as rework, and explain long waits or size growth. Count
   shared time and token usage only once.
 
-> **END Shared Area** · sha256 `d03f2325cc348448`
+> **END Shared Area** · sha256 `48d70cbc5e50cafe`
 
 ## What this repository is
 
