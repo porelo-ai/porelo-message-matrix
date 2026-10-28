@@ -189,7 +189,7 @@ class PublishTest {
                                     + " removes with the rest; no other machine's token")
                     .containsExactlyInAnyOrder(
                             "config/porelo/matrix/homeserver.conf",
-                            "config/porelo/matrix/registration-token");
+                            "config/porelo/matrix/tokens/registration-token");
         }
         final Lifecycle.Report again = new Lifecycle.Report();
         LocalHomeserver.forgetPublished(env(), again, true);

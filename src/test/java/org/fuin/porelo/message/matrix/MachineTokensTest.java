@@ -37,7 +37,7 @@ class MachineTokensTest {
     }
 
     private Path tokens() {
-        return dir.resolve("config/porelo/matrix/registration-token");
+        return dir.resolve("config/porelo/matrix/tokens/registration-token");
     }
 
     /** Harm guarded: a machine named as a path writes a token outside the account's directory. */

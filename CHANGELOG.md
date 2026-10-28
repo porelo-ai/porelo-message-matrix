@@ -110,6 +110,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A machine admitted or dismissed while the homeserver runs is taken or refused at once. The registration tokens
+  moved into `~/.config/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
+  file the container started with, so an admitted machine got `401 Invalid registration token` until a restart, and
+  a dismissed one kept registering. The unit's next start moves an existing token file there.
 - A backup stops trying to acquire its locks when their shared wait budget expires, even when a
   holder releases a lock just after the deadline.
 - A backup no longer starves behind Porelo's poll loops; it waits at most about the longest poll

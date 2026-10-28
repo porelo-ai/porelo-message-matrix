@@ -432,9 +432,8 @@ class LocalHomeserverTest {
             throws Exception {
         final Map<String, String> env = new HashMap<>(credentials);
         env.put("XDG_CONFIG_HOME", dir.toString());
-        final Path config = LocalHomeserver.directory(env);
-        Files.createDirectories(config);
-        Files.writeString(config.resolve("registration-token"), "Q7\n");
+        Files.createDirectories(HomeserverToken.directory(env));
+        Files.writeString(HomeserverToken.file(env), "Q7\n");
         return startupError(env, new LoggedUnit(log, state), secrets);
     }
 
@@ -660,7 +659,7 @@ class LocalHomeserverTest {
                 "enabled",
                 "database",
                 "config/porelo/matrix/homeserver.conf",
-                "config/porelo/matrix/registration-token",
+                "config/porelo/matrix/tokens/registration-token",
                 "state/porelo/transports/matrix/abc.since",
                 "state/porelo/transports/matrix/room/abc.since",
                 "state/porelo/matrix/backups/database/meta/3");

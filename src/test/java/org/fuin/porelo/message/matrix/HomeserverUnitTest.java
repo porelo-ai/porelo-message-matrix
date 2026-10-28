@@ -167,7 +167,24 @@ class HomeserverUnitTest {
         assertThat(template)
                 .as("the unit")
                 .contains("EnvironmentFile=-%E/porelo/matrix/homeserver.conf")
-                .contains("-v %E/porelo/matrix/registration-token:/run/secrets/registration-token")
+                .contains("-v %E/porelo/matrix/tokens:/run/secrets/tokens")
                 .doesNotContain("%h/.config");
+    }
+
+    /**
+     * Harm guarded: a mounted file keeps the file the container started with, and the transport
+     * writes the tokens by a rename; a machine admitted while the homeserver runs is then refused
+     * with 401 until a restart, and a dismissed one goes on registering.
+     */
+    @Test
+    @DisplayName("The unit mounts the tokens' directory, never the token file itself")
+    void mountsTheTokensDirectory() throws IOException {
+        final String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+
+        assertThat(template)
+                .as("the unit")
+                .contains("TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/tokens/registration-token")
+                .contains("-v %E/porelo/matrix/tokens:/run/secrets/tokens:ro")
+                .doesNotContain("registration-token:/run/secrets");
     }
 }

@@ -26,7 +26,7 @@ class HomeserverTokenTest {
     }
 
     private Path token() {
-        return home.resolve(".config/porelo/matrix/registration-token");
+        return home.resolve(".config/porelo/matrix/tokens/registration-token");
     }
 
     @Test
@@ -86,9 +86,29 @@ class HomeserverTokenTest {
         try (var left = Files.list(token().getParent())) {
             assertThat(left.map(p -> p.getFileName().toString()).toList())
                     .as("what is left in the directory: no draft beside the token")
-                    .containsExactlyInAnyOrder(
-                            "registration-token", Publish.TLS_ENV, Certificate.TLS);
+                    .containsExactly("registration-token");
         }
+    }
+
+    /**
+     * Harm guarded: a token an earlier version kept beside the configuration, left there, is one
+     * the unit no longer mounts; a new one made beside it would lock out Porelo, which holds the
+     * old.
+     */
+    @Test
+    @DisplayName("A token kept at the earlier place moves into its directory, the same token")
+    void movesAnEarlierToken() throws IOException {
+        final Path earlier = home.resolve(".config/porelo/matrix/registration-token");
+        Files.createDirectories(earlier.getParent());
+        Files.writeString(earlier, "Q7", StandardCharsets.US_ASCII);
+        Files.setPosixFilePermissions(earlier, PosixFilePermissions.fromString("rw-------"));
+
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as(errBytes.toString(StandardCharsets.UTF_8))
+                .isEqualTo(Exit.OK);
+
+        assertThat(Files.readString(token(), StandardCharsets.US_ASCII)).isEqualTo("Q7");
+        assertThat(earlier).doesNotExist();
     }
 
     @Test
@@ -99,7 +119,7 @@ class HomeserverTokenTest {
         assertThat(run(Map.of("HOME", home.toString(), "XDG_CONFIG_HOME", config.toString())))
                 .isEqualTo(Exit.OK);
 
-        assertThat(config.resolve("porelo/matrix/registration-token")).isRegularFile();
+        assertThat(config.resolve("porelo/matrix/tokens/registration-token")).isRegularFile();
         assertThat(token()).doesNotExist();
     }
 

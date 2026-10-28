@@ -16,7 +16,7 @@ this account". With lingering on, the homeserver comes back after a reboot witho
 |---|---|---|
 | Port, on `127.0.0.1` only | `PORELO_MATRIX_PORT` in `~/.config/porelo/matrix/homeserver.conf`, under `$XDG_CONFIG_HOME` when it is set | the first free one from `8008` |
 | Server name, part of every account id; fixed once the database exists | `PORELO_MATRIX_SERVER_NAME` in the same file | `localhost` |
-| Registration token, made on first start, readable by the account alone | `~/.config/porelo/matrix/registration-token`, under `$XDG_CONFIG_HOME` when it is set | - |
+| Registration tokens, this machine's first, then each admitted machine's; made on first start, readable by the account alone | `~/.config/porelo/matrix/tokens/registration-token`, under `$XDG_CONFIG_HOME` when it is set; the unit mounts the directory `tokens`, so a token added or revoked holds at once | - |
 | Database | the podman volume `porelo-matrix-homeserver` | - |
 | Backups, up to 48, made on `SIGUSR2`; the account's alone, since they hold every token and password hash | `~/.local/state/porelo/matrix/backups`, under `$XDG_STATE_HOME` when it is set | - |
 | Container | `matrix-homeserver`, acted on only by the id in `$XDG_RUNTIME_DIR/porelo-matrix-homeserver.cid` | - |
@@ -56,7 +56,7 @@ stops and says the homeserver "was reset":
    `porelo vault remove transport/matrix/project/<project>` for each project;
 3. the transport's state: `rm -r ~/.local/state/porelo/transports/matrix`.
 
-`registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again.
+`tokens/registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again.
 
 ## Onto another machine
 

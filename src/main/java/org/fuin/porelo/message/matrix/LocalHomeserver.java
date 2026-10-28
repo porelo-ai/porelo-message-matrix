@@ -142,7 +142,7 @@ final class LocalHomeserver {
 
     /** The token the unit made before its first start, which only this account can read. */
     static String registrationToken(final Map<String, String> env) throws Failure {
-        final Path file = directory(env).resolve("registration-token");
+        final Path file = HomeserverToken.file(env);
         try {
             // The machines' tokens follow this machine's own, which is first.
             final String token =
@@ -560,24 +560,20 @@ final class LocalHomeserver {
                 report.kept(backups.toString(), ex.getMessage());
             }
         }
-        final Path dir = directory(env);
-        for (final String file : List.of("homeserver.conf", "registration-token")) {
-            delete(
-                    dir.resolve(file),
-                    report,
-                    "the homeserver's "
-                            + ("homeserver.conf".equals(file) ? "port" : "registration token")
-                            + ", "
-                            + dir.resolve(file));
-        }
+        final Path conf = directory(env).resolve("homeserver.conf");
+        delete(conf, report, "the homeserver's port, " + conf);
+        final Path token = HomeserverToken.file(env);
+        delete(token, report, "the homeserver's registration token, " + token);
         forgetPublished(env, report, closed);
         if (published) {
             systemctl("daemon-reload");
         }
-        try {
-            Files.deleteIfExists(dir);
-        } catch (final IOException ex) {
-            // Something else is in it, which is not the transport's to remove.
+        for (final Path dir : List.of(HomeserverToken.directory(env), directory(env))) {
+            try {
+                Files.deleteIfExists(dir);
+            } catch (final IOException ex) {
+                // Something else is in it, which is not the transport's to remove.
+            }
         }
         final Path state = Poll.stateDirectory(env);
         if (Files.isDirectory(state)) {

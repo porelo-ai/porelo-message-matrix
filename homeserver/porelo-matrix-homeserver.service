@@ -38,10 +38,10 @@ ExecStart=/usr/bin/podman run --rm -d --cidfile=%t/%N.cid --name matrix-homeserv
     -e TUWUNEL_ROCKSDB_PARALLELISM_THREADS=2 \
     -e TUWUNEL_ALLOW_FEDERATION=false -e TUWUNEL_ALLOW_REGISTRATION=true \
     -e TUWUNEL_NEW_USER_DISPLAYNAME_SUFFIX= \
-    -e TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/registration-token \
+    -e TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/tokens/registration-token \
     -e TUWUNEL_DATABASE_BACKUP_PATH=/backup -e TUWUNEL_DATABASE_BACKUPS_TO_KEEP=48 \
     -e 'TUWUNEL_ADMIN_SIGNAL_EXECUTE=["server backup-database"]' \
-    -v %E/porelo/matrix/registration-token:/run/secrets/registration-token:ro,Z \
+    -v %E/porelo/matrix/tokens:/run/secrets/tokens:ro,Z \
     --env-file=%E/porelo/matrix/tls.env \
     -v %E/porelo/matrix/tls:/tls:ro,Z \
     -v porelo-matrix-homeserver:/data \

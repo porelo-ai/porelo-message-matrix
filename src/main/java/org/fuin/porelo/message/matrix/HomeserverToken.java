@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
@@ -30,6 +31,10 @@ final class HomeserverToken {
 
     private static final int BYTES = 32;
 
+    private static final String NAME = "registration-token";
+
+    private static final String TOKENS = "tokens";
+
     private HomeserverToken() {}
 
     static void run(final List<String> args, final Map<String, String> env) throws Failure {
@@ -44,6 +49,7 @@ final class HomeserverToken {
     private static void token(final Map<String, String> env) throws Failure {
         final Path file = file(env);
         try {
+            moveIntoItsDirectory(env, file);
             if (Files.exists(file)) {
                 // An existing token is kept: Porelo may hold it, and a new one would lock Porelo
                 // out without a word. An empty file is none - a start stopped before writing it -
@@ -111,11 +117,41 @@ final class HomeserverToken {
         }
     }
 
-    /** {@code $XDG_CONFIG_HOME/porelo/matrix/registration-token}, else under {@code ~/.config}. */
+    /**
+     * A token an earlier version kept beside the configuration moved into its own directory, once.
+     * The unit mounts that directory, not the file: a file mount keeps the file the container
+     * started with, so a machine admitted or dismissed later, whose token is written by a rename,
+     * would not be seen until a restart.
+     */
+    private static void moveIntoItsDirectory(final Map<String, String> env, final Path file)
+            throws IOException, Failure {
+        final Path earlier = LocalHomeserver.directory(env).resolve(NAME);
+        if (Files.exists(file) || !Files.isRegularFile(earlier)) {
+            return;
+        }
+        final Path dir = file.getParent();
+        if (dir != null && !Files.isDirectory(dir)) {
+            Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
+        }
+        Files.move(earlier, file, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /**
+     * {@code $XDG_CONFIG_HOME/porelo/matrix/tokens/registration-token}, else under {@code
+     * ~/.config}.
+     */
     static Path file(final Map<String, String> env) throws Failure {
+        return directory(env).resolve(NAME);
+    }
+
+    /**
+     * The directory the unit mounts for the homeserver: the token file and nothing else of the
+     * account's.
+     */
+    static Path directory(final Map<String, String> env) throws Failure {
         final String xdg = env.get("XDG_CONFIG_HOME");
         if (xdg != null && Path.of(xdg).isAbsolute()) {
-            return Path.of(xdg, "porelo", "matrix", "registration-token");
+            return Path.of(xdg, "porelo", "matrix", TOKENS);
         }
         final String home = env.get("HOME");
         if (home == null || !Path.of(home).isAbsolute()) {
@@ -123,6 +159,6 @@ final class HomeserverToken {
                     Exit.CONFIG,
                     "neither XDG_CONFIG_HOME nor HOME names an absolute directory for the token");
         }
-        return Path.of(home, ".config", "porelo", "matrix", "registration-token");
+        return Path.of(home, ".config", "porelo", "matrix", TOKENS);
     }
 }

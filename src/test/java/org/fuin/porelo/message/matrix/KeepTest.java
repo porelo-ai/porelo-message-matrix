@@ -130,8 +130,8 @@ class KeepTest {
                         return List.of("Error: " + String.join(" ", captured[0].split("")));
                     }
                 };
-        Files.createDirectories(LocalHomeserver.directory(env));
-        Files.writeString(LocalHomeserver.directory(env).resolve("registration-token"), "Q7\n");
+        Files.createDirectories(HomeserverToken.directory(env));
+        Files.writeString(HomeserverToken.file(env), "Q7\n");
         final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         try {
             Keep.retake(

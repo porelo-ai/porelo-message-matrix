@@ -129,8 +129,8 @@ class PodmanUnitTest {
         }
         Files.writeString(dir.resolve("fixture.cat"), message + "\n");
         Files.writeString(dir.resolve("fixture.json"), record + "\n");
-        Files.createDirectories(dir.resolve("porelo/matrix"));
-        Files.writeString(dir.resolve("porelo/matrix/registration-token"), "Q7\n");
+        Files.createDirectories(dir.resolve("porelo/matrix/tokens"));
+        Files.writeString(dir.resolve("porelo/matrix/tokens/registration-token"), "Q7\n");
         command(
                 "journalctl",
                 """
@@ -181,8 +181,8 @@ class PodmanUnitTest {
     /** Harm guarded: a failed journal read must leave a useful and safe unit-state fallback. */
     @Test
     void aFailedLogReadGivesTheUnitState() throws Exception {
-        Files.createDirectories(dir.resolve("porelo/matrix"));
-        Files.writeString(dir.resolve("porelo/matrix/registration-token"), "Q7\n");
+        Files.createDirectories(dir.resolve("porelo/matrix/tokens"));
+        Files.writeString(dir.resolve("porelo/matrix/tokens/registration-token"), "Q7\n");
         command("journalctl", "echo 'Error: partial private output'\nexit 1\n");
         command("systemctl", "echo failed\n");
 
@@ -352,8 +352,8 @@ class PodmanUnitTest {
             record.put("MESSAGE", message);
         }
         Files.writeString(dir.resolve("output"), record + "\n");
-        Files.createDirectories(dir.resolve("porelo/matrix"));
-        Files.writeString(dir.resolve("porelo/matrix/registration-token"), "Q7\n");
+        Files.createDirectories(dir.resolve("porelo/matrix/tokens"));
+        Files.writeString(dir.resolve("porelo/matrix/tokens/registration-token"), "Q7\n");
         command("journalctl", "/bin/cat \"$XDG_CONFIG_HOME/output\"\n");
     }
 
