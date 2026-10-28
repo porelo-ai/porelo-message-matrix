@@ -1,9 +1,8 @@
 # MX45 — A Project Admin Brings The Room Onto A Central Homeserver
 
 **Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28, for
-[PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78); blocked by porelo's machine name
-`<host>-<account>` ([PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), porelo's
-issue for QB77).
+[PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78); blocked by porelo's
+[B312](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b312), the machine name `<host>-<account>`.
 **Size:** M - two lifecycle verbs in central mode, read in today's local `room()`/`ours()` and central `setup`, a
 contract change porelo reads (`describe`, the answers), docs and integration tests.
 

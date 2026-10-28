@@ -37,7 +37,7 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | For [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), estimated by the operator. A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
-| <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | porelo's machine name `<host>-<account>` | For [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), estimated by the operator. On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
+| <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | porelo's [B312](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b312) | For [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), estimated by the operator. On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
 
 ## Finished
