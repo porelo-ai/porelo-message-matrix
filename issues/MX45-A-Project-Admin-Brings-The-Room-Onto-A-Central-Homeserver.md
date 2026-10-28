@@ -1,6 +1,6 @@
 # MX45 — A Project Admin Brings The Room Onto A Central Homeserver
 
-**Status:** Analyzed; Accepted by the operator on 2026-10-28, for
+**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28, for
 [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78); blocked by porelo's machine name
 `<host>-<account>` ([PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), porelo's
 issue for QB77).

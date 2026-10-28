@@ -1,6 +1,6 @@
 # MX44 — The Host's Homeserver Gives Each Person A Token
 
-**Status:** Analyzed; Accepted by the operator on 2026-10-28, for
+**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28, for
 [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78).
 **Size:** M - three verbs on an account's own homeserver with no project, read in today's `MachineTokens` and
 `AdminRoom`, the homeserver's administrator made without a project's `setup`, docs and an integration test; no
