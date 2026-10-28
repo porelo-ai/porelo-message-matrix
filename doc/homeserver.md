@@ -100,8 +100,8 @@ VPN they share, over `https` with the account's own certificate:
 
 ## On Fedora
 
-The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration token for the
-container, and the account still reads it.
+The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'
+directory for the container, and the account still reads it.
 
 ## A central homeserver
 

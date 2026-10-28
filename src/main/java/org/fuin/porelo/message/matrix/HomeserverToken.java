@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
@@ -50,6 +50,7 @@ final class HomeserverToken {
         final Path file = file(env);
         try {
             moveIntoItsDirectory(env, file);
+            ownDirectory(file);
             if (Files.exists(file)) {
                 // An existing token is kept: Porelo may hold it, and a new one would lock Porelo
                 // out without a word. An empty file is none - a start stopped before writing it -
@@ -63,10 +64,6 @@ final class HomeserverToken {
                     return;
                 }
                 Files.delete(file);
-            }
-            final Path dir = file.getParent();
-            if (dir != null && !Files.isDirectory(dir)) {
-                Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
             }
             final byte[] random = new byte[BYTES];
             new SecureRandom().nextBytes(random);
@@ -129,11 +126,27 @@ final class HomeserverToken {
         if (Files.exists(file) || !Files.isRegularFile(earlier)) {
             return;
         }
+        ownDirectory(file);
+        // Linked in, then the earlier name removed: a link never replaces a token another start put
+        // there first, and two starts at once both end with the one token.
+        try {
+            Files.createLink(file, earlier);
+        } catch (final FileAlreadyExistsException | NoSuchFileException ex) {
+            // Another start moved it between the check and the link.
+        }
+        Files.deleteIfExists(earlier);
+    }
+
+    /** The token's directory, made if missing, and entered by its owner alone either way. */
+    private static void ownDirectory(final Path file) throws IOException {
         final Path dir = file.getParent();
-        if (dir != null && !Files.isDirectory(dir)) {
+        if (dir == null) {
+            return;
+        }
+        if (!Files.isDirectory(dir)) {
             Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
         }
-        Files.move(earlier, file, StandardCopyOption.ATOMIC_MOVE);
+        Files.setPosixFilePermissions(dir, OWNER_ONLY_DIR);
     }
 
     /**

@@ -192,10 +192,10 @@ final class Lifecycle {
 
     /**
      * Central {@code setup}: registers (or logs in as) this machine's provisioning account {@code
-     * @porelo.<machine>} with its derived password, returns at once on the first setup so the
-     * account is kept before anything can fail, and on subsequent setups joins the room named in
-     * the settings, checks that it is invite-only and forbids guests, and admits this machine's
-     * relay.
+     * @porelo.<machine>} with its derived password. On the first setup it joins only a room its
+     * name was invited into already, and answers not yet admitted on anything else, so the account
+     * is kept before anything can fail; on later setups it joins the room named in the settings,
+     * checks that it is invite-only and forbids guests, and admits this machine's relay.
      */
     private static ObjectNode setupCentral(
             final Options options, final Settings settings, final Map<String, String> env)
@@ -203,13 +203,6 @@ final class Lifecycle {
         final String machine = centralMachine(options, env);
         final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
-        // Host and port, as the contract says, the scheme's own port where the URL names none.
-        final String reaches =
-                url.getHost()
-                        + ":"
-                        + (url.getPort() >= 0
-                                ? url.getPort()
-                                : "https".equals(url.getScheme()) ? 443 : 80);
         final String registrationToken = elsewhereToken(settings, env);
         final String keptSecret = env.get(Config.MACHINE_SECRET);
         final String secret =
@@ -228,25 +221,66 @@ final class Lifecycle {
                 .put(Config.MACHINE, machine);
 
         // A machine just registered joins only where its name was invited before it existed, as
-        // `admit` does; otherwise it returns before joining, so its generated secret is kept even
-        // when the room is not yet invite-only.
-        final boolean registeredNow = keptSecret == null || keptSecret.isBlank();
-        final String room =
-                registeredNow && !invited(asMachine, configuredRoom)
-                        ? null
-                        : joinCentralRoom(asMachine, configuredRoom);
+        // `admit` does. Whatever fails then, its generated secret must reach Porelo, or the account
+        // is lost to it: so it answers not yet admitted, and the next setup, with the secret kept,
+        // joins or refuses the room in words.
+        if (keptSecret == null || keptSecret.isBlank()) {
+            try {
+                return invited(asMachine, configuredRoom)
+                        ? admitted(
+                                options,
+                                settings,
+                                env,
+                                answer,
+                                nobody,
+                                asMachine,
+                                machineAccount,
+                                secret,
+                                registrationToken,
+                                false)
+                        : notAdmitted(answer, machine, machineAccount, configuredRoom);
+            } catch (final Failure failure) {
+                return notAdmitted(answer, machine, machineAccount, configuredRoom);
+            }
+        }
+        return admitted(
+                options,
+                settings,
+                env,
+                answer,
+                nobody,
+                asMachine,
+                machineAccount,
+                secret,
+                registrationToken,
+                true);
+    }
+
+    /**
+     * Joins the room named in the settings, checks that it is invite-only and forbids guests, and
+     * admits this machine's relay; not yet invited, it answers not yet admitted. A room found wrong
+     * is left when {@code leaveWhenWrong} is true.
+     */
+    private static ObjectNode admitted(
+            final Options options,
+            final Settings settings,
+            final Map<String, String> env,
+            final ObjectNode answer,
+            final MatrixClient nobody,
+            final MatrixClient asMachine,
+            final Accounts.Session machineAccount,
+            final String secret,
+            final String registrationToken,
+            final boolean leaveWhenWrong)
+            throws Failure {
+        final String machine = centralMachine(options, env);
+        final URI url = Objects.requireNonNull(settings.homeserver());
+        final String configuredRoom = Objects.requireNonNull(settings.room());
+        final String room = joinCentralRoom(asMachine, configuredRoom);
         if (room == null) {
             return notAdmitted(answer, machine, machineAccount, configuredRoom);
         }
-        try {
-            checkCentralRoom(asMachine, configuredRoom, room, true);
-        } catch (final Failure failure) {
-            if (!registeredNow) {
-                throw failure;
-            }
-            // The secret just made must reach Porelo; the next setup refuses the room in words.
-            return notAdmitted(answer, machine, machineAccount, configuredRoom);
-        }
+        checkCentralRoom(asMachine, configuredRoom, room, leaveWhenWrong);
         displayName(nobody, machineAccount, "Porelo (administrator)");
 
         final Accounts.Session relay =
@@ -261,10 +295,17 @@ final class Lifecycle {
 
         put(answer.putObject("secrets"), settings.environment(url, relay.accessToken()));
         answer.put("conversation", room);
-        answer.putArray("reaches").add(reaches);
+        answer.putArray("reaches").add(reaches(url));
         answer.put("machine", machine);
         answer.put("admitted", true);
         return answer;
+    }
+
+    /** Host and port, as the contract says, the scheme's own port where the URL names none. */
+    private static String reaches(final URI url) {
+        return url.getHost()
+                + ":"
+                + (url.getPort() >= 0 ? url.getPort() : "https".equals(url.getScheme()) ? 443 : 80);
     }
 
     /** Keeps an account recognizable when setup recovers it or reuses its room. */
@@ -293,10 +334,6 @@ final class Lifecycle {
         return derivedAccount(nobody, ADMIN + "." + machine, secret, keptToken, registrationToken);
     }
 
-    /**
-     * Resolves {@code configuredRoom} if it is an alias and attempts to join it; returns {@code
-     * null} when the alias does not resolve or the machine's account is not invited yet.
-     */
     /**
      * Not yet in the project's room: the account a person lets in, and the room, so Porelo can name
      * both, as its contract has a transport on a shared server answer.
@@ -339,6 +376,10 @@ final class Lifecycle {
         return sync.path("rooms").path("invite").has(roomId);
     }
 
+    /**
+     * Resolves {@code configuredRoom} if it is an alias and attempts to join it; returns {@code
+     * null} when the alias does not resolve or the machine's account is not invited yet.
+     */
     private static @Nullable String joinCentralRoom(
             final MatrixClient asMachine, final String configuredRoom) throws Failure {
         final String roomId;
@@ -623,13 +664,8 @@ final class Lifecycle {
             id = Accounts.whoami(asMachine);
         } catch (final Failure failure) {
             if (failure.exitCode() == Exit.TEMPORARY) {
-                throw new Failure(
-                        Exit.TEMPORARY,
-                        "the homeserver "
-                                + nobody.config().homeserver()
-                                + " was not reached: "
-                                + failure.getMessage(),
-                        failure);
+                // Not reached, or busy: not a token that is wrong, and worth trying again.
+                throw failure;
             }
             throw new Failure(
                     Exit.CONFIG,
@@ -1445,6 +1481,9 @@ final class Lifecycle {
                 }
             }
         } catch (final Failure failure) {
+            if (failure.exitCode() == Exit.TEMPORARY) {
+                throw failure;
+            }
             report.kept("the room " + configuredRoom, failure.getMessage());
         }
         final Path stateDir;

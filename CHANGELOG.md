@@ -116,12 +116,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `clear` on a central homeserver ends 75, saying the homeserver was not reached, where it cannot be reached; it
   answered 78 "not valid" before. A token the homeserver no longer knows means it let the machine go already: `clear`
   then ends 0 and says so.
-- A first `setup` beside a homeserver that already runs restarts it onto the port it writes, instead of waiting
-  three minutes on a port nothing listens on.
+- A first `setup` beside a homeserver that already runs stops it before it chooses the port, so the homeserver keeps
+  its port and comes back where the file says, instead of `setup` waiting three minutes on a port nothing listens on.
 - A machine admitted or dismissed while the homeserver runs is taken or refused at once. The registration tokens
   moved into `~/.config/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
   file the container started with, so an admitted machine got `401 Invalid registration token` until a restart, and
-  a dismissed one kept registering. The unit's next start moves an existing token file there.
+  a dismissed one kept registering. The unit's next start moves an existing token file there, and `setup` restarts
+  a homeserver an earlier version started.
 - A backup stops trying to acquire its locks when their shared wait budget expires, even when a
   holder releases a lock just after the deadline.
 - A backup no longer starves behind Porelo's poll loops; it waits at most about the longest poll

@@ -38,9 +38,13 @@ class LocalHomeserverTest {
 
     @TempDir private Path dir;
 
-    /** Harm guarded: setup must not wait on a new port while the active unit keeps its old one. */
+    /**
+     * Harm guarded: setup must not wait on a new port while the active unit keeps its old one, nor
+     * read a token file the running unit, started by an earlier version, does not mount.
+     */
     @Test
-    @DisplayName("A newly written port stops an active unit before starting it")
+    @DisplayName(
+            "An active unit is stopped before its start only when its port or its token file is not yet where it goes")
     void aNewPortStopsAnActiveUnitBeforeStartingIt() throws Exception {
         final Map<String, String> env = Map.of("XDG_CONFIG_HOME", dir.toString());
         final List<String> calls = new ArrayList<>();
@@ -108,6 +112,21 @@ class LocalHomeserverTest {
 
         assertThat(calls)
                 .as("the active unit must read the newly written port on its next start")
+                .containsExactly("stop", "start");
+
+        Files.createDirectories(HomeserverToken.directory(env));
+        Files.writeString(HomeserverToken.file(env), "Q7\n");
+        calls.clear();
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit)).isSameAs(started);
+        assertThat(calls)
+                .as("with its port and token where they are, a running unit is left running")
+                .containsExactly("start");
+
+        Files.delete(HomeserverToken.file(env));
+        calls.clear();
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit)).isSameAs(started);
+        assertThat(calls)
+                .as("one an earlier version started mounts the token file; its next start moves it")
                 .containsExactly("stop", "start");
     }
 

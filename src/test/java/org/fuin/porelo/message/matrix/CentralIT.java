@@ -298,6 +298,37 @@ class CentralIT {
     }
 
     /**
+     * Harm guarded: a machine invited into a room that turns out wrong loses the secret it just
+     * made when the first setup refuses, and can never set up under its name again.
+     */
+    @Test
+    @DisplayName(
+            "Invited into a public room, a first setup keeps the account and answers not admitted; the next refuses with 78")
+    void invitedIntoAPublicRoomTheFirstSetupKeepsTheAccount() throws Exception {
+        invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
+        setJoinRule(person, room, "public");
+
+        final JsonNode first =
+                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+
+        assertThat(first.path("admitted").asBoolean()).as("not admitted").isFalse();
+        assertThat(first.path("account").path(Config.MACHINE_SECRET).asText())
+                .as("the secret just made reaches Porelo")
+                .isNotEmpty();
+        final Transport.Result second =
+                attempt(
+                        with(baseEnv(), first.path("account")),
+                        "setup",
+                        "--project",
+                        PROJECT,
+                        "--machine",
+                        MACHINE_ONE);
+        assertThat(second.exit())
+                .as("the next setup refuses the room in words: %s", second.err())
+                .isEqualTo(Exit.CONFIG);
+    }
+
+    /**
      * Harm guarded: upper-case host names must not prevent a machine and its tasks from joining
      * their project's conversation or disagree with the machine name kept in the account.
      */

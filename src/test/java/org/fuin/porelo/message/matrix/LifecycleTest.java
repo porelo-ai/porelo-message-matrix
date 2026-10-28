@@ -82,6 +82,22 @@ class LifecycleTest {
         }
     }
 
+    /** What the verb printed on stdout. */
+    private String out(final String settings, final Map<String, String> env, final String... args)
+            throws Failure {
+        final java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        Lifecycle.run(
+                args[0],
+                List.of(args).subList(1, args.length),
+                env,
+                new java.io.ByteArrayInputStream(
+                        settings.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                new java.io.PrintStream(bytes, true, java.nio.charset.StandardCharsets.UTF_8),
+                new java.io.PrintStream(java.io.OutputStream.nullOutputStream()),
+                new PodmanUnit(Map.of()));
+        return bytes.toString(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     /** The reason a person reads, so a refusal is told from another that answers the same code. */
     private String reason(
             final String settings, final Map<String, String> env, final String... args) {
@@ -215,7 +231,7 @@ class LifecycleTest {
             homeserver.answer(401, "{\"errcode\":\"M_UNKNOWN_TOKEN\",\"error\":\"unknown\"}");
 
             org.assertj.core.api.Assertions.assertThat(
-                            reason(
+                            out(
                                     central(homeserver.url()),
                                     centralAccount(),
                                     "clear",
@@ -223,8 +239,8 @@ class LifecycleTest {
                                     "demo",
                                     "--machine",
                                     "hosta"))
-                    .as("nothing is left on the homeserver to clear")
-                    .isEmpty();
+                    .as("nothing is left on the homeserver to clear, and it says so")
+                    .contains("the homeserver had let this machine go already");
         }
     }
 
@@ -252,6 +268,6 @@ class LifecycleTest {
                                 "hosta"))
                 .as("a homeserver not reached is temporary")
                 .startsWith(Exit.TEMPORARY + " ")
-                .contains("not reached");
+                .contains("not reachable");
     }
 }

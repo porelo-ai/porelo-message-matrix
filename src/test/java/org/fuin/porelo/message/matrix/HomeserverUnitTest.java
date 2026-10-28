@@ -184,7 +184,7 @@ class HomeserverUnitTest {
         assertThat(template)
                 .as("the unit")
                 .contains("TUWUNEL_REGISTRATION_TOKEN_FILE=/run/secrets/tokens/registration-token")
-                .contains("-v %E/porelo/matrix/tokens:/run/secrets/tokens:ro")
+                .contains("-v %E/porelo/matrix/tokens:/run/secrets/tokens:ro,Z")
                 .doesNotContain("registration-token:/run/secrets");
     }
 }

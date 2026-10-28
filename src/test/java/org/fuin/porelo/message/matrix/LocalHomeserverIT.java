@@ -254,6 +254,9 @@ class LocalHomeserverIT {
                         .toString();
         final JsonNode first =
                 lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
+        assertThat(first.path("admitted").asBoolean(false))
+                .as("admitted before it registered, the machine joins at its first setup")
+                .isTrue();
         keep(hostb, first.path("account"));
         final JsonNode second =
                 lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
