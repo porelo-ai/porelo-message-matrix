@@ -52,13 +52,19 @@ final class ProcessUnit implements Unit, AutoCloseable {
         if (Files.isExecutable(target)) {
             return target;
         }
-        final String id = podman("create", Tuwunel.image()).strip();
-        try {
-            podman("cp", id + ":/usr/bin/tuwunel", target.toString());
-        } finally {
-            podman("rm", id);
-        }
+        copyOut(target, "podman");
         return target;
+    }
+
+    /** Copies the binary out of a container of the pinned image, made and removed for it. */
+    static void copyOut(final Path target, final String podman)
+            throws IOException, InterruptedException {
+        final String id = podman(podman, "create", Tuwunel.image()).strip();
+        try {
+            podman(podman, "cp", id + ":/usr/bin/tuwunel", target.toString());
+        } finally {
+            podman(podman, "rm", id);
+        }
     }
 
     int runs() {
@@ -260,15 +266,27 @@ final class ProcessUnit implements Unit, AutoCloseable {
         }
     }
 
-    private static String podman(final String... args) throws IOException, InterruptedException {
-        final List<String> command = new java.util.ArrayList<>(List.of("podman"));
+    private static String podman(final String podman, final String... args)
+            throws IOException, InterruptedException {
+        final List<String> command = new java.util.ArrayList<>(List.of(podman));
         command.addAll(List.of(args));
-        final Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-        final String output =
-                new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (process.waitFor() != 0) {
-            throw new IllegalStateException(String.join(" ", command) + " failed: " + output);
+        // A pull's progress goes to stderr, apart from the id the caller reads from stdout.
+        final Path errors = Files.createTempFile("podman", ".err");
+        try {
+            final Process process =
+                    new ProcessBuilder(command).redirectError(errors.toFile()).start();
+            final String output =
+                    new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (process.waitFor() != 0) {
+                throw new IllegalStateException(
+                        String.join(" ", command)
+                                + " failed: "
+                                + output
+                                + Files.readString(errors, StandardCharsets.UTF_8));
+            }
+            return output;
+        } finally {
+            Files.delete(errors);
         }
-        return output;
     }
 }
