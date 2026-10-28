@@ -110,6 +110,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A first `setup` beside a homeserver that already runs restarts it onto the port it writes, instead of waiting
+  three minutes on a port nothing listens on.
 - A machine admitted or dismissed while the homeserver runs is taken or refused at once. The registration tokens
   moved into `~/.config/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
   file the container started with, so an admitted machine got `401 Invalid registration token` until a restart, and

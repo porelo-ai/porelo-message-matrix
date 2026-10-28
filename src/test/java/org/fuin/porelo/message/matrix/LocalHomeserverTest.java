@@ -38,6 +38,79 @@ class LocalHomeserverTest {
 
     @TempDir private Path dir;
 
+    /** Harm guarded: setup must not wait on a new port while the active unit keeps its old one. */
+    @Test
+    @DisplayName("A newly written port stops an active unit before starting it")
+    void aNewPortStopsAnActiveUnitBeforeStartingIt() throws Exception {
+        final Map<String, String> env = Map.of("XDG_CONFIG_HOME", dir.toString());
+        final List<String> calls = new ArrayList<>();
+        final Failure started = new Failure(Exit.TEMPORARY, "end the test before waiting for HTTP");
+        final Unit unit =
+                new Unit() {
+                    @Override
+                    public boolean installed() {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean active() {
+                        return true;
+                    }
+
+                    @Override
+                    public String state() {
+                        throw new AssertionError("startup diagnostics must not be reached");
+                    }
+
+                    @Override
+                    public List<String> recentLog() {
+                        throw new AssertionError("startup diagnostics must not be reached");
+                    }
+
+                    @Override
+                    public void start() throws Failure {
+                        calls.add("start");
+                        throw started;
+                    }
+
+                    @Override
+                    public void stop() {
+                        calls.add("stop");
+                    }
+
+                    @Override
+                    public boolean hasDatabase() {
+                        throw new AssertionError("setup must not read the database");
+                    }
+
+                    @Override
+                    public void removeDatabase() {
+                        throw new AssertionError("setup must not remove the database");
+                    }
+
+                    @Override
+                    public void signalBackup() {
+                        throw new AssertionError("setup must not request a backup");
+                    }
+
+                    @Override
+                    public int runOnce(final List<String> args, final Map<String, String> secrets) {
+                        throw new AssertionError("setup must not run the homeserver directly");
+                    }
+                };
+        assertThat(LocalHomeserver.directory(env).resolve("homeserver.conf"))
+                .as("the active unit started before its configuration existed")
+                .doesNotExist();
+
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit))
+                .as("the stand-in ends setup at start, before the HTTP wait")
+                .isSameAs(started);
+
+        assertThat(calls)
+                .as("the active unit must read the newly written port on its next start")
+                .containsExactly("stop", "start");
+    }
+
     /** Harm guarded: Porelo must receive the startup cause rather than shutdown noise. */
     @Test
     void theLastErrorPrecedesShutdownNoise() throws Exception {

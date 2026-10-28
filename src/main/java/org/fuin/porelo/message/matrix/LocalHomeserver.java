@@ -102,6 +102,8 @@ final class LocalHomeserver {
 
     record Running(URI url, int port, String registrationToken) {}
 
+    private record Port(int number, boolean written) {}
+
     private LocalHomeserver() {}
 
     static Path directory(final Map<String, String> env) throws Failure {
@@ -125,7 +127,7 @@ final class LocalHomeserver {
 
     static Running ensure(final Map<String, String> env, final Unit unit) throws Failure {
         final Path dir = directory(env);
-        final int port = port(dir.resolve("homeserver.conf"));
+        final Port selected = selectPort(dir.resolve("homeserver.conf"));
         if (!unit.installed()) {
             throw new Failure(
                     Exit.CONFIG,
@@ -134,7 +136,11 @@ final class LocalHomeserver {
                             + " is not installed for this account:"
                             + " install the package porelo-matrix-homeserver, or name the project's homeserver");
         }
+        if (selected.written() && unit.active()) {
+            unit.stop();
+        }
         unit.start();
+        final int port = selected.number();
         final URI url = URI.create("http://127.0.0.1:" + port);
         awaitUp(url, env, unit);
         return new Running(url, port, registrationToken(env));
@@ -164,6 +170,11 @@ final class LocalHomeserver {
 
     /** The port in the file, or the first free one from 8008 on, written there so it stays. */
     static int port(final Path conf) throws Failure {
+        return selectPort(conf).number();
+    }
+
+    /** Keeps whether the unit needs to read a newly written port on its next start. */
+    private static Port selectPort(final Path conf) throws Failure {
         final List<String> lines = new ArrayList<>();
         try {
             if (Files.exists(conf)) {
@@ -175,7 +186,9 @@ final class LocalHomeserver {
         for (final String line : lines) {
             if (line.strip().startsWith(PORT + "=")) {
                 try {
-                    return Integer.parseInt(line.strip().substring(PORT.length() + 1).strip());
+                    return new Port(
+                            Integer.parseInt(line.strip().substring(PORT.length() + 1).strip()),
+                            false);
                 } catch (final NumberFormatException ex) {
                     throw new Failure(
                             Exit.CONFIG, conf + " names a port that is not a number: " + line, ex);
@@ -204,7 +217,7 @@ final class LocalHomeserver {
                     "cannot write the homeserver's port to " + conf + ": " + ex.getMessage(),
                     ex);
         }
-        return port;
+        return new Port(port, true);
     }
 
     /** The value a line {@code key=value} of the file gives, or null when none does. */
