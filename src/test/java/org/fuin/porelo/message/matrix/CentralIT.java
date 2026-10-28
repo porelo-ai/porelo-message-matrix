@@ -138,6 +138,29 @@ class CentralIT {
         return roomId;
     }
 
+    /** Lets guests join {@code roomId}, which a project's room must never do. */
+    private void allowGuests(final Tuwunel.Account owner, final String roomId)
+            throws IOException, InterruptedException {
+        final HttpResponse<String> response =
+                http.send(
+                        HttpRequest.newBuilder(
+                                        URI.create(
+                                                tuwunel.url()
+                                                        + "/_matrix/client/v3/rooms/"
+                                                        + MatrixClient.segment(roomId)
+                                                        + "/state/m.room.guest_access/"))
+                                .header("Authorization", "Bearer " + owner.accessToken())
+                                .header("Content-Type", "application/json")
+                                .PUT(
+                                        HttpRequest.BodyPublishers.ofString(
+                                                "{\"guest_access\":\"can_join\"}"))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode())
+                .as("setting guest_access on %s: %s", roomId, response.body())
+                .isEqualTo(200);
+    }
+
     /** Invites {@code userId} into {@code roomId} as {@code inviter}. */
     private void invite(final Tuwunel.Account inviter, final String roomId, final String userId)
             throws IOException, InterruptedException {
@@ -303,10 +326,10 @@ class CentralIT {
      */
     @Test
     @DisplayName(
-            "Invited into a public room, a first setup keeps the account and answers not admitted; the next refuses with 78")
-    void invitedIntoAPublicRoomTheFirstSetupKeepsTheAccount() throws Exception {
+            "Invited into a room open to guests, a first setup keeps the account and its invitation; the next refuses with 78")
+    void invitedIntoARoomOpenToGuestsTheFirstSetupKeepsTheAccount() throws Exception {
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
-        setJoinRule(person, room, "public");
+        allowGuests(person, room);
 
         final JsonNode first =
                 run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);

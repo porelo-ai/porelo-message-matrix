@@ -270,4 +270,31 @@ class LifecycleTest {
                 .startsWith(Exit.TEMPORARY + " ")
                 .contains("not reachable");
     }
+
+    /**
+     * Harm guarded: a homeserver that goes away while clear works through the room ends 0, so the
+     * host is given back with accounts a later clear would have taken out.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "clear on a central homeserver that fails busy midway ends 75, not 0")
+    void clearThatFailsBusyMidwayIsTemporary() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}");
+            homeserver.answer(503, "{\"errcode\":\"M_UNKNOWN\",\"error\":\"busy\"}");
+            homeserver.answer(503, "{\"errcode\":\"M_UNKNOWN\",\"error\":\"busy\"}");
+
+            org.assertj.core.api.Assertions.assertThat(
+                            exit(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "clear",
+                                    "--project",
+                                    "demo",
+                                    "--machine",
+                                    "hosta"))
+                    .as("busy is temporary, worth trying again")
+                    .isEqualTo(Exit.TEMPORARY);
+        }
+    }
 }

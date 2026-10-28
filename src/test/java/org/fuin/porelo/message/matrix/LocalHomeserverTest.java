@@ -78,7 +78,13 @@ class LocalHomeserverTest {
                     }
 
                     @Override
-                    public void stop() {
+                    public void stop() throws Failure {
+                        // The first scenario: nothing of the account's is there yet.
+                        if (!Files.exists(HomeserverToken.directory(env))) {
+                            assertThat(LocalHomeserver.directory(env).resolve("homeserver.conf"))
+                                    .as("the port is chosen only once the unit has let its own go")
+                                    .doesNotExist();
+                        }
                         calls.add("stop");
                     }
 

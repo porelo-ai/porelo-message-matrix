@@ -1477,6 +1477,9 @@ final class Lifecycle {
                     Accounts.retire(nobody, localpart, Accounts.password(secret, localpart), room);
                     report.removed("the account " + id);
                 } catch (final Failure failure) {
+                    if (failure.exitCode() == Exit.TEMPORARY) {
+                        throw failure;
+                    }
                     report.kept("the account " + id, failure.getMessage());
                 }
             }

@@ -123,9 +123,16 @@ final class HomeserverToken {
     private static void moveIntoItsDirectory(final Map<String, String> env, final Path file)
             throws IOException, Failure {
         final Path earlier = LocalHomeserver.directory(env).resolve(NAME);
-        if (Files.exists(file) || !Files.isRegularFile(earlier)) {
+        if (!Files.isRegularFile(earlier)) {
             return;
         }
+        if (Files.exists(file) && Files.size(file) > 0) {
+            // In place already, from a start stopped before it removed the earlier name.
+            Files.deleteIfExists(earlier);
+            return;
+        }
+        // An empty one is none, left by a start stopped before writing it.
+        Files.deleteIfExists(file);
         ownDirectory(file);
         // Linked in, then the earlier name removed: a link never replaces a token another start put
         // there first, and two starts at once both end with the one token.
