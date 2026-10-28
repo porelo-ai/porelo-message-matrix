@@ -17,14 +17,9 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions (walk 21) |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `publish`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | After [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39). The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
-
-## Analyzed
-
-| # | Size | Blocked by | Open questions | What it covers |
-|---|---|---|---|---|
-| <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | 0 | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions (walk 21) |
 
 ## Accepted
 
@@ -43,11 +38,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx46"></a>[MX46](MX46-A-Machines-Token-Holds-At-Once.md) | S | - | A machine admitted or dismissed while the homeserver runs is taken or refused at once: the unit mounts the tokens' directory, not the single file a rename leaves stale (seen in 6i) |
-| <a id="mx49"></a>[MX49](MX49-Clear-On-A-Central-Homeserver-Says-What-Stopped-It.md) | S | - | `clear` on a central homeserver answers 75 when it cannot reach it and 0 when the homeserver has let the machine go, instead of 78 "not valid" for both (6i's give-back) |
-| <a id="mx47"></a>[MX47](MX47-A-Central-Setup-Joins-When-Already-Invited.md) | XS | - | A machine `admit` invited before it registered joins at its first `setup`, not only at the second |
-| <a id="mx48"></a>[MX48](MX48-Not-Yet-Admitted-Names-Its-Account-And-Room.md) | XS | - | A not yet admitted central `setup` answers `address` and `room`, as porelo's contract has it, so the person reads whom to let in |
-| <a id="mx50"></a>[MX50](MX50-Setup-Takes-The-Port-The-Homeserver-Runs-On.md) | S | - | A first `setup` restarts an already running homeserver onto the port it writes, instead of waiting 180 s on a port nothing listens on (6i-M0.2) |
 | <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | For [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), estimated by the operator. A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
 | <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | porelo's [B312](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b312) | For [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78), estimated by the operator. On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
@@ -56,6 +46,11 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx46"></a>[MX46](README.md#mx46) | A Machine's Token Holds At Once | The registration tokens moved into a `tokens` directory the homeserver's unit mounts, so a machine admitted or dismissed while it runs is taken or refused at once; an earlier token file moves there on the next start |
+| <a id="mx47"></a>[MX47](README.md#mx47) | A Central Setup Joins When Already Invited | A machine invited before it registered, as `admit` does, joins at its first `setup`; a first setup that cannot be admitted keeps the secret it made and answers not admitted |
+| <a id="mx48"></a>[MX48](README.md#mx48) | Not Yet Admitted Names Its Account And Room | A central `setup` not yet admitted answers `address` and `room`, so Porelo names the account to let in and the room |
+| <a id="mx49"></a>[MX49](README.md#mx49) | Clear On A Central Homeserver Says What Stopped It | `clear` on a central homeserver ends 75 when the homeserver is not reached or busy, and 0 when it no longer knows the machine's token, saying so |
+| <a id="mx50"></a>[MX50](README.md#mx50) | Setup Takes The Port The Homeserver Runs On | A first `setup` stops a homeserver that already runs before choosing the port, and one an earlier version started, so it does not wait on a port nothing listens on |
 | <a id="mx40"></a>[MX40](README.md#mx40) | A Person Leaves A Project's Room | `part` takes a person out of a project's room and locks the account out of every session unless another project's room keeps it, and `join` takes such an account back without `--reset` |
 | <a id="mx34"></a>[MX34](README.md#mx34) | The Homeserver Starts On A Large Machine | The local homeserver's container bounded to 512 processes, 1 GiB and 2 CPUs, with Tuwunel's database pool and caches capped, so it starts and backs up on a machine of any size |
 | <a id="mx35"></a>[MX35](README.md#mx35) | A Person Knows The Room's Helpers | The administrator and the relay carry display names a person reads, and a line naming only them is marked `helpers` for Porelo to answer, waking no task |
