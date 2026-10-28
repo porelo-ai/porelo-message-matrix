@@ -235,6 +235,12 @@ class CentralIT {
                 .isEqualTo(MACHINE_ONE);
         assertThat(before.has("conversation")).as("no conversation while not admitted").isFalse();
         assertThat(before.has("secrets")).as("no relay secrets while not admitted").isFalse();
+        assertThat(before.path("address").asText())
+                .as("the account a person lets in, for Porelo to name")
+                .isEqualTo("@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
+        assertThat(before.path("room").asText())
+                .as("the room it is let into, for Porelo to name")
+                .isEqualTo(room);
 
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
 
@@ -270,6 +276,25 @@ class CentralIT {
                                         + Tuwunel.SERVER_NAME))
                 .as("relay membership in the project's room")
                 .isEqualTo("join");
+    }
+
+    /**
+     * Harm guarded: a machine whose name a person (or the account's own admit) invited before it
+     * registered waits for a second task start it has no reason to need.
+     */
+    @Test
+    @DisplayName("A machine invited before it registered is admitted at its first setup")
+    void aMachineInvitedBeforeItRegisteredIsAdmittedAtOnce() throws Exception {
+        invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
+
+        final JsonNode first =
+                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+
+        assertThat(first.path("admitted").asBoolean()).as("admitted at the first setup").isTrue();
+        assertThat(first.path("conversation").asText()).as("the room id").isEqualTo(room);
+        assertThat(first.path("account").path(Config.MACHINE_SECRET).asText())
+                .as("the secret just made is kept")
+                .isNotEmpty();
     }
 
     /**

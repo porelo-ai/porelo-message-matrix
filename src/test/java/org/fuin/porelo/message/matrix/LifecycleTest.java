@@ -190,4 +190,68 @@ class LifecycleTest {
                 .as("no machine named, none dismissed")
                 .isEqualTo(Exit.USAGE);
     }
+
+    private Map<String, String> centralAccount() {
+        final Map<String, String> env = new java.util.HashMap<>(account());
+        env.put(Config.MACHINE_SECRET, "machine-secret");
+        env.put(Config.ADMIN_TOKEN, "machine-token");
+        env.put(Config.MACHINE, "hosta");
+        return env;
+    }
+
+    private static String central(final String url) {
+        return "{\"homeserver\":\"" + url + "\",\"room\":\"!room:example.org\"}";
+    }
+
+    /**
+     * Harm guarded: a host whose machine the homeserver let go (dismissed, or the homeserver reset)
+     * can never clear, so its give-back stops on a refusal nobody can act on.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "clear on a central homeserver that no longer knows the machine's token ends 0")
+    void clearAfterTheHomeserverLetTheMachineGo() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(401, "{\"errcode\":\"M_UNKNOWN_TOKEN\",\"error\":\"unknown\"}");
+
+            org.assertj.core.api.Assertions.assertThat(
+                            reason(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "clear",
+                                    "--project",
+                                    "demo",
+                                    "--machine",
+                                    "hosta"))
+                    .as("nothing is left on the homeserver to clear")
+                    .isEmpty();
+        }
+    }
+
+    /**
+     * Harm guarded: a homeserver briefly away is reported as a token that is not valid, so the
+     * person looks for a fault in the setup that is not there, and nothing is tried again.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "clear on a central homeserver that cannot be reached ends 75, saying so")
+    void clearWhileTheHomeserverIsNotReached() throws Exception {
+        final String url;
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            url = homeserver.url();
+        }
+
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central(url),
+                                centralAccount(),
+                                "clear",
+                                "--project",
+                                "demo",
+                                "--machine",
+                                "hosta"))
+                .as("a homeserver not reached is temporary")
+                .startsWith(Exit.TEMPORARY + " ")
+                .contains("not reached");
+    }
 }

@@ -227,18 +227,26 @@ final class Lifecycle {
                 .put(Config.MACHINE_SECRET, secret)
                 .put(Config.MACHINE, machine);
 
-        // A machine just registered cannot have been invited yet; return before joining so its
-        // generated secret is kept even when the room is not yet invite-only.
+        // A machine just registered joins only where its name was invited before it existed, as
+        // `admit` does; otherwise it returns before joining, so its generated secret is kept even
+        // when the room is not yet invite-only.
+        final boolean registeredNow = keptSecret == null || keptSecret.isBlank();
         final String room =
-                keptSecret == null || keptSecret.isBlank()
+                registeredNow && !invited(asMachine, configuredRoom)
                         ? null
                         : joinCentralRoom(asMachine, configuredRoom);
         if (room == null) {
-            answer.put("machine", machine);
-            answer.put("admitted", false);
-            return answer;
+            return notAdmitted(answer, machine, machineAccount, configuredRoom);
         }
-        checkCentralRoom(asMachine, configuredRoom, room, true);
+        try {
+            checkCentralRoom(asMachine, configuredRoom, room, true);
+        } catch (final Failure failure) {
+            if (!registeredNow) {
+                throw failure;
+            }
+            // The secret just made must reach Porelo; the next setup refuses the room in words.
+            return notAdmitted(answer, machine, machineAccount, configuredRoom);
+        }
         displayName(nobody, machineAccount, "Porelo (administrator)");
 
         final Accounts.Session relay =
@@ -289,6 +297,48 @@ final class Lifecycle {
      * Resolves {@code configuredRoom} if it is an alias and attempts to join it; returns {@code
      * null} when the alias does not resolve or the machine's account is not invited yet.
      */
+    /**
+     * Not yet in the project's room: the account a person lets in, and the room, so Porelo can name
+     * both, as its contract has a transport on a shared server answer.
+     */
+    private static ObjectNode notAdmitted(
+            final ObjectNode answer,
+            final String machine,
+            final Accounts.Session machineAccount,
+            final String configuredRoom) {
+        answer.put("machine", machine);
+        answer.put("address", machineAccount.userId());
+        answer.put("room", configuredRoom);
+        answer.put("admitted", false);
+        return answer;
+    }
+
+    /** Whether the machine's account holds an invitation into the configured room. */
+    private static boolean invited(final MatrixClient asMachine, final String configuredRoom)
+            throws Failure {
+        final String roomId;
+        if (configuredRoom.startsWith("#")) {
+            final JsonNode found =
+                    asMachine.find(
+                            "/_matrix/client/v3/directory/room/"
+                                    + MatrixClient.segment(configuredRoom));
+            if (found == null) {
+                return false;
+            }
+            roomId = found.path("room_id").asText("");
+        } else {
+            roomId = configuredRoom;
+        }
+        final String filter =
+                "{\"room\":{\"timeline\":{\"limit\":0},\"state\":{\"types\":[]},"
+                        + "\"ephemeral\":{\"types\":[]},\"account_data\":{\"types\":[]}},"
+                        + "\"presence\":{\"types\":[]},\"account_data\":{\"types\":[]}}";
+        final JsonNode sync =
+                asMachine.get(
+                        "/_matrix/client/v3/sync?timeout=0&filter=" + MatrixClient.segment(filter));
+        return sync.path("rooms").path("invite").has(roomId);
+    }
+
     private static @Nullable String joinCentralRoom(
             final MatrixClient asMachine, final String configuredRoom) throws Failure {
         final String roomId;
@@ -572,6 +622,15 @@ final class Lifecycle {
         try {
             id = Accounts.whoami(asMachine);
         } catch (final Failure failure) {
+            if (failure.exitCode() == Exit.TEMPORARY) {
+                throw new Failure(
+                        Exit.TEMPORARY,
+                        "the homeserver "
+                                + nobody.config().homeserver()
+                                + " was not reached: "
+                                + failure.getMessage(),
+                        failure);
+            }
             throw new Failure(
                     Exit.CONFIG,
                     "the machine's token Porelo holds is not valid on "
@@ -1333,12 +1392,26 @@ final class Lifecycle {
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final MatrixClient nobody = client(url, "", settings);
         final MatrixClient asMachine = nobody.as(adminToken);
-        final String machineId = machineId(nobody, asMachine, machine);
+        final Report report = new Report();
+        final String machineId;
+        try {
+            machineId = machineId(nobody, asMachine, machine);
+        } catch (final Failure failure) {
+            // A token the homeserver no longer knows: it let this machine go, dismissed or reset,
+            // and nothing of it is left there to clear.
+            if (!(failure.getCause() instanceof Failure refused
+                    && refused.exitCode() == Exit.NOT_PERMITTED)) {
+                throw failure;
+            }
+            report.kept(
+                    "this machine's accounts on " + url,
+                    "the homeserver had let this machine go already: " + refused.getMessage());
+            return report.answer();
+        }
         final String server = AdminRoom.server(machineId);
         final String relay = "@porelo-relay-" + project + "." + machine + ":" + server;
         final String suffix = ":" + server;
         final String machineSuffix = "." + machine + suffix;
-        final Report report = new Report();
         try {
             final String room = resolveCentralRoom(asMachine, configuredRoom);
             final Map<String, String> elsewhere = membersElsewhereCentral(asMachine, room);

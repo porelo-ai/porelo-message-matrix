@@ -110,6 +110,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A machine whose name was invited into the room before it registered, as `admit` does, joins at its first `setup`,
+  not only at the second. A central `setup` not yet admitted answers `address` and `room`, so Porelo names the account
+  a person lets in and the room.
+- `clear` on a central homeserver ends 75, saying the homeserver was not reached, where it cannot be reached; it
+  answered 78 "not valid" before. A token the homeserver no longer knows means it let the machine go already: `clear`
+  then ends 0 and says so.
 - A first `setup` beside a homeserver that already runs restarts it onto the port it writes, instead of waiting
   three minutes on a port nothing listens on.
 - A machine admitted or dismissed while the homeserver runs is taken or refused at once. The registration tokens
