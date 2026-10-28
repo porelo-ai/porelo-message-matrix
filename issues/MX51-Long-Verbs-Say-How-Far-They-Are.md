@@ -1,6 +1,6 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** S - stderr lines in `LocalHomeserver.awaitUp`, `Keep` and `Publish`, with their tests; stdout's contract is
 unchanged.
 

@@ -1,6 +1,6 @@
 # MX46 — A Machine's Token Holds At Once
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** S - the unit's mount and `HomeserverToken`/`MachineTokens` in this repository, an integration test; no
 contract another repository reads.
 

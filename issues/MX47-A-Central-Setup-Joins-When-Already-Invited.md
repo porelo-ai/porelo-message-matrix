@@ -1,6 +1,6 @@
 # MX47 — A Central Setup Joins When Already Invited
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** XS - one branch in `Lifecycle`'s central `setup` and its test; no contract change.
 
 **What must be true.** A machine that `admit` invited into the room before it registered joins the room at its first

@@ -1,6 +1,6 @@
 # MX48 — Not Yet Admitted Names Its Account And Room
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** XS - two fields in one answer, the doc's table and a test; porelo's contract already names them.
 
 **What must be true.** When a machine is not in the project's room yet, the person reads which account to let in

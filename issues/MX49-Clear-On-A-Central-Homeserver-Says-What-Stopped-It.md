@@ -1,6 +1,6 @@
 # MX49 — Clear On A Central Homeserver Says What Stopped It
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** S - `Lifecycle.machineId` and `clearCentral` with their tests; the exit codes are the existing contract's.
 
 **What must be true.** A host given back after its machine was dismissed, or while the homeserver cannot be reached,

@@ -1,6 +1,6 @@
 # MX50 — Setup Takes The Port The Homeserver Runs On
 
-**Status:** Analyzed.
+**Status:** Estimated by the operator on 2026-10-28.
 **Size:** S - `LocalHomeserver.port` and the setup path's start, with their tests; no contract change.
 
 **What must be true.** A first `setup` on an account whose homeserver already runs answers within seconds. It does
