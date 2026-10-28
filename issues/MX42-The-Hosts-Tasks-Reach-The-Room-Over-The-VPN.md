@@ -1,6 +1,7 @@
 # MX42 — The Host's Tasks Reach The Room Over The VPN
 
-**Status:** Implementing; its host side blocked by porelo [B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304).
+**Status:** Review; this machine's side, published with `36adabe`. The host's side comes with porelo's
+[B304](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b304), pushed in the same round.
 **Size:** L - crosses repositories (the unit and certificate here, the host's settings in porelo and porelo-host),
 with a design to decide first.
 

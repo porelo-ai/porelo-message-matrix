@@ -1,6 +1,6 @@
 # MX23 — The Transport Takes Its Tokens On Its Input
 
-**Status:** Implementing; the transport's half of porelo's
+**Status:** Review, published with `36adabe`; the transport's half of porelo's
 [B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206), which closes what making the
 running transport not dumpable leaves open.
 **Size:** M - one contract change, made here and in porelo together: every verb reads its secrets from its input
