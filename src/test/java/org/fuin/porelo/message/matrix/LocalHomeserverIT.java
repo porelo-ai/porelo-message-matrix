@@ -614,6 +614,8 @@ class LocalHomeserverIT {
         Accounts.register(nobody, "task.hosta", password, tokenA);
         // Listed before @porelo.hosta, so the order answered is the verb's own.
         Accounts.register(nobody, "a.hosta", password, tokenA);
+        // Registered by its holder, a machine's @porelo that refuses nothing.
+        Accounts.register(nobody, "porelo.worker.hosta", password, tokenA);
         final Accounts.Session poreloB = Accounts.register(nobody, "porelo.hostb", password, hostb);
         final MatrixClient asB = nobody.as(poreloB.accessToken());
         final String room =
@@ -639,6 +641,16 @@ class LocalHomeserverIT {
                 .isEqualTo(
                         "{\"machine\":\"hostz\",\"known\":false,\"revoked\":false,\"expelled\":[]}");
 
+        Accounts.register(nobody, "porelo.hostd", password, tokenA);
+        assertThatThrownBy(() -> machineToken("issue", "hostd"))
+                .as("a machine the files know nothing of, whose @porelo is listed")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("has accounts of hostd already");
+        assertThatThrownBy(() -> machineToken("issue", "x.hostd"))
+                .as("a machine ending as one listed by its @porelo only")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+
         final String hostc = machineToken("issue", "hostc").path("token").asText();
         Accounts.register(nobody, "porelo.hostc", password, hostc);
         machineToken("revoke", "hostc");
@@ -647,7 +659,7 @@ class LocalHomeserverIT {
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("hostc's token was revoked");
         assertThatThrownBy(() -> machineToken("issue", "x.hostc"))
-                .as("a machine ending as one listed by its @porelo only")
+                .as("a machine ending as one revoked")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
         assertThat(machineToken("expel", "hostc").path("expelled"))
@@ -661,7 +673,11 @@ class LocalHomeserverIT {
         assertThat(expelled.path("expelled"))
                 .as("every account of the machine, @porelo.hosta first")
                 .extracting(JsonNode::asText)
-                .containsExactly(poreloA.userId(), "@a.hosta:" + server, "@task.hosta:" + server);
+                .containsExactly(
+                        poreloA.userId(),
+                        "@a.hosta:" + server,
+                        "@porelo.worker.hosta:" + server,
+                        "@task.hosta:" + server);
         assertThat(expelled.path("revoked").asBoolean()).as("its token goes with it").isTrue();
         assertThat(expelled.path("known").asBoolean()).as("known").isTrue();
         for (final String localpart : List.of("porelo.hosta", "task.hosta", "a.hosta")) {

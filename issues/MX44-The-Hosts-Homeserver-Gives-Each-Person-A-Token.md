@@ -1,6 +1,6 @@
 # MX44 — The Host's Homeserver Gives Each Person A Token
 
-**Status:** Implementing.
+**Status:** Review since 2026-10-29.
 **Size:** M - three verbs on an account's own homeserver with no project, read in today's `MachineTokens` and
 `AdminRoom`, the homeserver's administrator made without a project's `setup`, docs and an integration test; no
 contract another repository reads beyond the verbs' answers.
@@ -80,6 +80,17 @@ register again, while another person's accounts stay.
   nothing the homeserver does holds the lock. It leaves out accounts that end as a longer machine's that was issued a
   token, and it is never refused on names the person registered. The helper's `issue` refuses a machine revoked
   before; a project's `admit` still admits it again.
+- **What the fourth review added:** a name `expel` recorded only from what the homeserver lists never held a token,
+  so it refuses no `expel` of a longer machine that ends as it, and a machine holding its token is answered it again
+  whatever was expelled since; the refusal of a name ending as a machine issued comes before the answer that nothing
+  is known; a token revoked or expelled records its machine as known, even one issued before that record was kept;
+  the helper's `issue` refuses a machine revoked before it registers `@porelo`. Its reading of that fix added: the
+  token file the homeserver reads is made of the machines' files alone, so a draft an `issue` killed left beside
+  them hands out no token revoked; the record is made before the token goes, so no read finds a machine neither
+  holding a token nor known; a `revoke` run again finishes one cut off, rewriting the homeserver's file under the
+  lock, and one before anything was made answers `false`. Left as it is: a backup holds the
+  database only, so on another host restored from it `expel` weighs only what that host issued, and a machine revoked
+  by a version before the record cannot be told from one never issued.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).

@@ -1,6 +1,6 @@
 # MX54 — The Homeserver Serves A Certificate Made Elsewhere
 
-**Status:** Implementing.
+**Status:** Review since 2026-10-29.
 **Size:** M - one contract change another repository builds against, in `Certificate`, `Publish` and `Keep`, with
 docs; no new verb.
 

@@ -52,8 +52,8 @@ class MachineTokensTest {
                 .isInstanceOf(Failure.class)
                 .extracting(failure -> ((Failure) failure).exitCode())
                 .isEqualTo(Exit.USAGE);
-        assertThat(dir.resolve("config/porelo/escape"))
-                .as("nothing written outside the account's directory")
+        assertThat(dir.resolve("config/porelo/matrix/escape"))
+                .as("nothing written outside the tokens' directory")
                 .doesNotExist();
     }
 
@@ -372,6 +372,148 @@ class MachineTokensTest {
         assertThat(MachineTokens.issue(env, "hosta")).as("admitted again").isNotBlank();
     }
 
+    /**
+     * Harm guarded: a machine given its token before the host kept a record of it is revoked, known
+     * no more, and given a token again while its accounts stay.
+     */
+    @Test
+    @DisplayName("A token revoked makes its machine known, even one issued before the record")
+    void aRevokeKeepsTheMachineKnown() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        Files.delete(dir.resolve("config/porelo/matrix/known-machines/hosta"));
+        MachineTokens.revoke(env, "hosta");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "hosta", "x", List.of("@porelo:x")))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hosta's token was revoked");
+    }
+
+    /**
+     * Harm guarded: a name expelled from what the homeserver lists, never issued a token, refuses
+     * the expel of the machine issued whose name ends as it, whose accounts then stay.
+     */
+    @Test
+    @DisplayName(
+            "A name expelled by what is listed stands against no machine issued a token, ending as it")
+    void aNameExpelledByItsListingBlocksNoLongerMachine() throws Exception {
+        final String token = MachineTokens.issue(env, "x.hosta");
+        assertThat(MachineTokens.expel(env, "hosta", true))
+                .as("the shorter name expelled")
+                .isEqualTo(MachineTokens.Expel.NO_TOKEN);
+
+        assertThat(MachineTokens.issue(env, "x.hosta"))
+                .as("the longer machine issued its token again")
+                .isEqualTo(token);
+        assertThat(expel("x.hosta")).as("and expelled").isEqualTo(MachineTokens.Expel.REVOKED);
+    }
+
+    /**
+     * Harm guarded: expel of a name ending as a machine issued answers that nothing is known, so
+     * the machine meant keeps its token and accounts.
+     */
+    @Test
+    @DisplayName("A name ending as a machine issued is refused before it is answered as unknown")
+    void refusesANameEndingAsAnIssuedOneBeforeAnsweringUnknown() throws Exception {
+        MachineTokens.issue(env, "hosta");
+
+        assertThatThrownBy(() -> expel("x.hosta"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("expel hosta instead");
+    }
+
+    /**
+     * Harm guarded: an issue killed before its draft is removed leaves the token beside the
+     * machine's, and every later rewrite hands the homeserver the token revoked.
+     */
+    @Test
+    @DisplayName("A draft left beside the tokens hands the homeserver no token revoked")
+    void aDraftLeftBehindIsNoToken() throws Exception {
+        final String token = MachineTokens.issue(env, "hosta");
+        Files.writeString(
+                dir.resolve("config/porelo/matrix/machine-tokens/.hosta-1.draft"), token + "\n");
+        MachineTokens.revoke(env, "hosta");
+
+        assertThat(Files.readString(tokens())).as("the token file").doesNotContain(token);
+    }
+
+    /**
+     * Harm guarded: a machine given its token before the host kept a record of it is expelled,
+     * known no more, so a name ending as it is answered unknown and the machine meant keeps all.
+     */
+    @Test
+    @DisplayName("A token expelled makes its machine known, even one issued before the record")
+    void anExpelKeepsTheMachineKnown() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        Files.delete(dir.resolve("config/porelo/matrix/known-machines/hosta"));
+        expel("hosta");
+
+        assertThatThrownBy(() -> expel("x.hosta"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("expel hosta instead");
+    }
+
+    /**
+     * Harm guarded: an account ending as a name only expelled, which never held a token, is taken
+     * for that name's, and the machine's expel leaves it active.
+     */
+    @Test
+    @DisplayName("An account ending as a name only expelled is the shorter machine's to expel")
+    void aNameOnlyExpelledKeepsNoAccounts() throws Exception {
+        MachineTokens.expel(env, "x.hosta", true);
+
+        assertThat(
+                        MachineTokens.accounts(
+                                env, "hosta", "x", List.of("@porelo.hosta:x", "@worker.x.hosta:x")))
+                .containsExactly("@porelo.hosta:x", "@worker.x.hosta:x");
+    }
+
+    /**
+     * Harm guarded: a revoke cut off after the machine's file went answers no token the second time
+     * and leaves the homeserver's file still holding it.
+     */
+    @Test
+    @DisplayName(
+            "A revoke run again after one cut off takes the token out of the homeserver's file")
+    void aRevokeAgainFinishesOneCutOff() throws Exception {
+        final String token = MachineTokens.issue(env, "hosta");
+        Files.delete(dir.resolve("config/porelo/matrix/machine-tokens/hosta"));
+
+        MachineTokens.revoke(env, "hosta");
+
+        assertThat(Files.readString(tokens())).as("the token file").doesNotContain(token);
+    }
+
+    /**
+     * Harm guarded: with the homeserver's own file gone, as after a clear, a revoke fails and
+     * leaves the machine's file, which the next start puts back among the tokens.
+     */
+    @Test
+    @DisplayName("A revoke with the homeserver's file gone still removes the machine's")
+    void aRevokeWithoutTheHomeserversFile() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        Files.delete(tokens());
+
+        assertThat(MachineTokens.revoke(env, "hosta")).as("revoked").isTrue();
+        assertThat(dir.resolve("config/porelo/matrix/machine-tokens/hosta"))
+                .as("the machine's file")
+                .doesNotExist();
+    }
+
+    /** Harm guarded: a revoke before the homeserver's first start fails instead of answering. */
+    @Test
+    @DisplayName("A revoke with nothing made yet answers that there was no token")
+    void aRevokeBeforeAnythingAnswersFalse() throws Exception {
+        final Map<String, String> fresh =
+                Map.of(
+                        "HOME",
+                        dir.resolve("fresh").toString(),
+                        "XDG_CONFIG_HOME",
+                        dir.resolve("fresh/config").toString());
+
+        assertThat(MachineTokens.revoke(fresh, "hostz")).isFalse();
+        assertThat(dir.resolve("fresh/config/porelo/matrix")).as("nothing made").doesNotExist();
+    }
+
     @Test
     @DisplayName("A revoke whose token file was not written leaves the machine known to expel")
     void aRevokeHalfDoneLeavesTheMachineKnown() throws Exception {
@@ -440,8 +582,10 @@ class MachineTokensTest {
         MachineTokens.issue(env, "hosta");
         expel("hosta");
         MachineTokens.issue(env, "hostb");
+        MachineTokens.issue(env, "hostc");
+        MachineTokens.revoke(env, "hostc");
 
-        for (final String machine : List.of("../hostc", "hosta", "x.hosta", "x.hostb")) {
+        for (final String machine : List.of("../hostc", "hosta", "x.hosta", "x.hostb", "hostc")) {
             assertThatThrownBy(
                             () ->
                                     MachineTokenVerb.run(

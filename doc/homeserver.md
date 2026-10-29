@@ -134,11 +134,12 @@ administrator's helper admits each person's machine and takes it out again:
   the token files the homeserver reads and a record that the machine was issued one (`known-machines/<machine>`).
   It refuses a machine expelled or revoked before, a machine never issued a token whose accounts `@….<machine>` the
   homeserver lists already (their names are taken), and a machine whose accounts' names would end as a known
-  machine's: one issued a token here, or one the homeserver lists by its `@porelo.<machine>`. What the files tell is
-  checked before `@porelo` is registered.
+  machine's: one issued a token here or expelled, or one the homeserver lists by its `@porelo.<machine>`. A machine
+  holding its token is answered it again, weighed when it was issued. What the files tell is checked before
+  `@porelo` is registered.
 - **`revoke`** answers `{"machine": "<machine>", "revoked": true|false}`; the homeserver refuses the token at its
   next registration. A revoked token logs no account out, so `expel` comes first; a machine revoked is issued no
-  token again.
+  token again, and a token revoked records its machine as known, even one issued before that record was kept.
 - **`expel`** records the machine as expelled and revokes its token at once, then deactivates every
   `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out of every room, and answers
   `{"machine": "<machine>", "known": true, "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated
@@ -148,7 +149,9 @@ administrator's helper admits each person's machine and takes it out again:
   and is left; no name a token's holder registers keeps `expel` from their own accounts. A machine of which nothing
   is known, with no token, no record and no account, is left as it is, so a name mistyped takes no name for good:
   it answers `"known": false` with exit 0, for a lock nothing to take away. A machine whose name ends as one issued
-  a token here (`x.<machine>` while `<machine>` was) is refused (78).
+  a token here (`x.<machine>` while `<machine>` was) is refused (78) before all else, known or not; a name only
+  expelled, which never held a token, refuses no machine's `expel`. The records are the host's and no backup holds
+  them, so on another host restored from a backup, `expel` weighs only what that host issued.
 
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'

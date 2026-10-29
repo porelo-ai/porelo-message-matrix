@@ -110,13 +110,8 @@ final class MachineTokens {
                 refuseAlike(env, machine, machinesListed(ids, server));
                 final Path issued = LocalHomeserver.directory(env).resolve(KNOWN);
                 if (!Files.exists(file)) {
-                    if (revokedIsFinal && Files.exists(issued.resolve(machine))) {
-                        throw new Failure(
-                                Exit.CONFIG,
-                                machine
-                                        + "'s token was revoked, and its accounts stay; expel "
-                                        + machine
-                                        + " and add the person under another machine name");
+                    if (revokedIsFinal) {
+                        refuseRevoked(env, machine);
                     }
                     refuseTaken(machine, ids, server);
                     final byte[] random = new byte[BYTES];
@@ -144,11 +139,20 @@ final class MachineTokens {
      */
     static boolean revoke(final Map<String, String> env, final String machine) throws Failure {
         final Path file = LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine));
+        if (!Files.isDirectory(LocalHomeserver.directory(env))) {
+            // Nothing made yet, so no token to take away and nowhere to lock.
+            return false;
+        }
         final boolean had;
         try (FileChannel channel = lock(env);
                 FileLock held = channel.lock()) {
+            known(env, file, machine);
             had = Files.deleteIfExists(file);
-            combine(env);
+            // Rewritten even with no file left, so a revoke run again finishes one cut off; with
+            // the homeserver's own file gone, the next start writes it from the machines' files.
+            if (Files.isRegularFile(HomeserverToken.file(env))) {
+                combine(env);
+            }
         } catch (final IOException ex) {
             throw new Failure(
                     Exit.CONFIG,
@@ -160,12 +164,18 @@ final class MachineTokens {
 
     /**
      * What {@code issue} refuses, checked before anything is made for the machine: a name that is
-     * no machine's, a machine expelled, and one whose accounts' names would end as another's.
+     * no machine's, a machine expelled or revoked, and one whose accounts' names would end as
+     * another's.
      */
     static void admissible(final Map<String, String> env, final String machine) throws Failure {
         name(machine);
         refuseExpelled(env, machine);
         refuseAlike(env, machine, List.of());
+        // The record before the token: an issue running beside makes the token first.
+        if (Files.exists(LocalHomeserver.directory(env).resolve(KNOWN).resolve(machine))
+                && !admitted(env, machine)) {
+            refuseRevoked(env, machine);
+        }
     }
 
     /** What {@code expel} found. */
@@ -184,24 +194,19 @@ final class MachineTokens {
      * beside the tokens and outside their directory, so it outlives the token: every account of the
      * machine is deactivated next, and its names stay taken. A machine the files know nothing of is
      * left as it is unless {@code listed}, its accounts being listed on the homeserver, so a name
-     * mistyped takes no name for good. Refused for a machine whose name ends as another machine's
-     * the host issued a token, whose accounts' names would end as its own.
+     * mistyped takes no name for good. Refused, before all else, for a machine whose name ends as
+     * another's the host issued a token, whose accounts' names would end as its own; a name only
+     * expelled never held one, so it refuses no machine's expel.
      */
     static Expel expel(final Map<String, String> env, final String machine, final boolean listed)
             throws Failure {
         final Path file = LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine));
         final Path dir = LocalHomeserver.directory(env).resolve(EXPELLED);
         final Path record = dir.resolve(machine);
+        final Path known = LocalHomeserver.directory(env).resolve(KNOWN);
         try (FileChannel channel = lock(env);
                 FileLock held = channel.lock()) {
-            if (!listed
-                    && !Files.exists(file)
-                    && !Files.exists(record)
-                    && !Files.exists(
-                            LocalHomeserver.directory(env).resolve(KNOWN).resolve(machine))) {
-                return Expel.UNKNOWN;
-            }
-            for (final String other : issued(env)) {
+            for (final String other : held(env)) {
                 if (machine.endsWith("." + other)) {
                     throw new Failure(
                             Exit.CONFIG,
@@ -214,7 +219,14 @@ final class MachineTokens {
                                     + " instead");
                 }
             }
+            if (!listed
+                    && !Files.exists(file)
+                    && !Files.exists(record)
+                    && !Files.exists(known.resolve(machine))) {
+                return Expel.UNKNOWN;
+            }
             mark(dir, machine);
+            known(env, file, machine);
             final boolean had = Files.deleteIfExists(file);
             combine(env);
             return had ? Expel.REVOKED : Expel.NO_TOKEN;
@@ -239,7 +251,7 @@ final class MachineTokens {
             throws Failure {
         final String ending = ending(machine, server);
         final List<String> longer =
-                issued(env).stream()
+                held(env).stream()
                         .filter(other -> other.endsWith("." + machine))
                         .map(other -> ending(other, server))
                         .toList();
@@ -257,12 +269,29 @@ final class MachineTokens {
         return found;
     }
 
+    /**
+     * A machine holding its token recorded as known before the token goes, so a machine given it
+     * before the record was kept is never, for a moment, neither.
+     */
+    private static void known(final Map<String, String> env, final Path file, final String machine)
+            throws IOException, Failure {
+        if (Files.exists(file)) {
+            mark(LocalHomeserver.directory(env).resolve(KNOWN), machine);
+        }
+    }
+
     /** Every machine the host issued a token: admitted now, revoked or expelled. */
-    private static Set<String> issued(final Map<String, String> env) throws Failure {
+    private static Set<String> held(final Map<String, String> env) throws Failure {
         final Path home = LocalHomeserver.directory(env);
-        final Set<String> issued = new TreeSet<>(names(home.resolve(DIRECTORY)));
-        issued.addAll(names(home.resolve(EXPELLED)));
-        issued.addAll(names(home.resolve(KNOWN)));
+        final Set<String> held = new TreeSet<>(names(home.resolve(DIRECTORY)));
+        held.addAll(names(home.resolve(KNOWN)));
+        return held;
+    }
+
+    /** Every machine whose accounts' names the host keeps: issued a token, or expelled. */
+    private static Set<String> issued(final Map<String, String> env) throws Failure {
+        final Set<String> issued = held(env);
+        issued.addAll(names(LocalHomeserver.directory(env).resolve(EXPELLED)));
         return issued;
     }
 
@@ -321,6 +350,18 @@ final class MachineTokens {
         }
     }
 
+    private static void refuseRevoked(final Map<String, String> env, final String machine)
+            throws Failure {
+        if (Files.exists(LocalHomeserver.directory(env).resolve(KNOWN).resolve(name(machine)))) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    machine
+                            + "'s token was revoked, and its accounts stay; expel "
+                            + machine
+                            + " and add the person under another machine name");
+        }
+    }
+
     /** Whether the machine holds a token now. */
     static boolean admitted(final Map<String, String> env, final String machine) throws Failure {
         return Files.exists(
@@ -335,12 +376,15 @@ final class MachineTokens {
 
     /**
      * As {@code admit} refuses it: two machines whose accounts' names would end alike. Every
-     * machine known is weighed: issued a token here, or listed on the homeserver by its
-     * {@code @porelo}.
+     * machine known is weighed: issued a token here, expelled, or listed on the homeserver by its
+     * {@code @porelo}. A machine holding its token was weighed when it was issued.
      */
     private static void refuseAlike(
             final Map<String, String> env, final String machine, final List<String> listed)
             throws Failure {
+        if (admitted(env, machine)) {
+            return;
+        }
         final Set<String> known = issued(env);
         known.addAll(listed);
         for (final String other : known) {
@@ -450,12 +494,9 @@ final class MachineTokens {
         final List<String> lines = new ArrayList<>();
         lines.add(local(Files.readString(tokens, StandardCharsets.US_ASCII)));
         final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
-        if (Files.isDirectory(dir)) {
-            try (Stream<Path> files = Files.list(dir)) {
-                for (final Path file : files.sorted().toList()) {
-                    lines.add(read(file));
-                }
-            }
+        // A machine's name only: a draft an issue killed left beside them is no token.
+        for (final String machine : names(dir)) {
+            lines.add(read(dir.resolve(machine)));
         }
         write(tokens, String.join("\n", lines) + "\n", true);
     }
