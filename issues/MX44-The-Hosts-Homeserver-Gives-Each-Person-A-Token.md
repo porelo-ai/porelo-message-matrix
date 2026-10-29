@@ -1,6 +1,6 @@
 # MX44 — The Host's Homeserver Gives Each Person A Token
 
-**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28.
+**Status:** Implementing.
 **Size:** M - three verbs on an account's own homeserver with no project, read in today's `MachineTokens` and
 `AdminRoom`, the homeserver's administrator made without a project's `setup`, docs and an integration test; no
 contract another repository reads beyond the verbs' answers.
@@ -45,12 +45,21 @@ register again, while another person's accounts stay.
 - A second person's accounts and token are unchanged through all of it, measured.
 - Nothing of a token appears on stderr, in a file name or a log line.
 
+## Measured on Tuwunel 1.9.4
+
+- **`!admin users list-users`** lists every local account by id, one per line in a code block, with no paging option
+  and no limit seen; a deactivated account is no longer listed.
+- **A deactivated name stays taken:** registering it again answers `M_USER_IN_USE`, and its access tokens answer
+  `M_UNKNOWN_TOKEN` at once.
+- **`reset-password` ends no session:** the account's existing access token still answers `whoami`; only the old
+  password stops logging in. So `expel` sets a password of its own, logs in with it and ends every session
+  (`/logout/all`), takes the account out of every room (`list-joined-rooms`, `force-leave-room`), and sets a
+  password nobody keeps last.
+
 ## To be checked
 
-- **Whether an expelled name can be used again.** Tuwunel's `users deactivate` keeps a deactivated name taken, so a
-  person removed and later added again would not get `@porelo.<M>` back. If so, `expel` logs out, takes the account
-  out of every room and resets its password to one nobody holds, which leaves the name free for the person's own
-  Porelo to take back. Measured on Tuwunel 1.9.4 before building.
-- Which admin-room command lists accounts by name on Tuwunel 1.9.4 (`users list-users` or similar), and its limit.
+- **How a person removed and added again gets their name back.** A deactivated name stays taken, and an account
+  locked with a password nobody holds cannot be logged into by the person's Porelo, whose passwords derive from its
+  machine secret. Asked of the operator (QM48); `expel` waits on the answer, `issue` and `revoke` do not.
 - Related: [MX38](README.md#mx38) (an application service per project) and the Idea of an exclusive namespace per
   person, which the operator left out under QM46 (a).

@@ -11,6 +11,12 @@ sequence.
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
+
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
@@ -36,7 +42,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | Estimated by the operator. A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
 | <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | - | Estimated by the operator. On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
 
