@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,9 +55,11 @@ final class CentralRoom {
 
     /**
      * Declarative and idempotent: invites each listed machine's {@code @porelo.<machine>} not yet
-     * invited or joined, then, for each machine in the room the list no longer names, kicks every
-     * {@code @….<machine>} from this room, {@code @porelo.<machine>} first, reading the room again
-     * until none is left. The maker's own machine is never taken out.
+     * invited or joined, then, for every machine ever in the room the list no longer names, kicks
+     * every {@code @….<machine>} from this room, {@code @porelo.<machine>} first, reading the room
+     * again until none of them is left, so a dropped machine invites no other back. The maker's own
+     * machine is never taken out, nor any account a listed machine's name could claim. Refused
+     * before anything is done for a listed machine banned from the room.
      */
     static ObjectNode members(
             final MatrixClient asMaker,
@@ -97,16 +100,12 @@ final class CentralRoom {
 
         final List<String> listed = new ArrayList<>(machines);
         listed.remove(machine);
+        final Set<String> kept = new TreeSet<>(listed);
+        kept.add(machine);
         Map<String, String> members = members(asMaker, path);
-        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
-        final var invited = answer.putArray("invited");
         for (final String other : listed) {
             final String id = porelo(other, server);
-            final String membership = members.getOrDefault(id, "");
-            if ("join".equals(membership) || "invite".equals(membership)) {
-                continue;
-            }
-            if ("ban".equals(membership)) {
+            if ("ban".equals(members.get(id))) {
                 throw new Failure(
                         Exit.CONFIG,
                         id
@@ -115,34 +114,34 @@ final class CentralRoom {
                                 + "; a person with the power to do so lifts the ban, then members"
                                 + " invites it");
             }
-            asMaker.post(path + "/invite", MatrixClient.JSON.createObjectNode().put("user_id", id));
-            invited.add(id);
         }
 
-        final Set<String> present = present(members, project, server);
-        final Set<String> known = new TreeSet<>(present);
-        known.addAll(listed);
-        known.add(machine);
-        final var removed = answer.putArray("removed");
-        for (final String dropped : present) {
-            if (listed.contains(dropped) || dropped.equals(machine)) {
-                continue;
+        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
+        final var invited = answer.putArray("invited");
+        for (final String other : listed) {
+            final String id = porelo(other, server);
+            if (!in(members.getOrDefault(id, ""))) {
+                asMaker.post(
+                        path + "/invite", MatrixClient.JSON.createObjectNode().put("user_id", id));
+                invited.add(id);
             }
-            List<String> left = accounts(members, dropped, server, known);
-            for (int round = 0; !left.isEmpty(); round++) {
-                if (round == ROUNDS) {
-                    throw new Failure(
-                            Exit.TEMPORARY,
-                            "accounts of "
-                                    + dropped
-                                    + " are still in "
-                                    + alias
-                                    + " after "
-                                    + ROUNDS
-                                    + " rounds: "
-                                    + String.join(", ", left));
-                }
-                for (final String id : left) {
+        }
+
+        final var removed = answer.putArray("removed");
+        List<String> left = left(members, kept, project, server);
+        for (int round = 0; !left.isEmpty(); round++) {
+            if (round == ROUNDS) {
+                throw new Failure(
+                        Exit.TEMPORARY,
+                        "accounts of machines dropped are still in "
+                                + alias
+                                + " after "
+                                + ROUNDS
+                                + " rounds: "
+                                + String.join(", ", left));
+            }
+            for (final String id : left) {
+                try {
                     asMaker.post(
                             path + "/kick",
                             MatrixClient.JSON
@@ -150,12 +149,31 @@ final class CentralRoom {
                                     .put("user_id", id)
                                     .put("reason", REASON));
                     removed.add(id);
+                } catch (final Failure failure) {
+                    // One that left by itself meanwhile is refused a kick; the room read next says.
+                    if (failure.exitCode() != Exit.NOT_PERMITTED) {
+                        throw failure;
+                    }
                 }
-                members = members(asMaker, path);
-                left = accounts(members, dropped, server, known);
             }
+            members = members(asMaker, path);
+            left = left(members, kept, project, server);
         }
         return answer;
+    }
+
+    /**
+     * The accounts in the room of every machine ever in it that is not kept, read anew each round,
+     * so a machine a dropped one invited meanwhile is taken out too.
+     */
+    private static List<String> left(
+            final Map<String, String> members,
+            final Set<String> kept,
+            final String project,
+            final String server) {
+        final Set<String> dropped = machines(members, server);
+        dropped.removeAll(kept);
+        return accounts(members, dropped, kept, project, server);
     }
 
     /** Every member of the room by id, with its membership. */
@@ -171,62 +189,62 @@ final class CentralRoom {
     }
 
     /**
-     * The machines in the room: those whose {@code @porelo.<machine>} or relay is invited or
-     * joined.
+     * Every machine ever in the room by its {@code @porelo.<machine>} of any membership, a left one
+     * too, so a machine whose {@code @porelo} went while its tasks stayed is still seen. A relay's
+     * name is not read, since a project's name may hold a dot.
      */
-    static Set<String> present(
-            final Map<String, String> members, final String project, final String server) {
-        final Set<String> present = new TreeSet<>();
+    static Set<String> machines(final Map<String, String> members, final String server) {
+        final Set<String> machines = new TreeSet<>();
+        final String prefix = "@" + Lifecycle.ADMIN + ".";
         final String suffix = ":" + server;
-        for (final Map.Entry<String, String> member : members.entrySet()) {
-            final String id = member.getKey();
-            if (!in(member.getValue()) || !id.endsWith(suffix)) {
-                continue;
-            }
-            for (final String prefix :
-                    List.of("@" + Lifecycle.ADMIN + ".", "@porelo-relay-" + project + ".")) {
-                if (id.startsWith(prefix)) {
-                    final String name =
-                            id.substring(prefix.length(), id.length() - suffix.length());
-                    if (!name.isEmpty()) {
-                        present.add(name);
-                    }
+        for (final String id : members.keySet()) {
+            if (id.startsWith(prefix) && id.endsWith(suffix)) {
+                final String name = id.substring(prefix.length(), id.length() - suffix.length());
+                if (!name.isEmpty()) {
+                    machines.add(name);
                 }
             }
         }
-        return present;
+        return machines;
     }
 
     /**
-     * The dropped machine's accounts invited to or joined in the room, {@code @porelo.<machine>}
-     * first. An account whose name ends as a longer machine's that is known in the room is that
-     * machine's.
+     * The dropped machines' accounts invited to or joined in the room, their
+     * {@code @porelo.<machine>} first, so none invites its tasks back while they go. A machine's
+     * {@code @porelo} and its relay in this project are its own by name. Any other
+     * {@code @….<machine>} is the machine's, a person taking no name ending as a machine's, unless
+     * its name ends as a kept machine's too ({@code @job.x.hosta} with {@code x.hosta} kept and
+     * {@code hosta} dropped): a kept machine's account is never touched.
      */
     static List<String> accounts(
             final Map<String, String> members,
-            final String dropped,
-            final String server,
-            final Set<String> known) {
-        final String ending = "." + dropped + ":" + server;
-        final List<String> longer =
-                known.stream()
-                        .filter(other -> other.endsWith("." + dropped))
-                        .map(other -> "." + other + ":" + server)
-                        .toList();
-        final List<String> found = new ArrayList<>();
-        for (final Map.Entry<String, String> member : members.entrySet()) {
-            final String id = member.getKey();
-            if (!in(member.getValue())
-                    || !id.endsWith(ending)
-                    || longer.stream().anyMatch(id::endsWith)) {
-                continue;
-            }
-            if (id.equals(porelo(dropped, server))) {
-                found.addFirst(id);
-            } else {
-                found.add(id);
+            final Set<String> dropped,
+            final Set<String> kept,
+            final String project,
+            final String server) {
+        final Set<String> porelos = new LinkedHashSet<>();
+        final Set<String> others = new LinkedHashSet<>();
+        for (final String machine : dropped) {
+            final String own = porelo(machine, server);
+            final String relay = "@porelo-relay-" + project + "." + machine + ":" + server;
+            final String ending = "." + machine + ":" + server;
+            for (final Map.Entry<String, String> member : members.entrySet()) {
+                final String id = member.getKey();
+                if (!in(member.getValue()) || !id.endsWith(ending)) {
+                    continue;
+                }
+                if (id.equals(own)) {
+                    porelos.add(id);
+                } else if (id.equals(relay)
+                        || kept.stream()
+                                .noneMatch(other -> id.endsWith("." + other + ":" + server))) {
+                    others.add(id);
+                }
             }
         }
+        others.removeAll(porelos);
+        final List<String> found = new ArrayList<>(porelos);
+        found.addAll(others);
         return found;
     }
 

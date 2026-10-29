@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `#porelo-<P>:<server>` as `@porelo.<M>`, invite-only, closed to guests and unlisted, or takes the room under that
   alias only if `@porelo.<M>` made it, and answers `"created_room": true`. `members --project P --machines M1,M2,…`,
   run by that machine, keeps the room to the list: it invites each listed machine's `@porelo` not yet in, and takes
-  every account of a machine the list drops out of that room alone, `@porelo` first; `describe` offers both.
+  every account of a machine ever in the room that the list drops out of that room alone, `@porelo` first, never
+  one a listed machine's name could claim; a central task named `porelo.…` is refused; `describe` offers both.
 - `machine-token issue|revoke|expel <machine>` admits a person's machine to the account's own homeserver with no
   project and no room, and takes it out again: `issue` registers the administrator `@porelo` first if there is none
   and answers its token under `account`, then answers the machine's own registration token, the same on every call;

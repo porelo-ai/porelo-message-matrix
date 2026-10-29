@@ -244,6 +244,16 @@ final class Lifecycle {
         final String secret =
                 keptSecret != null && !keptSecret.isBlank() ? keptSecret : Accounts.secret();
         final MatrixClient nobody = client(url, "", settings);
+        // Refused before an account is made: the room --create-room makes is the project's alias.
+        if (options.createRoom() && !configuredRoom.startsWith(alias(options.project(), ""))) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "--create-room makes the room "
+                            + alias(options.project(), "<server>")
+                            + ", and the project's settings name the room "
+                            + configuredRoom
+                            + "; name that alias as the project's room");
+        }
 
         final Accounts.Session machineAccount =
                 machineAccount(
@@ -715,8 +725,11 @@ final class Lifecycle {
 
     private static String centralTask(final Options options) throws Failure {
         final String task = required(options.task(), "--task");
-        // Kept out of the machine's own provisioning and relay localparts.
-        if (ADMIN.equals(task) || task.startsWith("porelo-relay-")) {
+        // Kept out of the machine's own provisioning and relay localparts; a task @porelo.x.<M>
+        // would read as the machine x.<M>'s @porelo.
+        if (ADMIN.equals(task)
+                || task.startsWith("porelo-relay-")
+                || task.startsWith(ADMIN + ".")) {
             throw new Failure(
                     Exit.CONFIG, "'" + task + "' is a transport account name, not a task's");
         }

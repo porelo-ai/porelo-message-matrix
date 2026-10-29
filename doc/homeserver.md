@@ -169,7 +169,8 @@ What a person does on the central homeserver:
 - **Or let the project admin's Porelo make the room and keep it:** its `setup --create-room` makes
   `#porelo-<project>:<server>` as `@porelo.<machine>`, and its `members` keeps the room to the machines of the
   project's signed developer list, inviting each and taking out every account of a machine the list drops
-  ([the contract](transport.md#the-lifecycle)). The project's settings then name that alias as `room`, and nobody needs
+  ([the contract](transport.md#the-lifecycle)). Every `@<name>.<machine>` in that room counts as the machine's, so
+  a person takes a name that ends as no machine's. The project's settings then name that alias as `room`, and nobody needs
   to invite the machines by hand.
 - **Make the project's room** from a Matrix client as invite-only (`join_rule: invite`, such as the
   `private_chat` preset, whose invite power level is 0) with guests forbidden (`m.room.guest_access` set to

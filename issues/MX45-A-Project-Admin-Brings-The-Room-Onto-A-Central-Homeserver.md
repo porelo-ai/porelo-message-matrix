@@ -1,6 +1,6 @@
 # MX45 — A Project Admin Brings The Room Onto A Central Homeserver
 
-**Status:** Implementing since 2026-10-29. Estimated by the operator on 2026-10-28; Accepted on 2026-10-28. It builds on Porelo naming a transport's machine `<host>-<account>`.
+**Status:** Review since 2026-10-29. Estimated by the operator on 2026-10-28; Accepted on 2026-10-28. It builds on Porelo naming a transport's machine `<host>-<account>`.
 **Size:** M - two lifecycle verbs in central mode, read in today's local `room()`/`ours()` and central `setup`, a
 contract change porelo reads (`describe`, the answers), docs and integration tests.
 
@@ -41,6 +41,36 @@ this room and still in another project's, a person's account and the remaining d
 - `members` twice with one list changes nothing the second time.
 - A room under the alias that the project admin's `@porelo.<M>` did not make is refused, and nothing is invited into
   it.
+
+## Review
+
+A read-only review by another model found the following, and each is fixed with a test that failed first:
+
+- **A dropped machine's tasks stayed** once its `@porelo` and relay had left, by themselves or in a `members` cut
+  off. A machine now counts as in the room by its `@porelo` of any membership, one that left too.
+- **Another project's relay read as a machine:** a project's name may hold a dot (`demo.v2`), so
+  `@porelo-relay-demo.v2.<M>` looked like the machine `v2.<M>`. A relay's name is no longer read.
+- **A task named `porelo.worker` read as the machine `worker.<M>`**, whose accounts were then taken out. Central
+  `enroll` now refuses a task named `porelo.…` (78).
+- **Nested machines** (`x.hosta` beside `hosta`): an account `@job.x.hosta` is either's, so dropping one kept or
+  kicked the other's task. A listed machine's account is never touched now: an account counts as a dropped
+  machine's only if no listed machine's name could claim it, while a dropped machine's `@porelo` and its relay in
+  this project are its own by name. Refusing nested names, tried first, let any member lock `members` by one
+  invitation and refused renaming a machine; the readings found both. Left: a dropped machine's task whose name
+  also ends as a listed machine's stays in the room, which needs two nested machine names in one project.
+- **One dropped machine could invite another back** between their kicks. All dropped machines' accounts are kicked
+  in the same rounds now, as `dismiss` does, and each round reads anew which machines are in, so one invited
+  meanwhile is taken out too. A kick refused because the account left by itself is no failure.
+- **A banned listed machine** was refused only after earlier ones were invited. The ban is checked first.
+- **Settings naming another room** registered `@porelo.<M>` before `--create-room` refused. Now `setup` refuses
+  a room of another name before any account is made. The alias on another server is told only once the account
+  shows the server's name, so that refusal still comes on the next setup.
+- **Tests that missed it:** nothing read `"created_room"`; the empty list was checked by the answer, not the room;
+  the room made by another was refused before its maker was compared. Each is checked now.
+
+Decided under the plan's "every `@….<M>`": on a room the project admin keeps, every `@<name>.<M>` counts as the
+machine's, so a person takes a name ending as no machine's (doc/homeserver.md says so). A person's account cannot be
+told from a task's by its name, and Porelo names the tasks.
 
 ## Measured on Tuwunel 1.9.4
 

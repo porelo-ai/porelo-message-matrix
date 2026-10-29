@@ -1657,6 +1657,9 @@ class CentralIT {
         assertThat(setup.path("admitted").asBoolean())
                 .as("%s admitted to %s: %s", machine, project, setup)
                 .isTrue();
+        assertThat(setup.path("created_room").asBoolean())
+                .as("the room made, and so said, with --create-room only: %s", setup)
+                .isEqualTo(args.contains("--create-room"));
         return with(baseEnv(), setup.path("account"), setup.path("secrets"));
     }
 
@@ -1752,6 +1755,20 @@ class CentralIT {
                 .isZero();
         assertThat(power.path("kick").asInt()).as("but takes nobody out: %s", power).isPositive();
 
+        final Transport.Result fakeMachine =
+                attempt(
+                        admin,
+                        "enroll",
+                        "--project",
+                        PROJECT,
+                        "--task",
+                        "porelo.worker",
+                        "--machine",
+                        "admin-m");
+        assertThat(fakeMachine.exit())
+                .as("a task that would read as a machine's @porelo: %s", fakeMachine.err())
+                .isEqualTo(Exit.CONFIG);
+
         // dev-two is not registered yet when it is invited.
         assertThat(members(admin, PROJECT, "admin-m,dev-one,dev-two").path("invited"))
                 .as("both developers invited, the maker not")
@@ -1775,6 +1792,22 @@ class CentralIT {
                 person,
                 MatrixClient.JSON.createObjectNode(),
                 200);
+
+        // A person invites a machine not listed, its name ending as dev-two's, by mistake.
+        tuwunel.call(
+                "POST",
+                "/_matrix/client/v3/rooms/" + MatrixClient.segment(projectRoom) + "/invite",
+                person,
+                MatrixClient.JSON.createObjectNode().put("user_id", porelo("x.dev-two")),
+                200);
+        final JsonNode cleared = members(admin, PROJECT, "dev-two,dev-one");
+        assertThat(cleared.path("removed"))
+                .as("the invitation taken back, nothing of dev-two's touched")
+                .extracting(JsonNode::asText)
+                .containsExactly(porelo("x.dev-two"));
+        assertThat(tuwunel.membership(asAdmin, projectRoom, "@t2.dev-two:" + Tuwunel.SERVER_NAME))
+                .as("dev-two's task stays")
+                .isEqualTo("join");
 
         final JsonNode again = members(admin, PROJECT, "dev-two,dev-one");
         assertThat(again.path("invited").size() + again.path("removed").size())
@@ -1821,14 +1854,44 @@ class CentralIT {
                                 MatrixClient.JSON.createObjectNode()))
                 .as("a kicked task cannot join the invite-only room by itself")
                 .isEqualTo(403);
+        // dev-two's @porelo and relay leave by themselves, its task stays.
+        for (final String token :
+                List.of(two.get(Config.ADMIN_TOKEN), two.get(Config.ACCESS_TOKEN))) {
+            tuwunel.call(
+                    "POST",
+                    "/_matrix/client/v3/rooms/" + MatrixClient.segment(projectRoom) + "/leave",
+                    new Tuwunel.Account("", token),
+                    MatrixClient.JSON.createObjectNode(),
+                    200);
+        }
         final JsonNode none = members(admin, PROJECT, "");
+        final String t2 = "@t2.dev-two:" + Tuwunel.SERVER_NAME;
         assertThat(none.path("removed"))
-                .as("an empty list takes out every machine but the maker")
+                .as("an empty list takes out every machine but the maker, its @porelo gone too")
                 .extracting(JsonNode::asText)
-                .contains(porelo("dev-two"));
-        assertThat(tuwunel.membership(asAdmin, projectRoom, person.userId()))
-                .as("the person stays")
-                .isEqualTo("join");
+                .containsExactly(t2);
+        for (final String id :
+                List.of(
+                        t2,
+                        porelo("dev-two"),
+                        "@porelo-relay-" + PROJECT + ".dev-two:" + Tuwunel.SERVER_NAME)) {
+            assertThat(tuwunel.membership(asAdmin, projectRoom, id))
+                    .as("%s out of the project's room", id)
+                    .isEqualTo("leave");
+        }
+        for (final String stays :
+                List.of(
+                        person.userId(),
+                        porelo("admin-m"),
+                        "@porelo-relay-" + PROJECT + ".admin-m:" + Tuwunel.SERVER_NAME)) {
+            assertThat(tuwunel.membership(asAdmin, projectRoom, stays))
+                    .as("%s stays", stays)
+                    .isEqualTo("join");
+        }
+        final JsonNode noneAgain = members(admin, PROJECT, "");
+        assertThat(noneAgain.path("invited").size() + noneAgain.path("removed").size())
+                .as("the empty list again changes nothing: %s", noneAgain)
+                .isZero();
     }
 
     /**
@@ -1839,7 +1902,7 @@ class CentralIT {
     @DisplayName(
             "A room under the alias that the admin's machine did not make is refused, and nobody is invited")
     void aRoomUnderTheAliasMadeByAnotherIsRefused() throws Exception {
-        final String theirs = tuwunel.createRoom(person);
+        final String theirs = createCentralRoom(person, true);
         tuwunel.call(
                 "PUT",
                 "/_matrix/client/v3/directory/room/" + MatrixClient.segment(alias("taken")),
@@ -1859,6 +1922,19 @@ class CentralIT {
         assertThat(first.path("admitted").asBoolean())
                 .as("the first setup keeps the account, admitted nowhere")
                 .isFalse();
+        // Let in by the room's maker, so only who made the room tells it apart.
+        tuwunel.call(
+                "POST",
+                "/_matrix/client/v3/rooms/" + MatrixClient.segment(theirs) + "/invite",
+                person,
+                MatrixClient.JSON.createObjectNode().put("user_id", porelo("admin-m")),
+                200);
+        tuwunel.call(
+                "POST",
+                "/_matrix/client/v3/join/" + MatrixClient.segment(theirs),
+                new Tuwunel.Account("", first.path("account").path(Config.ADMIN_TOKEN).asText()),
+                MatrixClient.JSON.createObjectNode(),
+                200);
 
         final Transport.Result again =
                 attempt(
@@ -1870,7 +1946,7 @@ class CentralIT {
                         "admin-m",
                         "--create-room");
         assertThat(again.exit()).as(again.err()).isEqualTo(Exit.CONFIG);
-        assertThat(again.err()).contains("which is not the room Porelo made");
+        assertThat(again.err()).contains("which is not the room Porelo made", "it was made by");
         final Transport.Result members =
                 attempt(
                         with(baseEnv(), first.path("account")),
@@ -1882,6 +1958,7 @@ class CentralIT {
                         "--machine",
                         "admin-m");
         assertThat(members.exit()).as(members.err()).isEqualTo(Exit.CONFIG);
+        assertThat(members.err()).contains("it was made by");
         assertThat(
                         tuwunel.callStatus(
                                 "GET",
@@ -1892,6 +1969,38 @@ class CentralIT {
                                 person,
                                 MatrixClient.JSON.createObjectNode()))
                 .as("nobody invited into it")
+                .isEqualTo(404);
+    }
+
+    /**
+     * Harm guarded: a project whose settings name another room registers {@code @porelo.<M>}, and
+     * uses a registration token, before --create-room refuses only on the next setup.
+     */
+    @Test
+    @DisplayName("--create-room is refused for settings naming another room before any account")
+    void createRoomRefusesAnotherRoomFirst() throws Exception {
+        settings = settingsJson("#elsewhere:" + Tuwunel.SERVER_NAME);
+
+        final Transport.Result refused =
+                attempt(
+                        baseEnv(),
+                        "setup",
+                        "--project",
+                        "wrong",
+                        "--machine",
+                        "admin-w",
+                        "--create-room");
+
+        assertThat(refused.exit()).as(refused.err()).isEqualTo(Exit.CONFIG);
+        assertThat(refused.err()).contains("#porelo-wrong:");
+        assertThat(
+                        tuwunel.callStatus(
+                                "GET",
+                                "/_matrix/client/v3/profile/"
+                                        + MatrixClient.segment(porelo("admin-w")),
+                                person,
+                                null))
+                .as("no account registered")
                 .isEqualTo(404);
     }
 }
