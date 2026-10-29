@@ -17,8 +17,8 @@ a directory another backup filled.
 - **Two backups into one directory.** `backup` checks that the target is empty before it takes the lock. Two runs
   into the same empty directory both pass; the first fills it, and the second, finding files, fails and empties
   the directory (`Keep.emptyAgain`), the first one's copy with it. One run then reported success with nothing kept.
-- The host's playbook runs `backup` every hour and at `down`
-  ([HO07](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho07)), so a run that gives up and
+- The host's playbook runs `backup` every hour and at `down`,
+  so a run that gives up and
   the next one meeting is not far-fetched.
 
 ## Measured

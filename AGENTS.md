@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `48d70cbc5e50cafe` · changed 2026-10-28T06:34Z
+> **BEGIN Shared Area** · sha256 `beb8bb2dcc465a68` · changed 2026-10-29T05:10Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -48,7 +48,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   locally.**
 - **Amend, squash or rebase only when every affected commit is unpublished**, checked with
   `git ls-remote origin refs/heads/main`, never with a cached `origin/main`; several local commits
-  are allowed. A pushed commit is repaired by a new commit on the remote's tip, never by a force push.
+  are allowed. A pushed commit is repaired by a new commit on the remote's tip, never by a force push;
+  a task's own unmerged branch is the one exception, taking its amended commit with `--force`.
 - **A commit message is one line of at most 72 characters saying in words what changed**, never by a
   requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
   what they share, not each of them. Trailers may follow below a blank line, and nothing else.
@@ -72,16 +73,19 @@ and the UTC time that text last changed; change it in the channel first, never i
 ### Issues
 
 - **Every open task is an issue in `issues/`, named `<prefix><nn>-Short-Title.md`** with one of its
-  repository's prefixes; a repository may own several, for subgroups. An issue is one task, says
-  what must be true and how it is judged done, and names a dependency on another repository's issue
-  by repository and number.
+  repository's prefixes; a repository may own several, for subgroups. An issue is one task and says
+  what must be true and how it is judged done.
+- **An issue is self-contained: it states the contract it builds against in words and names no issue,
+  sprint, release or requirement of another repository.** Only `porelo-project`'s requirements and
+  plans name them, with their order and their waits (`plan/after.yml`), so a change of plan changes
+  `porelo-project` alone.
 - **A new issue follows this skeleton**, and its index row is added in the same commit; *Why* and
   *The shape* may follow *What must be true* in a larger issue:
 
       # <PREFIX><nn> — <Short Title>
 
       **Status:** Idea | Accepted | Analyzed | Estimated | Backlog | Implementing | Review | Rework;
-      blocked by <repository> <number>, if so.
+      blocked by <number> of this repository, if so.
       **Size:** XS | S | M | L | XL - one line why (from Analyzed on).
 
       **What must be true.** One or two sentences, from the point of view of whoever uses it.
@@ -122,8 +126,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   size or plan that grows clearly while building is said before building on.
 - **`issues/README.md` is the index, grouped by state** in this order: Review, Rework, Implementing,
   Backlog, Analyzed, Accepted, Idea, Estimated, then Finished and Rejected last; each group a table of
-  number, size, blocked by and what it covers, and in *Analyzed* also the number of open questions
-  (the group's heading says the state; a note on how far it is goes into what it covers), ordered by
+  number, size, blocked by (in this repository) and what it covers, and in *Analyzed* also the number
+  of open questions (the group's heading says the state; a note on how far it is goes into what it covers), ordered by
   what to do next; it changes in the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
 - **A rejected issue's file is deleted**; its number, title and one sentence why stay as a row under
   *Rejected* in the index, so the same idea is not brought twice.
@@ -153,17 +157,18 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Every row of an index opens with an anchor named after its number**, `<a id="<number>"></a>`,
   the number lower case; a *Finished* or *Rejected* row keeps it.
 - **An issue number in `issues/` is a link to its row in the index, never to its file**, which is
-  deleted when the issue is finished: `[<NUMBER>](README.md#<number>)` in the same repository, the
-  other repository's index on GitHub for another's. The row outlives the file, so the link does not
-  break. The shared tools check that every number is such a link and that its anchor exists.
+  deleted when the issue is finished: `[<NUMBER>](README.md#<number>)` in the same repository, and in
+  `porelo-project` the other repository's index on GitHub for another's. The row outlives the file, so
+  the link does not break. The shared tools check that every number is such a link, that its anchor
+  exists, and that no repository but `porelo-project` cites another's issue.
 - **Code, comments, test names and anything that ships never cite an issue number**; they state the
   constraint itself, since the issue is deleted once it is finished.
 - **A sprint-scoped instruction applies only to issues assigned to that sprint in the release
   plan.** Check each issue’s assignment before changing its state or starting work under that
   instruction.
-- **A requirement handover includes the text the receiving repository needs and the commit it came
-  from.** Identify a proposal as a proposal until the operator accepts it. Publish a new index row
-  before another repository links to it.
+- **A requirement handover includes the text the receiving repository needs; where it came from goes
+  into the handover, never into the issue.** Identify a proposal as a proposal until the operator
+  accepts it. Publish a new index row before `porelo-project` links to it.
 
 ### Testing and machines
 
@@ -426,7 +431,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   times, count returns after first readiness as rework, and explain long waits or size growth. Count
   shared time and token usage only once.
 
-> **END Shared Area** · sha256 `48d70cbc5e50cafe`
+> **END Shared Area** · sha256 `beb8bb2dcc465a68`
 
 ## What this repository is
 

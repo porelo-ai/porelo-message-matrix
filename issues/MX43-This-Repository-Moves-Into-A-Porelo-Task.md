@@ -6,9 +6,6 @@
 the rented host: the agent takes this issue from start to Review in the task, its pushes reach the host's forge, the
 forge's build is green, and it is reached in the project's room under this repository's name.
 
-From [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59), the move of this repository
-in its order.
-
 ## The shape
 
 - **What moves:** this repository alone, with its agent; the issues, the documentation and the code.
@@ -16,9 +13,9 @@ in its order.
   start the homeserver.
 - **The forge's build:** the steps of today's Build workflow on the host's forge, the packages and their install legs
   included.
-- **The room's name:** `Agent Matrix`, from the nickname `Matrix` in porelo-project's `project.yml`, as porelo
-  [B298](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b298) names an agent.
-- **The way back:** as the procedure of [PJ59](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj59) gives it for every agent; the task's open work fetched into the local
+- **The room's name:** `Agent Matrix`, from the nickname `Matrix` in porelo-project's `project.yml`, as Porelo names an agent
+  after its nickname.
+- **The way back:** as the project's procedure for an agent's move lays out; the task's open work fetched into the local
   checkout first.
 - **The room during the move:** porelo-project's signed `project.yml` names
   `homeserver: https://matrix.porelo.internal:<port>` with the room, the CA as `ca_certificate` and

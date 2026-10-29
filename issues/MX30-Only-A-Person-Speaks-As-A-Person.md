@@ -1,6 +1,6 @@
 # MX30 — Only A Person Speaks As A Person
 
-**Status:** Accepted; after porelo-project's [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39).
+**Status:** Accepted.
 **Size:** M - a setting in the transport's contract with porelo, the room's and the direct chats' poll, and an
 integration test on the central homeserver.
 

@@ -1,8 +1,7 @@
 # MX23 — The Transport Takes Its Tokens On Its Input
 
-**Status:** Review, published with `36adabe`; the transport's half of porelo's
-[B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206), which closes what making the
-running transport not dumpable leaves open.
+**Status:** Review, published with `36adabe`; the transport's half of a contract change with porelo, which hands a
+transport its secrets on its input and so closes what making the running transport not dumpable leaves open.
 **Size:** M - one contract change, made here and in porelo together: every verb reads its secrets from its input
 instead of the environment, `describe` says so, and the environment stays a fallback for a Porelo of the old way;
 the tests of every verb that takes a token, `doc/transport.md`, and a VM run against a porelo that hands them so.
@@ -21,8 +20,7 @@ environment closes it.
 
 ## Plan
 
-The contract agreed with Agent Core on 2026-10-27 for porelo's
-[B206](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b206):
+The contract agreed with porelo, in which Porelo hands a transport its secrets on standard input:
 
 - **One object on standard input**, `{"settings": {...}, "secrets": {...}}`, closed once written. `settings` comes to
   a lifecycle verb and to `settings`. `secrets` is the whole map the transport printed and Porelo kept, key for key,

@@ -88,9 +88,7 @@ On a test VM, against the pinned Tuwunel:
   `set_presence=offline`, bound to the project room alone so it never reads a task's direct chats or the lobby, with
   a position and a lock of its own kept apart from each task's `--direct` position and stable when the task it reads
   as changes or retires. `Person.deliver` does not strip a task reader from `to`, so a mention of only the reading
-  task still addresses that task; once existing rooms are migrated and historical helper references are handled,
-  porelo's [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264) can be proposed for
-  rejection.
+  task still addresses that task.
 - **Existing rooms:** their creator stays the administrator, so `ours` keeps accepting such a room by its old proof;
   `setup` makes the lobby, sets the restricted rule, and has the relay and the administrator leave only once a task
   in the project's new namespace is in the lobby and the room as a reader; old task accounts outside the namespace
@@ -162,8 +160,7 @@ On a test VM, against the pinned Tuwunel:
 11. **Reading as a task strips that task from `to` (`Person.java`):** `Person.deliver` removes `self` from
     recipients, so mentioning only the reading task produces an empty `to`, and historical messages can still
     mention or reply to departed helpers. `Person.deliver` must not strip a task reader from `to` and must handle
-    historical helper references before [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264)
-    is rejected.
+    historical helper references.
 12. **Harm misidentifies the signature verifier and overstates token isolation (`Poll.java`, `MessageDelivery`,
     `SshSignature.java`):** the filter checks signature format only while `porelo`'s `MessageDelivery` verifies
     allowed peer keys and recorded people, and lifecycle verbs still hold the administrator token and log in as
@@ -204,8 +201,7 @@ Each part becomes its own issue when this one is taken up:
    resolving it, `join`'s order.
 4. **Part 4 — Lifecycle and migration without helpers** (L): `enroll`, `join`, `retire`, `clear` through the service,
    `membersElsewhere` with invitations, the migration of existing rooms, the central homeserver left as it is; then
-   the relay goes and porelo's [B264](https://github.com/porelo-ai/porelo/blob/main/issues/base/README.md#b264) can
-   be proposed for rejection.
+   the relay goes.
 
 Order: 1, then 2, 3, 4. Build estimate for all: 960 min, a guess.
 

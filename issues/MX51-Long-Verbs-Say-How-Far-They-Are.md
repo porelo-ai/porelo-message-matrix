@@ -1,7 +1,7 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Backlog, the operator's word on 2026-10-28: planned for a later round. It needs porelo to show a
-transport's stderr while the verb runs, which Agent Core files as a B-issue; until then the lines reach a person only
+**Status:** Backlog. It needs porelo to show a
+transport's stderr while the verb runs; until then the lines reach a person only
 when the transport runs directly.
 **Size:** S - stderr lines in `LocalHomeserver.awaitUp`, `Keep` and `Publish`, with their tests; stdout's contract is
 unchanged.
@@ -11,7 +11,7 @@ it has waited. A silent minute no longer looks like a hang.
 
 ## Plan
 
-The operator's word in sprint 6i (28 Oct), after M0.2 hung silently: long CLI processes should not run without a
+The operator's word after a test step hung silently: long CLI processes should not run without a
 status. The waits are `LocalHomeserver.awaitUp` (up to `START_TIMEOUT`, 180 s, after a start or restart: `setup`,
 `publish`, `restore`), `Keep` (`backup`/`restore`: stopping, copying, starting) and `Publish` (the certificate, then
 the restart).

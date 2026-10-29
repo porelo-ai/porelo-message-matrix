@@ -1,8 +1,6 @@
 # MX24 — The Room Outlives The Machine
 
-**Status:** Review; the transport's part of porelo-project's
-[PJ45](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj45), which keeps chosen data when a
-rented host goes.
+**Status:** Review; the transport's part of keeping chosen data when a rented host goes.
 **Size:** M - two new verbs and a change to `setup`, the unit's mounts, a contract porelo-host reads, and an
 integration test with the real homeserver; no other repository changes.
 
@@ -75,7 +73,7 @@ On Tuwunel 1.9.4, the pinned image, in rootless podman on the host, with throwaw
   a one-off run - is an interface; `PodmanUnit` is the unit through `systemctl --user` and podman, and the tests'
   `ProcessUnit` runs the image's own binary as a process, so `KeepIT` needs neither systemd nor a container start.
 - **Not lifecycle verbs**: Porelo never runs them, so `describe` does not list them; `doc/transport.md` gets a section
-  *Keeping the conversation* for the host's playbook ([HO07](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho07)),
+  *Keeping the conversation* for porelo-host's playbook, which runs `backup` and `restore`,
   `doc/homeserver.md` the backup directory.
 - **Red first**, `KeepIT` on the real homeserver: a room with messages, a relay poll, a message more, `backup`, the
   account cleared, `restore`, `setup` and the relay's `poll` with an empty vault: the room's messages are there, and
@@ -90,7 +88,7 @@ On Tuwunel 1.9.4, the pinned image, in rootless podman on the host, with throwaw
 - A `restore` into an account with a database restores nothing and answers `present`, the database unchanged.
 - No token or password in a command line, a log line or a file while `setup` takes `@porelo` back: the run's
   `/proc/<pid>/cmdline` and the journal read for it.
-- `doc/transport.md` states both commands' arguments, output and exit codes, as [HO07](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho07) needs them.
+- `doc/transport.md` states both commands' arguments, output and exit codes, as porelo-host's playbook needs them.
 
 ## To be checked
 

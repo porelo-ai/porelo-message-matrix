@@ -23,8 +23,8 @@ still hangs no poll.
   tasks stopped it ran at once.
 - On a busy machine the playbook's backup therefore never succeeds, and the conversation does not outlive the
   host.
-- The host's playbook takes a backup every hour as well as at `down`
-  ([HO07](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho07)), so while tasks poll no
+- The host's playbook takes a backup every hour as well as at `down`,
+  so while tasks poll no
   hourly backup succeeds either.
 
 ## Measured

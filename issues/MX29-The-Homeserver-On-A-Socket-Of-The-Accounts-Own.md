@@ -1,6 +1,6 @@
 # MX29 — The Homeserver On A Socket Of The Account's Own
 
-**Status:** Backlog; after porelo-project's [PJ39](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj39).
+**Status:** Backlog.
 
 **What must be true.** The account's own homeserver is reached through a unix socket only that account can
 open, so no other account on the machine can stand in for it at any moment - not even for the milliseconds

@@ -1,7 +1,6 @@
 # MX44 — The Host's Homeserver Gives Each Person A Token
 
-**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28, for
-[PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78).
+**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28.
 **Size:** M - three verbs on an account's own homeserver with no project, read in today's `MachineTokens` and
 `AdminRoom`, the homeserver's administrator made without a project's `setup`, docs and an integration test; no
 contract another repository reads beyond the verbs' answers.
@@ -13,7 +12,7 @@ the host has no account left that can log in or stay in a room, and no other per
 ## Plan
 
 Read in `36adabe`. The host's homeserver is an account's own homeserver (`porelo-matrix`,
-[HO11](https://github.com/porelo-ai/porelo-host/blob/main/issues/README.md#ho11)'s unit, published by
+the unit porelo-host installs, published by
 [MX42](README.md#mx42)'s `publish --name matrix.<host>.porelo.internal`), and every person on the host reaches it in
 central mode as `<host>-<user>` (porelo's machine name). What is missing is the administrator's side without a
 project:
@@ -54,5 +53,4 @@ register again, while another person's accounts stay.
   Porelo to take back. Measured on Tuwunel 1.9.4 before building.
 - Which admin-room command lists accounts by name on Tuwunel 1.9.4 (`users list-users` or similar), and its limit.
 - Related: [MX38](README.md#mx38) (an application service per project) and the Idea of an exclusive namespace per
-  person, which [PJ78](https://github.com/porelo-ai/porelo-project/blob/main/issues/README.md#pj78) left out under
-  the operator's QM46 (a).
+  person, which the operator left out under QM46 (a).
