@@ -10,8 +10,8 @@ were in stay as they were.
 
 ## Plan
 
-Seen in an operator's walk: `porelo talk join sluice-dry michi` answered `'michi' has an account already;
---reset gives it a new password` (77). `michi` was in another project's room. `Lifecycle.join` takes an existing account
+Seen in an operator's walk: `porelo talk join sluice-dry carol` answered `'carol' has an account already;
+--reset gives it a new password` (77). `carol` was in another project's room. `Lifecycle.join` takes an existing account
 without `--reset` only when `part` took it out of this room and it is in no other project's room.
 
 - In `join`, an existing account that is a member of another project's room on this homeserver (`membersElsewhere`)
