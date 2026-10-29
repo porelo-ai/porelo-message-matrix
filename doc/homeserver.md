@@ -56,7 +56,11 @@ stops and says the homeserver "was reset":
    `porelo vault remove transport/matrix/project/<project>` for each project;
 3. the transport's state: `rm -r ~/.local/state/porelo/transports/matrix`.
 
-`tokens/registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again.
+`tokens/registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again. On a host
+whose helper admitted people's machines, their tokens and records go too, since the accounts they stood for went
+with the database: `porelo-message-transport-matrix machine-token revoke <machine>` for each file in
+`~/.config/porelo/matrix/machine-tokens/`, which takes its token out of the file the homeserver reads, then
+`rm -r ~/.config/porelo/matrix/expelled-machines`.
 
 ## Onto another machine
 
@@ -127,13 +131,16 @@ administrator's helper admits each person's machine and takes it out again:
   under `account` to be kept and handed back. Once `@porelo` exists, nothing registers a second one.
 - **`issue`** answers `{"machine": "<machine>", "token": "…"}`, the same token on every later call, and writes only
   the token files the homeserver reads. It refuses a machine whose accounts' names would end as an admitted
-  machine's, and a machine expelled before.
+  machine's, a machine expelled before, and a machine not admitted whose accounts `@….<machine>` the homeserver
+  lists already: their names are taken. These are checked before `@porelo` is registered.
 - **`revoke`** answers `{"machine": "<machine>", "revoked": true|false}`; the homeserver refuses the token at its
   next registration. A revoked token logs no account out, so `expel` comes first.
-- **`expel`** deactivates every `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out
-  of every room, and answers `{"machine": "<machine>", "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken,
-  so the machine is recorded as expelled (`expelled-machines/<machine>` beside the tokens) and gets no token again:
-  the person comes back under another user name.
+- **`expel`** records the machine as expelled and revokes its token at once, then deactivates every
+  `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out of every room, and answers
+  `{"machine": "<machine>", "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken, so
+  the record (`expelled-machines/<machine>` beside the tokens) keeps the machine from a token again: the person
+  comes back under another user name. A machine of which the homeserver knows nothing, with no token, no record
+  and no account, is refused, so a name mistyped takes no name for good.
 
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'

@@ -48,7 +48,8 @@ final class MachineTokenVerb {
 
     /**
      * The administrator made before any machine gets a token: the first account registered is the
-     * homeserver's administrator, and a person's would be otherwise.
+     * homeserver's administrator, and a person's would be otherwise. What {@code issue} refuses is
+     * refused before that, so a refusal registers no administrator whose token is never answered.
      */
     private static void issue(
             final Map<String, String> env,
@@ -56,23 +57,36 @@ final class MachineTokenVerb {
             final Unit unit,
             final ObjectNode answer)
             throws Failure {
-        refuseAlike(env, machine);
+        MachineTokens.admissible(env, machine);
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
         final String given = env.get(Config.ADMIN_TOKEN);
+        final Accounts.Session admin = administrator(local, env, unit);
         if (given == null || given.isBlank()) {
-            final Accounts.Session admin = administrator(local, env, unit);
             answer.putObject("account").put(Config.ADMIN_TOKEN, admin.accessToken());
-        } else {
-            administrator(local, env, unit);
+        }
+        if (!MachineTokens.admitted(env, machine)) {
+            final List<String> taken = accounts(room(local, admin), ending(admin, machine));
+            if (!taken.isEmpty()) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "the homeserver has accounts of "
+                                + machine
+                                + " already ("
+                                + String.join(", ", taken)
+                                + "), whose names a new Porelo cannot take; expel "
+                                + machine
+                                + ", or add the person under another machine name");
+            }
         }
         answer.put("token", MachineTokens.issue(env, machine));
     }
 
     /**
      * Every account of the machine deactivated, {@code @porelo.<machine>} first, and the machine
-     * recorded as expelled first of all, so no token is issued for it while this runs. Tuwunel
-     * lists a deactivated account no more; the list is read again until none of the machine's is
-     * left.
+     * recorded as expelled and its token revoked first of all, so no token is issued for it while
+     * this runs. Tuwunel lists a deactivated account no more; the list is read again until none of
+     * the machine's is left. A machine of which the homeserver knows nothing is refused, so a name
+     * mistyped takes no name for good.
      */
     private static void expel(
             final Map<String, String> env,
@@ -87,18 +101,33 @@ final class MachineTokenVerb {
                     "expel needs the administrator's token among the secrets on stdin, as issue"
                             + " answered it");
         }
+        MachineTokens.name(machine);
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
         final Accounts.Session admin = administrator(local, env, unit);
-        final MatrixClient asAdmin = client(local.url(), admin.accessToken());
-        final AdminRoom room = AdminRoom.of(asAdmin, admin.userId());
-        MachineTokens.recordExpelled(env, machine);
-        final String ending = "." + machine + ":" + AdminRoom.server(admin.userId());
+        final AdminRoom room = room(local, admin);
+        final String ending = ending(admin, machine);
+        List<String> left = accounts(room, ending);
+        if (left.isEmpty()
+                && !MachineTokens.admitted(env, machine)
+                && !MachineTokens.expelled(env, machine)) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    machine
+                            + " was never admitted to this homeserver, and it has no account of"
+                            + " it; name the machine as issue was given it");
+        }
+        answer.put("revoked", MachineTokens.expel(env, machine));
         final List<String> expelled = new ArrayList<>();
-        for (int round = 0; round < ROUNDS; round++) {
-            final List<String> left = accounts(room, ending);
-            if (left.isEmpty()) {
-                expelled.forEach(answer.putArray("expelled")::add);
-                return;
+        for (int round = 0; !left.isEmpty(); round++) {
+            if (round == ROUNDS) {
+                throw new Failure(
+                        Exit.TEMPORARY,
+                        "accounts of "
+                                + machine
+                                + " are still listed after "
+                                + ROUNDS
+                                + " rounds: "
+                                + String.join(", ", left));
             }
             for (final String id : left) {
                 room.deactivate(id);
@@ -106,47 +135,32 @@ final class MachineTokenVerb {
                     expelled.add(id);
                 }
             }
+            left = accounts(room, ending);
         }
-        throw new Failure(
-                Exit.TEMPORARY,
-                "accounts of "
-                        + machine
-                        + " are still listed after "
-                        + ROUNDS
-                        + " rounds: "
-                        + String.join(", ", accounts(room, ending)));
+        expelled.forEach(answer.putArray("expelled")::add);
+    }
+
+    /** What every account of the machine's name ends with on this homeserver. */
+    private static String ending(final Accounts.Session admin, final String machine) {
+        return "." + machine + ":" + AdminRoom.server(admin.userId());
     }
 
     /** The machine's accounts the homeserver lists, {@code @porelo.<machine>} first. */
     private static List<String> accounts(final AdminRoom room, final String ending) throws Failure {
         final List<String> found = new ArrayList<>();
         for (final String id : room.users()) {
-            if (id.endsWith(ending)) {
-                if (id.startsWith("@" + Lifecycle.ADMIN + ".")) {
-                    found.addFirst(id);
-                } else {
-                    found.add(id);
-                }
+            if (id.equals("@" + Lifecycle.ADMIN + ending)) {
+                found.addFirst(id);
+            } else if (id.endsWith(ending)) {
+                found.add(id);
             }
         }
         return found;
     }
 
-    /** As {@code admit} refuses it: two machines whose accounts' names would end alike. */
-    private static void refuseAlike(final Map<String, String> env, final String machine)
+    private static AdminRoom room(final LocalHomeserver.Running local, final Accounts.Session admin)
             throws Failure {
-        for (final String other : MachineTokens.admitted(env)) {
-            if (!other.equals(machine)
-                    && (other.endsWith("." + machine) || machine.endsWith("." + other))) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        "the machine "
-                                + other
-                                + " is admitted already, and its accounts' names and "
-                                + machine
-                                + "'s would end alike; admit a machine of another name");
-            }
-        }
+        return AdminRoom.of(client(local.url(), admin.accessToken()), admin.userId());
     }
 
     private static Accounts.Session administrator(

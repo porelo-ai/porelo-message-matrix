@@ -96,6 +96,33 @@ class MainTest {
                 .contains("its homeserver is https://matrix.example.org");
     }
 
+    /**
+     * Harm guarded: the administrator's token comes on a command line or in the environment because
+     * {@code machine-token} reads it from no input.
+     */
+    @Test
+    @DisplayName("machine-token takes the administrator's token from the input's secrets")
+    void machineTokenReadsTheAdminTokenFromTheInput() {
+        assertThat(runWithInput("{}", "machine-token", "expel", "../hosta"))
+                .as("with none")
+                .isEqualTo(Exit.CONFIG);
+        assertThat(stderr()).as("with none").contains("expel needs the administrator's token");
+        errBytes.reset();
+
+        final int exit =
+                runWithInput(
+                        "{\"secrets\":{\"" + Config.ADMIN_TOKEN + "\":\"t\"}}",
+                        "machine-token",
+                        "expel",
+                        "../hosta");
+
+        assertThat(exit).as(stderr()).isEqualTo(Exit.USAGE);
+        assertThat(stderr())
+                .as("the token taken, the name refused before the homeserver is started")
+                .contains("not a machine's name")
+                .doesNotContain("administrator's token");
+    }
+
     /** Harm guarded: a draft handed the new way is checked as something else. */
     @Test
     @DisplayName("settings reads the draft from the new way's object")

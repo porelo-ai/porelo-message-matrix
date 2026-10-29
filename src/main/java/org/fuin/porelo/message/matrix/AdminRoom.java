@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -22,6 +23,11 @@ final class AdminRoom {
      * it, read from a room's members say, would be a second command.
      */
     private static final Pattern ARGUMENT = Pattern.compile("[!@A-Za-z0-9][\\x21-\\x7e]{0,254}");
+
+    /** The answer to {@code list-users}: how many, then one id a line in a code block. */
+    private static final Pattern FOUND =
+            Pattern.compile(
+                    "Found ([0-9]{1,9}) local user account\\(s\\):\n```\n((?:[^\n]*\n)*)```\\s*");
 
     private final MatrixClient admin;
 
@@ -181,19 +187,43 @@ final class AdminRoom {
 
     /**
      * Every local account the homeserver lists, by id; a deactivated one it lists no more. The
-     * answer holds them one a line in a code block, and a line that is no user id is passed over.
+     * answer holds them one a line in a code block, as many as it says it found.
      */
     List<String> users() throws Failure {
-        final String answer = command("!admin users list-users");
-        if (!answer.startsWith("Found ")) {
+        return users(command("!admin users list-users"), adminId);
+    }
+
+    /**
+     * The ids of an answer to {@code list-users}, refused whole unless every line is read: an
+     * account passed over would be taken for one deactivated. The administrator is listed in every
+     * answer read right.
+     */
+    static List<String> users(final String answer, final String adminId) throws Failure {
+        final Matcher found = FOUND.matcher(answer);
+        if (!found.matches()) {
             throw new Failure(Exit.PROTOCOL, "listing the accounts answered: " + firstLine(answer));
         }
         final List<String> ids = new ArrayList<>();
-        for (final String line : answer.lines().toList()) {
-            final String id = line.strip();
-            if (id.startsWith("@") && ARGUMENT.matcher(id).matches()) {
-                ids.add(id);
+        for (final String line : found.group(2).lines().toList()) {
+            if (!line.startsWith("@") || !ARGUMENT.matcher(line).matches()) {
+                throw new Failure(
+                        Exit.PROTOCOL,
+                        "listing the accounts answered a line that is no user id: "
+                                + firstLine(line));
             }
+            ids.add(line);
+        }
+        if (ids.size() != Integer.parseInt(found.group(1)) || !ids.contains(adminId)) {
+            throw new Failure(
+                    Exit.PROTOCOL,
+                    "listing the accounts answered "
+                            + ids.size()
+                            + " of the "
+                            + found.group(1)
+                            + " it found, "
+                            + (ids.contains(adminId) ? "" : "not ")
+                            + "with "
+                            + adminId);
         }
         return ids;
     }

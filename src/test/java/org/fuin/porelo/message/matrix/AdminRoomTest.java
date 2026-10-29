@@ -100,4 +100,38 @@ class AdminRoomTest {
             assertThat(reply).as("the reply taken").isEqualTo("Found 2 local user account(s):");
         }
     }
+
+    /**
+     * Harm guarded: {@code expel} takes an account the list leaves out, or one a changed answer
+     * names otherwise, for gone, and the person keeps a working account on a homeserver that says
+     * they were removed.
+     */
+    @Test
+    @DisplayName("the accounts listed are read as Tuwunel 1.9.4 answers them")
+    void readsTheAccountsListed() throws Failure {
+        assertThat(
+                        AdminRoom.users(
+                                "Found 3 local user account(s):\n```\n@a.m1:x\n@porelo.m1:x\n"
+                                        + "@porelo:x\n```",
+                                "@porelo:x"))
+                .as("the accounts listed")
+                .containsExactly("@a.m1:x", "@porelo.m1:x", "@porelo:x");
+    }
+
+    @ParameterizedTest(name = "case {index}")
+    @ValueSource(
+            strings = {
+                "Found 3 local user account(s):\n```\n@a.m1:x\n@porelo:x\n```",
+                "Found 2 local user account(s):\n```\n@a.m1:x (locked)\n@porelo:x\n```",
+                "Found 2 local user account(s):\n- @a.m1:x\n- @porelo:x",
+                "Found 1 local user account(s):\n```\n@a.m1:x\n```",
+                "Found many local user account(s):\n```\n@porelo:x\n```",
+                "No users found."
+            })
+    @DisplayName("an answer read otherwise is refused, never taken for fewer accounts")
+    void refusesAnAnswerReadOtherwise(final String answer) {
+        assertThatThrownBy(() -> AdminRoom.users(answer, "@porelo:x"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("listing the accounts");
+    }
 }

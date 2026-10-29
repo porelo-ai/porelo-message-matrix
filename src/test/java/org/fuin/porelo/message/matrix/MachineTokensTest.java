@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.PrintStream;
@@ -148,8 +149,7 @@ class MachineTokensTest {
             "A machine expelled before is refused a token in words, even after its token was revoked")
     void refusesAnExpelledMachine() throws Exception {
         MachineTokens.issue(env, "hosta");
-        MachineTokens.recordExpelled(env, "hosta");
-        assertThat(MachineTokens.revoke(env, "hosta")).as("its token goes").isTrue();
+        assertThat(MachineTokens.expel(env, "hosta")).as("its token goes").isTrue();
         final String before = Files.readString(tokens());
 
         assertThatThrownBy(() -> MachineTokens.issue(env, "hosta"))
@@ -168,5 +168,80 @@ class MachineTokensTest {
         assertThat(MachineTokens.issue(env, "hostb"))
                 .as("another machine is issued a token")
                 .isNotBlank();
+    }
+
+    /**
+     * Harm guarded: an expelled machine keeps its token, and whoever holds it registers accounts of
+     * other names on the homeserver after the person was removed.
+     */
+    @Test
+    @DisplayName("Expelling a machine revokes its token at once, and again is no error")
+    void expellingRevokesTheToken() throws Exception {
+        final String token = MachineTokens.issue(env, "hosta");
+
+        assertThat(MachineTokens.expel(env, "hosta")).as("it had a token").isTrue();
+
+        assertThat(Files.readString(tokens()))
+                .as("the homeserver's token file")
+                .doesNotContain(token);
+        assertThat(dir.resolve("config/porelo/matrix/expelled-machines/hosta"))
+                .as("the record")
+                .exists();
+        assertThat(MachineTokens.expel(env, "hosta")).as("expelled again").isFalse();
+    }
+
+    /**
+     * Harm guarded: a machine whose token was revoked first cannot be expelled, and its accounts
+     * stay working.
+     */
+    @Test
+    @DisplayName("A machine revoked before is expelled still, with no token to revoke")
+    void expelsAMachineRevokedBefore() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        MachineTokens.revoke(env, "hosta");
+
+        assertThat(MachineTokens.expel(env, "hosta")).as("it had a token").isFalse();
+
+        assertThat(MachineTokens.expelled(env, "hosta")).as("recorded").isTrue();
+        assertThat(MachineTokens.admitted(env, "hosta")).as("admitted").isFalse();
+    }
+
+    /**
+     * Harm guarded: the accounts of one machine end as another's do, so expelling one deactivates
+     * the other's, and issuing both lets each take the other's names.
+     */
+    @Test
+    @DisplayName("Machines whose accounts' names would end alike are refused both ways")
+    void refusesMachinesEndingAlike() throws Exception {
+        MachineTokens.issue(env, "x.hosta");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "hosta"))
+                .as("issued")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThatThrownBy(() -> MachineTokens.expel(env, "hosta"))
+                .as("expelled")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThatThrownBy(() -> MachineTokens.admissible(env, "hosta"))
+                .as("checked before")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThat(MachineTokens.admitted(env)).as("admitted").containsExactly("x.hosta");
+    }
+
+    @Test
+    @DisplayName("A machine expelled or named as a path is not admissible, checked before all else")
+    void refusesBeforeAllElse() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        MachineTokens.expel(env, "hosta");
+
+        assertThatThrownBy(() -> MachineTokens.admissible(env, "hosta"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hosta was expelled");
+        assertThatThrownBy(() -> MachineTokens.admissible(env, "../hostb"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("not a machine's name");
+        assertThatCode(() -> MachineTokens.admissible(env, "hostb")).doesNotThrowAnyException();
     }
 }

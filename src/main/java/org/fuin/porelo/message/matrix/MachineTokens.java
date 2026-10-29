@@ -72,14 +72,8 @@ final class MachineTokens {
             }
             try (FileChannel channel = lock(env);
                     FileLock held = channel.lock()) {
-                if (Files.exists(
-                        LocalHomeserver.directory(env).resolve(EXPELLED).resolve(machine))) {
-                    throw new Failure(
-                            Exit.CONFIG,
-                            machine
-                                    + " was expelled from this homeserver, and its accounts' names"
-                                    + " stay taken; add the person under another user name");
-                }
+                refuseExpelled(env, machine);
+                refuseAlike(env, machine);
                 if (!Files.exists(file)) {
                     final byte[] random = new byte[BYTES];
                     RANDOM.nextBytes(random);
@@ -89,8 +83,8 @@ final class MachineTokens {
                             false);
                 }
                 combine(env);
+                return read(file);
             }
-            return read(file);
         } catch (final IOException ex) {
             throw new Failure(
                     Exit.CONFIG,
@@ -120,19 +114,36 @@ final class MachineTokens {
     }
 
     /**
-     * The machine recorded as expelled, beside the tokens and outside their directory, so the
-     * record outlives its token: every account of it was deactivated, and its names stay taken.
+     * What {@code issue} refuses, checked before anything is made for the machine: a name that is
+     * no machine's, a machine expelled, and one whose accounts' names would end as another's.
      */
-    static void recordExpelled(final Map<String, String> env, final String machine) throws Failure {
+    static void admissible(final Map<String, String> env, final String machine) throws Failure {
+        name(machine);
+        refuseExpelled(env, machine);
+        refuseAlike(env, machine);
+    }
+
+    /**
+     * The machine recorded as expelled and its token revoked, both at once; answers whether it had
+     * a token. The record lies beside the tokens and outside their directory, so it outlives the
+     * token: every account of the machine is deactivated next, and its names stay taken.
+     */
+    static boolean expel(final Map<String, String> env, final String machine) throws Failure {
+        final Path file = LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine));
         final Path dir = LocalHomeserver.directory(env).resolve(EXPELLED);
-        try {
+        final Path record = dir.resolve(machine);
+        try (FileChannel channel = lock(env);
+                FileLock held = channel.lock()) {
+            refuseAlike(env, machine);
             if (!Files.isDirectory(dir)) {
                 Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
             }
-            final Path file = dir.resolve(name(machine));
-            if (!Files.exists(file)) {
-                Files.createFile(file, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
+            if (!Files.exists(record)) {
+                Files.createFile(record, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
             }
+            final boolean had = Files.deleteIfExists(file);
+            combine(env);
+            return had;
         } catch (final IOException ex) {
             throw new Failure(
                     Exit.CONFIG,
@@ -141,7 +152,47 @@ final class MachineTokens {
         }
     }
 
-    private static String name(final String machine) throws Failure {
+    private static void refuseExpelled(final Map<String, String> env, final String machine)
+            throws Failure {
+        if (expelled(env, machine)) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    machine
+                            + " was expelled from this homeserver, and its accounts' names stay"
+                            + " taken; add the person under another user name");
+        }
+    }
+
+    /** Whether the machine holds a token now. */
+    static boolean admitted(final Map<String, String> env, final String machine) throws Failure {
+        return Files.exists(
+                LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine)));
+    }
+
+    /** Whether the machine was expelled. */
+    static boolean expelled(final Map<String, String> env, final String machine) throws Failure {
+        return Files.exists(
+                LocalHomeserver.directory(env).resolve(EXPELLED).resolve(name(machine)));
+    }
+
+    /** As {@code admit} refuses it: two machines whose accounts' names would end alike. */
+    private static void refuseAlike(final Map<String, String> env, final String machine)
+            throws Failure {
+        for (final String other : admitted(env)) {
+            if (!other.equals(machine)
+                    && (other.endsWith("." + machine) || machine.endsWith("." + other))) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "the machine "
+                                + other
+                                + " is admitted already, and its accounts' names and "
+                                + machine
+                                + "'s would end alike; admit a machine of another name");
+            }
+        }
+    }
+
+    static String name(final String machine) throws Failure {
         if (!MACHINE.matcher(machine).matches()) {
             throw new Failure(Exit.USAGE, "not a machine's name: '" + machine + "'");
         }

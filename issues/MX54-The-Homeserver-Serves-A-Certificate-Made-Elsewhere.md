@@ -36,6 +36,27 @@ The contract, in words:
   ends, then refused, and the CA is never replaced.
 - Tests, red first: `CertificatePlacedTest`, with a CA and certificates made by the JDK's `keytool`.
 
+## Review
+
+A read-only sub-agent (Antigravity CLI, gemini-4-argon-high) reviewed the change. What it found and was fixed, each
+with a test seen red first: the placed certificate is checked as a client checks it (PKIX at the moment of the
+check, the CA with `CA:TRUE`, `serverAuth` and `digitalSignature`), a wildcard covers a name only with at least two
+labels under it and only in ASCII, a file holding a private key or more than one certificate is refused, a key the
+transport cannot read is refused in words, `clear` and `restore` leave the placed files, and a refused `publish`
+changes no setting.
+
+Declined, with the reason:
+
+- **A chain of intermediates:** one certificate per file. Tuwunel is handed `ca.crt` as the only anchor a client
+  trusts, so an intermediate would need a bundle every client reads alike; a host's administrator signs the server
+  certificate with the CA itself. The doc says so.
+- **Races between the check and the start:** the administrator's tooling takes no lock of the transport's, so a
+  lock here would order nothing. The files are placed while the homeserver is stopped, as the doc says; the next
+  start checks them before it serves them.
+- **The keys made in the tests:** they are made by `keytool` for one test each and never leave its directory.
+- **Tests of the native image:** the unit tests run on the JVM; the VM acceptance runs the native binary with a
+  placed certificate made by `openssl`, served through `publish`, a restart and `publish --off`.
+
 ## Acceptance
 
 - A placed certificate that covers the name by a wildcard is served unchanged through `publish` and a restart, and no

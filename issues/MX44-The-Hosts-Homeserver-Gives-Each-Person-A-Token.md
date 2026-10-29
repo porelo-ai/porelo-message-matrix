@@ -60,7 +60,13 @@ register again, while another person's accounts stay.
   given none, registers `@porelo` before any machine has a token and answers its token under `account`.
 - **`expel` deactivates every `@….<M>`**, which ends its sessions, and records the machine as expelled beside the
   tokens (`expelled-machines/<M>`, not in `machine-tokens`, whose every file is a token), so the record outlives
-  the token `revoke` removes.
+  the token. The record is written and the token revoked first, under the tokens' lock, so no `issue` runs between;
+  the answer adds `"revoked": true|false`.
+- **What the review added:** `issue` checks the name, the record and alike names before it registers `@porelo`, and
+  again under the lock; it refuses a machine not admitted whose accounts the homeserver lists already. `expel`
+  refuses alike names and a machine of which nothing is known (no token, no record, no account), and orders
+  `@porelo.<M>` by its exact id. `AdminRoom.users` refuses an answer it cannot read whole: every line in the code
+  block must be a user id, as many as it says it found, the administrator among them.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).

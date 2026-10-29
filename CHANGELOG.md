@@ -10,8 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `machine-token issue|revoke|expel <machine>` admits a person's machine to the account's own homeserver with no
   project and no room, and takes it out again: `issue` registers the administrator `@porelo` first if there is none
   and answers its token under `account`, then answers the machine's own registration token, the same on every call;
-  `revoke` refuses that token; `expel` deactivates every `@….<machine>`, which logs it out and takes it out of every
-  room, and records the machine, so a later `issue` for it is refused in words. The administrator's token comes on
+  `revoke` refuses that token; `expel` revokes it too and deactivates every `@….<machine>`, which logs it out and
+  takes it out of every room, and records the machine, so a later `issue` for it is refused in words. The administrator's token comes on
   stdin among the secrets.
 - A published homeserver serves a server certificate its host's administrator made elsewhere: with `ca.crt`,
   `tls/server.crt` and `tls/server.key` placed beside `homeserver.conf` and no `ca.key`, the transport makes, renews

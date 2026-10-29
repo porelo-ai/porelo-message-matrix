@@ -568,7 +568,7 @@ class LocalHomeserverIT {
      */
     @Test
     @DisplayName(
-            "With no project, a machine is issued one token, expelled from every account and room, revoked and refused again, and no other machine is touched")
+            "With no project, a machine is issued one token, expelled from every account and room with its token revoked, and refused again, and no other machine is touched")
     void issuesExpelsAndRevokesAMachineWithNoProject() throws Exception {
         final JsonNode first = machineToken("issue", "hosta");
         final String admin = first.path("account").path(Config.ADMIN_TOKEN).asText("");
@@ -590,6 +590,8 @@ class LocalHomeserverIT {
         final Accounts.Session poreloA =
                 Accounts.register(nobody, "porelo.hosta", password, tokenA);
         Accounts.register(nobody, "task.hosta", password, tokenA);
+        // Listed before @porelo.hosta, so the order answered is the verb's own.
+        Accounts.register(nobody, "a.hosta", password, tokenA);
         final Accounts.Session poreloB = Accounts.register(nobody, "porelo.hostb", password, hostb);
         final MatrixClient asB = nobody.as(poreloB.accessToken());
         final String room =
@@ -610,14 +612,20 @@ class LocalHomeserverIT {
                         "/_matrix/client/v3/join/" + MatrixClient.segment(room),
                         MatrixClient.JSON.createObjectNode());
 
+        assertThatThrownBy(() -> machineToken("expel", "hostz"))
+                .as("a machine the homeserver knows nothing of")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hostz was never admitted");
+
         final JsonNode expelled = machineToken("expel", "hosta");
 
+        final String server = AdminRoom.server(admin(nobody));
         assertThat(expelled.path("expelled"))
-                .as("both of the machine's accounts, @porelo.hosta first")
+                .as("every account of the machine, @porelo.hosta first")
                 .extracting(JsonNode::asText)
-                .containsExactly(
-                        poreloA.userId(), "@task.hosta:" + AdminRoom.server(admin(nobody)));
-        for (final String localpart : List.of("porelo.hosta", "task.hosta")) {
+                .containsExactly(poreloA.userId(), "@a.hosta:" + server, "@task.hosta:" + server);
+        assertThat(expelled.path("revoked").asBoolean()).as("its token goes with it").isTrue();
+        for (final String localpart : List.of("porelo.hosta", "task.hosta", "a.hosta")) {
             assertThatThrownBy(() -> Accounts.login(nobody, localpart, password))
                     .as("%s logs in no more", localpart)
                     .isInstanceOf(Failure.class);
@@ -631,16 +639,17 @@ class LocalHomeserverIT {
                                 + MatrixClient.segment(room)
                                 + "/state/m.room.member/"
                                 + MatrixClient.segment(poreloA.userId()));
-        assertThat(member == null ? "none" : member.path("membership").asText())
-                .as("the expelled account is in the room no more")
-                .isNotEqualTo("join");
+        assertThat(member).as("the expelled account's membership").isNotNull();
+        assertThat(member.path("membership").asText())
+                .as("the expelled account left the room")
+                .isEqualTo("leave");
         assertThat(Accounts.login(nobody, "porelo.hostb", password).userId())
                 .as("the other machine's account still logs in")
                 .isEqualTo(poreloB.userId());
 
         assertThat(machineToken("revoke", "hosta").path("revoked").asBoolean())
-                .as("its token goes")
-                .isTrue();
+                .as("revoked after expel, no token is left")
+                .isFalse();
         assertThatThrownBy(() -> Accounts.register(nobody, "intruder", Accounts.password(), tokenA))
                 .as("the revoked token registers nobody")
                 .isInstanceOf(Failure.class);
