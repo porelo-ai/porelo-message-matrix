@@ -634,10 +634,10 @@ class LocalHomeserverIT {
                         "/_matrix/client/v3/join/" + MatrixClient.segment(room),
                         MatrixClient.JSON.createObjectNode());
 
-        assertThatThrownBy(() -> machineToken("expel", "hostz"))
+        assertThat(machineToken("expel", "hostz").toString())
                 .as("a machine the homeserver knows nothing of")
-                .isInstanceOf(Failure.class)
-                .hasMessageContaining("hostz was never admitted");
+                .isEqualTo(
+                        "{\"machine\":\"hostz\",\"known\":false,\"revoked\":false,\"expelled\":[]}");
 
         final String hostc = machineToken("issue", "hostc").path("token").asText();
         Accounts.register(nobody, "porelo.hostc", password, hostc);
@@ -663,6 +663,7 @@ class LocalHomeserverIT {
                 .extracting(JsonNode::asText)
                 .containsExactly(poreloA.userId(), "@a.hosta:" + server, "@task.hosta:" + server);
         assertThat(expelled.path("revoked").asBoolean()).as("its token goes with it").isTrue();
+        assertThat(expelled.path("known").asBoolean()).as("known").isTrue();
         for (final String localpart : List.of("porelo.hosta", "task.hosta", "a.hosta")) {
             assertThatThrownBy(() -> Accounts.login(nobody, localpart, password))
                     .as("%s logs in no more", localpart)

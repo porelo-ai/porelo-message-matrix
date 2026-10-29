@@ -139,11 +139,12 @@ administrator's helper admits each person's machine and takes it out again:
   next registration. A revoked token logs no account out, so `expel` comes first.
 - **`expel`** records the machine as expelled and revokes its token at once, then deactivates every
   `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out of every room, and answers
-  `{"machine": "<machine>", "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken, so
+  `{"machine": "<machine>", "known": true, "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken, so
   the record (`expelled-machines/<machine>` beside the tokens) keeps the machine from a token again: the person
   comes back under another user name. A machine of which the homeserver knows nothing, with no token, no record
-  and no account, is refused, so a name mistyped takes no name for good, and so is a machine whose accounts' names
-  would end as a known machine's. A machine revoked before is expelled still.
+  and no account, is left as it is, so a name mistyped takes no name for good: it answers `"known": false` with
+  exit 0, for a lock nothing to take away. A machine whose accounts' names would end as a known machine's is
+  refused (78). A machine revoked before is expelled still.
 
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'

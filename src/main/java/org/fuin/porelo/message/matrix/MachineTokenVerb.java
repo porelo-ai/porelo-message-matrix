@@ -85,7 +85,8 @@ final class MachineTokenVerb {
      * Every account of the machine deactivated, {@code @porelo.<machine>} first, and the machine
      * recorded as expelled and its token revoked first of all, so no token is issued for it while
      * this runs. The accounts are read after that, and again until none of the machine's is left,
-     * since Tuwunel lists a deactivated account no more.
+     * since Tuwunel lists a deactivated account no more. A machine of which nothing is known is
+     * answered {@code "known": false} and left as it is: for a lock, nothing to take away.
      */
     private static void expel(
             final Map<String, String> env,
@@ -107,7 +108,13 @@ final class MachineTokenVerb {
                 Lifecycle.admin(nobody, env, local.registrationToken(), unit);
         final AdminRoom room = administrator(nobody, admin);
         final String server = AdminRoom.server(admin.userId());
-        answer.put("revoked", MachineTokens.expel(env, machine, server, room::users));
+        final MachineTokens.Expel found = MachineTokens.expel(env, machine, server, room::users);
+        answer.put("known", found != MachineTokens.Expel.UNKNOWN)
+                .put("revoked", found == MachineTokens.Expel.REVOKED);
+        if (found == MachineTokens.Expel.UNKNOWN) {
+            answer.putArray("expelled");
+            return;
+        }
         final String ending = MachineTokens.ending(machine, server);
         List<String> left = accounts(room, ending);
         final List<String> expelled = new ArrayList<>();

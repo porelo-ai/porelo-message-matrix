@@ -149,7 +149,7 @@ class MachineTokensTest {
             "A machine expelled before is refused a token in words, even after its token was revoked")
     void refusesAnExpelledMachine() throws Exception {
         MachineTokens.issue(env, "hosta");
-        assertThat(expel("hosta")).as("its token goes").isTrue();
+        assertThat(expel("hosta")).as("its token goes").isEqualTo(MachineTokens.Expel.REVOKED);
         final String before = Files.readString(tokens());
 
         assertThatThrownBy(() -> MachineTokens.issue(env, "hosta"))
@@ -179,7 +179,7 @@ class MachineTokensTest {
     void expellingRevokesTheToken() throws Exception {
         final String token = MachineTokens.issue(env, "hosta");
 
-        assertThat(expel("hosta")).as("it had a token").isTrue();
+        assertThat(expel("hosta")).as("it had a token").isEqualTo(MachineTokens.Expel.REVOKED);
 
         assertThat(Files.readString(tokens()))
                 .as("the homeserver's token file")
@@ -187,7 +187,7 @@ class MachineTokensTest {
         assertThat(dir.resolve("config/porelo/matrix/expelled-machines/hosta"))
                 .as("the record")
                 .exists();
-        assertThat(expel("hosta")).as("expelled again").isFalse();
+        assertThat(expel("hosta")).as("expelled again").isEqualTo(MachineTokens.Expel.NO_TOKEN);
     }
 
     /**
@@ -204,7 +204,7 @@ class MachineTokensTest {
                         MachineTokens.expel(
                                 env, "hosta", "x", () -> List.of("@porelo.hosta:x", "@porelo:x")))
                 .as("it had a token")
-                .isFalse();
+                .isEqualTo(MachineTokens.Expel.NO_TOKEN);
 
         assertThat(MachineTokens.expelled(env, "hosta")).as("recorded").isTrue();
         assertThat(MachineTokens.admitted(env, "hosta")).as("admitted").isFalse();
@@ -249,25 +249,23 @@ class MachineTokensTest {
         assertThatCode(() -> MachineTokens.admissible(env, "hostb")).doesNotThrowAnyException();
     }
 
-    private boolean expel(final String machine) throws Failure {
+    private MachineTokens.Expel expel(final String machine) throws Failure {
         return MachineTokens.expel(env, machine, "x", () -> List.of("@porelo:x"));
     }
 
     /**
-     * Harm guarded: a name mistyped expels nobody, yet takes the name for good, and the person
-     * meant is left in.
+     * Harm guarded: a name mistyped takes a name for good; or a lock that takes away what the
+     * homeserver never had stops on it as on a refusal.
      */
     @Test
-    @DisplayName("A machine of which nothing is known is not expelled, and no record is made of it")
-    void refusesToExpelAMachineUnknown() {
-        assertThatThrownBy(() -> expel("hostz"))
-                .isInstanceOf(Failure.class)
-                .hasMessageContaining("hostz was never admitted")
-                .extracting(failure -> ((Failure) failure).exitCode())
-                .isEqualTo(Exit.CONFIG);
+    @DisplayName(
+            "A machine of which nothing is known is answered as unknown, and no record is made")
+    void answersAMachineUnknown() throws Exception {
+        assertThat(expel("hostz")).as("answered").isEqualTo(MachineTokens.Expel.UNKNOWN);
         assertThat(dir.resolve("config/porelo/matrix/expelled-machines/hostz"))
                 .as("no record")
                 .doesNotExist();
+        assertThat(MachineTokens.issue(env, "hostz")).as("still issued a token").isNotBlank();
     }
 
     /**

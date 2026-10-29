@@ -71,6 +71,9 @@ register again, while another person's accounts stay.
   them again after the token is revoked, so an account registered meanwhile is deactivated too. The machines weighed
   for names ending alike are every one known: admitted, expelled, or listed by its `@porelo.<M>`, so a machine
   revoked or expelled is no gap. An `issue` that fails after registering `@porelo` answers its token still.
+- **A machine of which nothing is known**, asked for a host's lock, which goes on when there is nothing to take
+  away: `expel` answers `{"machine":"M","known":false,"revoked":false,"expelled":[]}` with exit 0, writes no record
+  and changes nothing. Every other answer says `"known": true`; every refusal exits non-zero.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).

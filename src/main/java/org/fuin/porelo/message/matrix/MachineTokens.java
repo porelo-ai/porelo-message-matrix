@@ -140,6 +140,16 @@ final class MachineTokens {
         refuseAlike(env, machine, List.of());
     }
 
+    /** What {@code expel} found. */
+    enum Expel {
+        /** Nothing known of the machine: no token, no record, no account; nothing was done. */
+        UNKNOWN,
+        /** Recorded as expelled, and its token revoked. */
+        REVOKED,
+        /** Recorded as expelled; it held no token. */
+        NO_TOKEN
+    }
+
     /** The accounts the homeserver lists, read when it is asked. */
     @FunctionalInterface
     interface Listing {
@@ -147,15 +157,15 @@ final class MachineTokens {
     }
 
     /**
-     * The machine recorded as expelled and its token revoked, both at once; answers whether it had
-     * a token. The record lies beside the tokens and outside their directory, so it outlives the
-     * token: every account of the machine is deactivated next, and its names stay taken. Decided
-     * under the tokens' lock with the accounts listed then, so no {@code issue} or {@code revoke}
-     * changes what is known meanwhile: refused for a machine whose accounts' names would end as
-     * another known machine's, and for one of which nothing is known (no token, no record, no
-     * account), so a name mistyped takes no name for good.
+     * The machine recorded as expelled and its token revoked, both at once. The record lies beside
+     * the tokens and outside their directory, so it outlives the token: every account of the
+     * machine is deactivated next, and its names stay taken. Decided under the tokens' lock with
+     * the accounts listed then, so no {@code issue} or {@code revoke} changes what is known
+     * meanwhile: refused for a machine whose accounts' names would end as another known machine's.
+     * A machine of which nothing is known (no token, no record, no account) is left as it is, so a
+     * name mistyped takes no name for good.
      */
-    static boolean expel(
+    static Expel expel(
             final Map<String, String> env,
             final String machine,
             final String server,
@@ -172,11 +182,7 @@ final class MachineTokens {
             if (!Files.exists(file)
                     && !Files.exists(record)
                     && ids.stream().noneMatch(id -> id.endsWith(ending))) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        machine
-                                + " was never admitted to this homeserver, and it has no account of"
-                                + " it; name the machine as issue was given it");
+                return Expel.UNKNOWN;
             }
             if (!Files.isDirectory(dir)) {
                 Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
@@ -186,7 +192,7 @@ final class MachineTokens {
             }
             final boolean had = Files.deleteIfExists(file);
             combine(env);
-            return had;
+            return had ? Expel.REVOKED : Expel.NO_TOKEN;
         } catch (final IOException ex) {
             throw new Failure(
                     Exit.CONFIG,
