@@ -54,7 +54,7 @@ final class Keep {
     private static final String CONF = "homeserver.conf";
 
     /** The CA's certificate and key, as {@link Certificate} keeps them beside the configuration. */
-    private static final List<String> CA = List.of(Certificate.CA_CERTIFICATE, "ca.key");
+    private static final List<String> CA = List.of(Certificate.CA_CERTIFICATE, Certificate.CA_KEY);
 
     /** For a backup of a busy room, measured at about one second: a wide margin. */
     static final Duration BACKUP_WAIT = Duration.ofSeconds(60);
@@ -247,6 +247,8 @@ final class Keep {
         final Path database = dir.resolve(DATABASE);
         final long id;
         final Path confHere = LocalHomeserver.directory(env).resolve(CONF);
+        final @Nullable Path confDir = confHere.getParent();
+        final boolean placedHere = confDir != null && Certificate.placed(confDir);
         final Path backups = backups(env);
         final Path state = Poll.stateDirectory(env);
         try {
@@ -272,7 +274,9 @@ final class Keep {
                 same(confHere, confThere, LocalHomeserver.SERVER_NAME, "server name");
             }
             whole(dir, "the copy");
-            whole(confHere.getParent(), "this account");
+            if (!placedHere) {
+                whole(confHere.getParent(), "this account");
+            }
             final Path caHere = confHere.resolveSibling(Certificate.CA_CERTIFICATE);
             final Path caThere = dir.resolve(Certificate.CA_CERTIFICATE);
             if (Files.exists(caHere)
@@ -307,7 +311,8 @@ final class Keep {
                 Files.write(confHere, unpublished(dir.resolve(CONF)), StandardCharsets.UTF_8);
                 made.add(confHere);
             }
-            for (final String name : CA) {
+            // Beside a placed certificate a CA key would be taken for the account's own CA.
+            for (final String name : placedHere ? List.<String>of() : CA) {
                 final Path there = dir.resolve(name);
                 final Path here = confHere.resolveSibling(name);
                 if (Files.isRegularFile(there) && !Files.exists(here)) {
@@ -366,11 +371,11 @@ final class Keep {
     }
 
     /**
-     * A CA is its certificate and its key together, or neither; half of one is refused, unless its
-     * certificate was placed with a server certificate made elsewhere.
+     * A CA is its certificate and its key together, or neither; half of one is refused. The
+     * account's own placed certificate is not checked so: its CA's key is elsewhere.
      */
     private static void whole(final @Nullable Path dir, final String whose) throws Failure {
-        if (dir == null || Certificate.placed(dir)) {
+        if (dir == null) {
             return;
         }
         final long present = CA.stream().filter(name -> Files.exists(dir.resolve(name))).count();

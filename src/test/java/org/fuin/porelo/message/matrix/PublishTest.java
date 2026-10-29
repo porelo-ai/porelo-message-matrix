@@ -10,6 +10,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -174,6 +175,90 @@ class PublishTest {
                 .as("the CA other machines trust stays")
                 .isEqualTo(ca);
         assertThat(answer.path("published").isNull()).as("the answer names none").isTrue();
+    }
+
+    /**
+     * Harm guarded: clearing the account's homeserver deletes the host administrator's certificate.
+     */
+    @Test
+    @DisplayName(
+            "Clearing leaves a placed certificate and its CA where the host's tooling put them")
+    void clearingLeavesAPlacedCertificate() throws Exception {
+        new PlacedCertificate(dir.resolve("ca"), Instant.now())
+                .place(
+                        matrix(),
+                        "dns:*.h.example,ip:192.0.2.2",
+                        Instant.now().minusSeconds(60),
+                        90);
+        publish("--address", "192.0.2.2:8011", "--name", "matrix.h.example");
+        final String placed = placed();
+
+        LocalHomeserver.forgetPublished(env(), new Lifecycle.Report(), true);
+
+        assertThat(placed()).as("ca.crt, server.crt and server.key kept").isEqualTo(placed);
+    }
+
+    /**
+     * Harm guarded: a publish refused for its certificate has already written the address, and
+     * every later start of the homeserver fails on it.
+     */
+    @Test
+    @DisplayName("A publish refused for its placed certificate changes no setting")
+    void aRefusedPublishChangesNoSetting() throws Exception {
+        new PlacedCertificate(dir.resolve("ca"), Instant.now())
+                .place(
+                        matrix(),
+                        "dns:*.h.example,ip:192.0.2.2",
+                        Instant.now().minus(java.time.Duration.ofDays(100)),
+                        90);
+        final String before = Files.readString(matrix().resolve("homeserver.conf"));
+
+        assertThatThrownBy(
+                        () -> publish("--address", "192.0.2.2:8011", "--name", "matrix.h.example"))
+                .as("an ended certificate")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("ended");
+
+        assertThat(Files.readString(matrix().resolve("homeserver.conf")))
+                .as("the settings as they were")
+                .isEqualTo(before);
+        assertThat(dropIn()).as("no socket address").doesNotExist();
+        assertThat(calls).as("nothing restarted").isEmpty();
+    }
+
+    /**
+     * Harm guarded: the host's certificate ends unnoticed, and every machine loses the homeserver.
+     */
+    @Test
+    @DisplayName(
+            "publish and every start say on stderr when a placed certificate ends within 30 days")
+    void saysWhenAPlacedCertificateEnds() throws Exception {
+        new PlacedCertificate(dir.resolve("ca"), Instant.now())
+                .place(
+                        matrix(),
+                        "dns:*.h.example,ip:192.0.2.2",
+                        Instant.now().minus(java.time.Duration.ofDays(80)),
+                        90);
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Publish.run(
+                List.of("--address", "192.0.2.2:8011", "--name", "matrix.h.example"),
+                env(),
+                new PrintStream(OutputStream.nullOutputStream()),
+                new PrintStream(err, true, StandardCharsets.UTF_8),
+                control);
+        assertThat(err.toString(StandardCharsets.UTF_8)).as("publish says it").contains("ends at");
+
+        final ByteArrayOutputStream start = new ByteArrayOutputStream();
+        HomeserverToken.run(List.of(), env(), new PrintStream(start, true, StandardCharsets.UTF_8));
+        assertThat(start.toString(StandardCharsets.UTF_8))
+                .as("the start says it")
+                .contains("ends at");
+    }
+
+    private String placed() throws Exception {
+        return Files.readString(matrix().resolve("ca.crt"))
+                + Files.readString(matrix().resolve("tls/server.crt"))
+                + Files.readString(matrix().resolve("tls/server.key"));
     }
 
     /** Harm guarded: the CA's key or the server's key outlives the account's homeserver. */

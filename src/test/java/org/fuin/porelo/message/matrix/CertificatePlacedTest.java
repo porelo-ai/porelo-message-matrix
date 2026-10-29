@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -163,6 +164,124 @@ class CertificatePlacedTest {
         Certificate.removeServer(dir);
 
         assertThat(files()).as("placed files kept").containsExactlyInAnyOrderEntriesOf(before);
+    }
+
+    /**
+     * Harm guarded: a certificate every client refuses is served, and the homeserver is
+     * unreachable.
+     */
+    @Test
+    @DisplayName("A placed certificate that is not for a server is refused, never replaced")
+    void refusesACertificateNotForAServer() throws Exception {
+        ca.place(dir, COVERING, NOW.minus(Duration.ofDays(1)), 90, "clientAuth");
+
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NAME, NOW))
+                .as("a client's certificate")
+                .isInstanceOf(Failure.class)
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(dir.resolve("ca.key")).as("no CA of the transport's own").doesNotExist();
+    }
+
+    /**
+     * Harm guarded: a key placed in ca.crt by mistake is handed to every machine as its CA file.
+     */
+    @Test
+    @DisplayName("A placed ca.crt that holds a private key is refused, and the key is not repeated")
+    void refusesACaFileWithAKey() throws Exception {
+        ca.place(dir, COVERING, NOW.minus(Duration.ofDays(1)), 90);
+        final String key = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg";
+        Files.writeString(
+                dir.resolve(Certificate.CA_CERTIFICATE),
+                "-----BEGIN PRIVATE KEY-----\n" + key + "\n-----END PRIVATE KEY-----\n",
+                StandardOpenOption.APPEND);
+
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NAME, NOW))
+                .as("a CA file with a key in it")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("private key")
+                .hasMessageNotContaining(key);
+        assertThatThrownBy(() -> Certificate.caCertificate(dir))
+                .as("nor is it handed out as the CA's certificate")
+                .isInstanceOf(Failure.class)
+                .hasMessageNotContaining(key);
+    }
+
+    /** Harm guarded: a wildcard for a whole top-level domain is taken to cover the host. */
+    @Test
+    @DisplayName("A wildcard covers no name of two labels")
+    void aWildcardCoversNoNameOfTwoLabels() throws Exception {
+        ca.place(dir, "dns:*.example,ip:192.0.2.2", NOW.minus(Duration.ofDays(1)), 90);
+
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, "h.example", NOW))
+                .as("*.example for h.example")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("does not cover h.example");
+    }
+
+    /**
+     * Harm guarded: while the host's tooling places its files one by one, a start makes a CA of its
+     * own and overwrites the server certificate and key placed so far, or removes the key.
+     */
+    @Test
+    @DisplayName(
+            "Placed files without ca.crt are refused and kept, and a lone placed key is never removed")
+    void keepsAnIncompletePlacement() throws Exception {
+        ca.place(dir, COVERING, NOW.minus(Duration.ofDays(1)), 90);
+        Files.delete(dir.resolve(Certificate.CA_CERTIFICATE));
+        final Path tls = dir.resolve(Certificate.TLS);
+        final String certificate = Files.readString(tls.resolve(Certificate.SERVER_CERTIFICATE));
+        final String key = Files.readString(tls.resolve(Certificate.SERVER_KEY));
+
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NAME, NOW))
+                .as("a placement without its CA")
+                .isInstanceOf(Failure.class)
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(tls.resolve(Certificate.SERVER_CERTIFICATE))
+                .as("the placed certificate kept")
+                .hasContent(certificate);
+        assertThat(dir.resolve("ca.key")).as("no CA of the transport's own").doesNotExist();
+
+        Files.delete(tls.resolve(Certificate.SERVER_CERTIFICATE));
+        Certificate.removeServer(dir);
+        assertThat(tls.resolve(Certificate.SERVER_KEY))
+                .as("a placed key whose certificate is being replaced stays")
+                .hasContent(key);
+    }
+
+    /** Harm guarded: a key the transport cannot read ends it with a stack trace, not in words. */
+    @Test
+    @DisplayName("A placed key in another form, or one that does not fit, is refused in words")
+    void refusesAKeyItCannotUse() throws Exception {
+        ca.place(dir, COVERING, NOW.minus(Duration.ofDays(1)), 90);
+        final Path key = dir.resolve(Certificate.TLS).resolve(Certificate.SERVER_KEY);
+        final String fitting = Files.readString(key);
+        Files.writeString(
+                key, "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEE\n-----END EC PRIVATE KEY-----\n");
+
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NAME, NOW))
+                .as("a SEC1 key")
+                .isInstanceOf(Failure.class)
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+
+        final Path other = Files.createDirectories(work.resolve("other-server"));
+        ca.place(other, COVERING, NOW.minus(Duration.ofDays(1)), 90);
+        Files.copy(
+                other.resolve(Certificate.TLS).resolve(Certificate.SERVER_KEY),
+                key,
+                StandardCopyOption.REPLACE_EXISTING);
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NAME, NOW))
+                .as("another certificate's key")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("does not fit");
+        assertThat(key)
+                .as("never replaced")
+                .hasContent(
+                        Files.readString(
+                                other.resolve(Certificate.TLS).resolve(Certificate.SERVER_KEY)));
+        assertThat(fitting).as("the test placed a key first").contains("BEGIN PRIVATE KEY");
     }
 
     private Map<String, String> files() throws Exception {

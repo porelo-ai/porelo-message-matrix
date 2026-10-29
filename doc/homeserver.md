@@ -97,13 +97,17 @@ VPN they share, over `https` with the account's own certificate:
   a token of its own, kept under `machine-tokens/<machine>` beside the token file, which holds this machine's own
   token first. Tuwunel reads the file at every registration, so `dismiss` refuses a machine's token at once.
 - **A certificate made elsewhere:** a host's administrator may place a server certificate signed by a CA whose key
-  never reaches this machine: `ca.crt` beside `homeserver.conf` (`0644`), and `tls/server.crt` with its EC key
-  `tls/server.key` (`0600`, in `tls/` of `0700`), all the account's own, and no `ca.key`. The transport then makes, renews
-  and removes none of them. Every start and `publish` check that the certificate is signed by that `ca.crt`, fits its
-  key, names the published address and the name (`*.<domain>` covers one label) and has not ended, and refuse in
-  words otherwise; in its last 30 days they say on stderr when it ends. A new one placed holds at the next start,
-  `systemctl --user restart porelo-matrix-homeserver`. `backup` carries no placed CA, since it is placed again
-  wherever the copy goes.
+  never reaches this machine: `ca.crt` beside `homeserver.conf` (`0644`), and `tls/server.crt` with its key
+  `tls/server.key` (`0600`, in `tls/` of `0700`), all the account's own, and no `ca.key`. Each file holds exactly one
+  certificate, no chain, and never a key beside it; the key is an unencrypted EC key in PKCS#8 (`BEGIN PRIVATE KEY`).
+  Place them while the homeserver is stopped. Any one of them without a `ca.key` marks the certificate as made
+  elsewhere: the transport then makes, renews and removes none of them, not on `publish --off`, `clear` or `restore`
+  either. Every start and `publish` check, as a client does, that the certificate is signed by that `ca.crt`, a CA's
+  certificate, that it is a server's (`serverAuth`, `digitalSignature` where it names usages), fits its key, names the
+  published address and the name (`*.<domain>` covers one label, under two at least) and holds now, and refuse in
+  words otherwise, before `publish` writes anything; in its last 30 days they say on stderr when it ends. A new one
+  placed holds at the next start, `systemctl --user restart porelo-matrix-homeserver`. `backup` carries no placed
+  CA, since it is placed again wherever the copy goes.
 - **`publish --off`** closes the socket and removes its address, `PORELO_MATRIX_PUBLISH` and the server certificate,
   then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file; a placed
   server certificate stays too.

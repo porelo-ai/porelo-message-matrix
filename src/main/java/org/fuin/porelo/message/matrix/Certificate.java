@@ -24,7 +24,10 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
+import java.security.cert.CertPathValidator;
 import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -36,7 +39,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
@@ -63,7 +68,7 @@ final class Certificate {
 
     static final String CA_CERTIFICATE = "ca.crt";
 
-    private static final String CA_KEY = "ca.key";
+    static final String CA_KEY = "ca.key";
 
     static final String TLS = "tls";
 
@@ -88,6 +93,8 @@ final class Certificate {
     private static final byte[] KEY_USAGE = oid(2, 5, 29, 15);
 
     private static final byte[] EXTENDED_KEY_USAGE = oid(2, 5, 29, 37);
+
+    private static final String SERVER_AUTH_OID = "1.3.6.1.5.5.7.3.1";
 
     private static final byte[] SERVER_AUTH = oid(1, 3, 6, 1, 5, 5, 7, 3, 1);
 
@@ -148,9 +155,11 @@ final class Certificate {
      * its key beside a server certificate. The transport never makes, renews or removes one.
      */
     static boolean placed(final Path dir) {
-        return Files.exists(dir.resolve(CA_CERTIFICATE))
-                && !Files.exists(dir.resolve(CA_KEY))
-                && Files.exists(dir.resolve(TLS).resolve(SERVER_CERTIFICATE));
+        // Any one of them is enough: the host's tooling may be placing the others still.
+        return !Files.exists(dir.resolve(CA_KEY))
+                && (Files.exists(dir.resolve(CA_CERTIFICATE))
+                        || Files.exists(dir.resolve(TLS).resolve(SERVER_CERTIFICATE))
+                        || Files.exists(dir.resolve(TLS).resolve(SERVER_KEY)));
     }
 
     /**
@@ -181,14 +190,26 @@ final class Certificate {
             final InetAddress address,
             final @Nullable String name,
             final Instant now)
-            throws IOException, GeneralSecurityException, Failure {
+            throws Failure {
+        final Path caFile = dir.resolve(CA_CERTIFICATE);
         final Path file = dir.resolve(TLS).resolve(SERVER_CERTIFICATE);
-        final X509Certificate server = read(file);
+        final Path key = dir.resolve(TLS).resolve(SERVER_KEY);
+        for (final Path needed : List.of(caFile, file, key)) {
+            if (!Files.exists(needed)) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        needed
+                                + " is missing: a certificate made elsewhere needs ca.crt,"
+                                + " tls/server.crt and tls/server.key, and one of the account's own"
+                                + " its ca.key");
+            }
+        }
+        final X509Certificate ca = single(caFile);
+        final X509Certificate server = single(file);
         try {
-            server.verify(read(dir.resolve(CA_CERTIFICATE)).getPublicKey());
+            server.verify(ca.getPublicKey());
         } catch (final GeneralSecurityException ex) {
-            throw new Failure(
-                    Exit.CONFIG, file + " is not signed by " + dir.resolve(CA_CERTIFICATE));
+            throw new Failure(Exit.CONFIG, file + " is not signed by " + caFile);
         }
         if (server.getNotBefore().toInstant().isAfter(now)) {
             throw new Failure(
@@ -202,51 +223,145 @@ final class Certificate {
                             + server.getNotAfter().toInstant()
                             + "; place a new one, the transport makes none");
         }
+        validate(ca, server, now, file);
         if (!coversAddress(server, address)) {
             throw new Failure(Exit.CONFIG, file + " does not cover " + address.getHostAddress());
         }
         if (name != null && !coversName(server, name)) {
             throw new Failure(Exit.CONFIG, file + " does not cover " + name);
         }
-        final Path key = dir.resolve(TLS).resolve(SERVER_KEY);
-        if (!fits(privateKey(key), server.getPublicKey())) {
+        final boolean fits;
+        try {
+            fits = fits(privateKey(key), server.getPublicKey());
+        } catch (final IOException | GeneralSecurityException | IllegalArgumentException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot read "
+                            + key
+                            + ": it must be an unencrypted EC key in PKCS#8 (BEGIN PRIVATE KEY)");
+        }
+        if (!fits) {
             throw new Failure(Exit.CONFIG, key + " does not fit " + file);
         }
     }
 
-    private static boolean coversAddress(final X509Certificate server, final InetAddress address)
-            throws GeneralSecurityException {
+    /**
+     * As a client checks it: a path from the CA at {@code now}, the CA a CA, and the certificate
+     * one for a server.
+     */
+    private static void validate(
+            final X509Certificate ca,
+            final X509Certificate server,
+            final Instant now,
+            final Path file)
+            throws Failure {
+        try {
+            final PKIXParameters parameters = new PKIXParameters(Set.of(new TrustAnchor(ca, null)));
+            parameters.setRevocationEnabled(false);
+            parameters.setDate(Date.from(now));
+            CertPathValidator.getInstance("PKIX")
+                    .validate(
+                            CertificateFactory.getInstance("X.509")
+                                    .generateCertPath(List.of(server)),
+                            parameters);
+            if (ca.getBasicConstraints() < 0) {
+                throw new Failure(Exit.CONFIG, file + "'s CA certificate is not a CA's");
+            }
+            final @Nullable List<String> usages = server.getExtendedKeyUsage();
+            if (usages != null && !usages.contains(SERVER_AUTH_OID)) {
+                throw new Failure(Exit.CONFIG, file + " is not a server's: no serverAuth usage");
+            }
+            final boolean @Nullable [] keyUsage = server.getKeyUsage();
+            if (keyUsage != null && !keyUsage[0]) {
+                throw new Failure(
+                        Exit.CONFIG, file + " is not a server's: no digitalSignature usage");
+            }
+        } catch (final GeneralSecurityException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    file + " is refused as a server's certificate: " + ex.getMessage());
+        }
+    }
+
+    /** The one certificate a placed file holds, never a key beside it nor a second one. */
+    private static X509Certificate single(final Path file) throws Failure {
+        try {
+            final String pem = Files.readString(file, StandardCharsets.US_ASCII);
+            if (pem.contains("PRIVATE KEY")) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        file
+                                + " holds a private key: place the certificate alone, and the key away");
+            }
+            final Collection<? extends java.security.cert.Certificate> found =
+                    CertificateFactory.getInstance("X.509")
+                            .generateCertificates(
+                                    new ByteArrayInputStream(
+                                            pem.getBytes(StandardCharsets.US_ASCII)));
+            if (found.size() != 1 || !(found.iterator().next() instanceof X509Certificate one)) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        file + " holds " + found.size() + " certificates: place exactly one");
+            }
+            return one;
+        } catch (final IOException | GeneralSecurityException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read " + file + ": " + ex.getMessage());
+        }
+    }
+
+    private static boolean coversAddress(final X509Certificate server, final InetAddress address) {
         for (final List<?> entry : alternativeNames(server)) {
             // 7 is iPAddress.
             if (Integer.valueOf(7).equals(entry.get(0))
                     && entry.get(1) instanceof String value
-                    && InetAddress.ofLiteral(value).equals(address)) {
+                    && address.equals(literal(value))) {
                 return true;
             }
         }
         return false;
     }
 
-    /** The name itself, or a wildcard in place of its first label alone. */
-    private static boolean coversName(final X509Certificate server, final String name)
-            throws GeneralSecurityException {
-        final int dot = name.indexOf('.');
-        final @Nullable String wildcard = dot < 0 ? null : "*" + name.substring(dot);
+    private static @Nullable InetAddress literal(final String value) {
+        try {
+            return InetAddress.ofLiteral(value);
+        } catch (final IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    /**
+     * The name itself, or a wildcard in place of its first label alone, under at least two labels,
+     * compared in ASCII alone.
+     */
+    private static boolean coversName(final X509Certificate server, final String name) {
+        final String lower = name.toLowerCase(Locale.ROOT);
+        final int dot = lower.indexOf('.');
+        final @Nullable String wildcard =
+                dot > 0 && lower.indexOf('.', dot + 1) > dot + 1
+                        ? "*" + lower.substring(dot)
+                        : null;
         for (final List<?> entry : alternativeNames(server)) {
-            // 2 is dNSName; a name has no case.
+            // 2 is dNSName; a name has no case, and a name outside ASCII is none of ours.
             if (Integer.valueOf(2).equals(entry.get(0))
                     && entry.get(1) instanceof String value
-                    && (value.equalsIgnoreCase(name) || value.equalsIgnoreCase(wildcard))) {
-                return true;
+                    && value.chars().allMatch(c -> c < 0x80)) {
+                final String candidate = value.toLowerCase(Locale.ROOT);
+                if (candidate.equals(lower) || candidate.equals(wildcard)) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    private static Collection<List<?>> alternativeNames(final X509Certificate server)
-            throws GeneralSecurityException {
-        final Collection<List<?>> names = server.getSubjectAlternativeNames();
-        return names == null ? List.of() : names;
+    /** None when they cannot be read: such a certificate covers nothing. */
+    private static Collection<List<?>> alternativeNames(final X509Certificate server) {
+        try {
+            final Collection<List<?>> names = server.getSubjectAlternativeNames();
+            return names == null ? List.of() : names;
+        } catch (final GeneralSecurityException ex) {
+            return List.of();
+        }
     }
 
     /**
@@ -287,7 +402,16 @@ final class Certificate {
     /** The CA's certificate as PEM, which another machine names as its {@code ca_file}. */
     static String caCertificate(final Path dir) throws Failure {
         try {
-            return Files.readString(dir.resolve(CA_CERTIFICATE), StandardCharsets.US_ASCII);
+            final String pem =
+                    Files.readString(dir.resolve(CA_CERTIFICATE), StandardCharsets.US_ASCII);
+            if (pem.contains("PRIVATE KEY")) {
+                // Handed to every machine admitted: never a key with it.
+                throw new Failure(
+                        Exit.CONFIG,
+                        dir.resolve(CA_CERTIFICATE)
+                                + " holds a private key: place the certificate alone");
+            }
+            return pem;
         } catch (final IOException ex) {
             throw new Failure(
                     Exit.CONFIG,

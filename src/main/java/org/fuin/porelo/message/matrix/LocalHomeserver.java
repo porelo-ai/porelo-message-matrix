@@ -629,19 +629,26 @@ final class LocalHomeserver {
             // Somebody else's drop-in is in it, which is not the transport's to remove.
         }
         final Path dir = directory(env);
+        // A certificate made elsewhere is the host administrator's to remove, with its CA.
+        final boolean placed = Certificate.placed(dir);
         for (final String file :
-                List.of(
-                        Certificate.CA_CERTIFICATE,
-                        "ca.key",
-                        Publish.TLS_ENV,
-                        ".certificate.lock",
-                        ".tokens.lock")) {
+                placed
+                        ? List.of(Publish.TLS_ENV, ".certificate.lock", ".tokens.lock")
+                        : List.of(
+                                Certificate.CA_CERTIFICATE,
+                                Certificate.CA_KEY,
+                                Publish.TLS_ENV,
+                                ".certificate.lock",
+                                ".tokens.lock")) {
             delete(
                     dir.resolve(file),
                     report,
                     "the homeserver's " + file + ", " + dir.resolve(file));
         }
         MachineTokens.forget(env, report);
+        if (placed) {
+            return;
+        }
         final Path tls = dir.resolve(Certificate.TLS);
         for (final String file : List.of(Certificate.SERVER_CERTIFICATE, Certificate.SERVER_KEY)) {
             delete(

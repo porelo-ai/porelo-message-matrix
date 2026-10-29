@@ -159,6 +159,8 @@ final class Publish {
                 throw new Failure(Exit.CONFIG, "cannot read " + conf + ": " + ex.getMessage(), ex);
             }
         }
+        // Checked before any setting is written: one refused here would fail every later start.
+        Certificate.ensure(LocalHomeserver.directory(env), address.ip(), name, Instant.now());
         setting(conf, LocalHomeserver.PUBLISH, address.text());
         setting(conf, LocalHomeserver.PUBLISH_NAME, name);
         final @Nullable String notice = prepare(env);

@@ -74,6 +74,17 @@ final class PlacedCertificate {
      */
     void place(final Path dir, final String san, final Instant start, final int days)
             throws IOException, InterruptedException, GeneralSecurityException {
+        place(dir, san, start, days, "serverAuth");
+    }
+
+    /** As {@link #place(Path, String, Instant, int)}, for the extended key usage named. */
+    void place(
+            final Path dir,
+            final String san,
+            final Instant start,
+            final int days,
+            final String usage)
+            throws IOException, InterruptedException, GeneralSecurityException {
         final Path server = store("server-" + System.nanoTime());
         keytool(
                 "-genkeypair",
@@ -114,7 +125,7 @@ final class PlacedCertificate {
                 "-ext",
                 "san=" + san,
                 "-ext",
-                "eku=serverAuth",
+                "eku=" + usage,
                 "-startdate",
                 START.format(start),
                 "-validity",

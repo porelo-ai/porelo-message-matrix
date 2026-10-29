@@ -374,6 +374,28 @@ class KeepTest {
         assertNothingMade();
     }
 
+    /**
+     * Harm guarded: a restore writes a CA key beside a placed certificate, and the next start takes
+     * it for a CA of the account's own and overwrites the host administrator's certificate and key.
+     */
+    @Test
+    @DisplayName("A restore onto a placed certificate copies no CA, and the placed files stay")
+    void restoreLeavesAPlacedCertificate() throws Exception {
+        final Path here = Files.createDirectories(conf().getParent());
+        new PlacedCertificate(dir.resolve("ca"), Instant.now())
+                .place(here, "dns:*.h.example,ip:192.0.2.2", Instant.now().minusSeconds(60), 90);
+        final Path copy = copy("8008");
+        Files.copy(here.resolve("ca.crt"), copy.resolve("ca.crt"));
+        Files.writeString(copy.resolve("ca.key"), "a key of the copy's");
+
+        Keep.restore(copy, env, unit);
+
+        assertThat(here.resolve("ca.key"))
+                .as("no CA key beside the placed certificate")
+                .doesNotExist();
+        assertThat(Certificate.placed(here)).as("still placed").isTrue();
+    }
+
     /** Harm guarded: a restore silently swaps the CA the other machines trust. */
     @Test
     @DisplayName(

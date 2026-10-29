@@ -137,7 +137,7 @@ class CertificateTest {
         assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NOW))
                 .as("without a server certificate the CA's key is needed, and refused missing")
                 .isInstanceOf(Failure.class)
-                .hasMessageContaining("has no key beside it");
+                .hasMessageContaining("is missing");
     }
 
     /** Harm guarded: server certificates are signed with a key no machine's CA file verifies. */
