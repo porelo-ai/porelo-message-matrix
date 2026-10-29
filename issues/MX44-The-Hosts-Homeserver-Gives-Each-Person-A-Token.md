@@ -52,14 +52,20 @@ register again, while another person's accounts stay.
 - **A deactivated name stays taken:** registering it again answers `M_USER_IN_USE`, and its access tokens answer
   `M_UNKNOWN_TOKEN` at once.
 - **`reset-password` ends no session:** the account's existing access token still answers `whoami`; only the old
-  password stops logging in. So `expel` sets a password of its own, logs in with it and ends every session
-  (`/logout/all`), takes the account out of every room (`list-joined-rooms`, `force-leave-room`), and sets a
-  password nobody keeps last.
+  password stops logging in.
+
+## Removal is final for the name
+
+- **`expel` deactivates every `@….<M>`**, which ends its sessions, and records the machine as expelled beside the
+  tokens (`expelled-machines/<M>`, not in `machine-tokens`, whose every file is a token), so the record outlives
+  the token `revoke` removes.
+- **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
+  this homeserver; add the person under another user name", and nothing is written.
+- Keeping the name on a re-admission is [MX53](README.md#mx53).
 
 ## To be checked
 
-- **How a person removed and added again gets their name back.** A deactivated name stays taken, and an account
-  locked with a password nobody holds cannot be logged into by the person's Porelo, whose passwords derive from its
-  machine secret. Asked of the operator (QM48); `expel` waits on the answer, `issue` and `revoke` do not.
+- Whether `users deactivate` also takes the account out of every room on Tuwunel 1.9.4, or `expel` must first
+  `force-leave-room` each room `list-joined-rooms` names; measured before `expel` is built.
 - Related: [MX38](README.md#mx38) (an application service per project) and the Idea of an exclusive namespace per
   person, which the operator left out under QM46 (a).
