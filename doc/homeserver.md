@@ -60,7 +60,7 @@ stops and says the homeserver "was reset":
 whose helper admitted people's machines, their tokens and records go too, since the accounts they stood for went
 with the database: `porelo-message-transport-matrix machine-token revoke <machine>` for each file in
 `~/.config/porelo/matrix/machine-tokens/`, which takes its token out of the file the homeserver reads, then
-`rm -r ~/.config/porelo/matrix/expelled-machines`.
+`rm -r ~/.config/porelo/matrix/expelled-machines ~/.config/porelo/matrix/known-machines`.
 
 ## Onto another machine
 
@@ -131,20 +131,24 @@ administrator's helper admits each person's machine and takes it out again:
   under `account` to be kept and handed back, even when that `issue` then fails: the answer comes on stdout beside
   the refusal. Once `@porelo` exists, nothing registers a second one.
 - **`issue`** answers `{"machine": "<machine>", "token": "…"}`, the same token on every later call, and writes only
-  the token files the homeserver reads. It refuses a machine expelled before, a machine not admitted whose accounts
-  `@….<machine>` the homeserver lists already (their names are taken), and a machine whose accounts' names would end
-  as a known machine's: one admitted, one expelled, or one the homeserver lists by its `@porelo.<machine>`. What the
-  files tell is checked before `@porelo` is registered.
+  the token files the homeserver reads and a record that the machine was issued one (`known-machines/<machine>`).
+  It refuses a machine expelled or revoked before, a machine never issued a token whose accounts `@….<machine>` the
+  homeserver lists already (their names are taken), and a machine whose accounts' names would end as a known
+  machine's: one issued a token here, or one the homeserver lists by its `@porelo.<machine>`. What the files tell is
+  checked before `@porelo` is registered.
 - **`revoke`** answers `{"machine": "<machine>", "revoked": true|false}`; the homeserver refuses the token at its
-  next registration. A revoked token logs no account out, so `expel` comes first.
+  next registration. A revoked token logs no account out, so `expel` comes first; a machine revoked is issued no
+  token again.
 - **`expel`** records the machine as expelled and revokes its token at once, then deactivates every
   `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out of every room, and answers
-  `{"machine": "<machine>", "known": true, "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken, so
-  the record (`expelled-machines/<machine>` beside the tokens) keeps the machine from a token again: the person
-  comes back under another user name. A machine of which the homeserver knows nothing, with no token, no record
-  and no account, is left as it is, so a name mistyped takes no name for good: it answers `"known": false` with
-  exit 0, for a lock nothing to take away. A machine whose accounts' names would end as a known machine's is
-  refused (78). A machine revoked before is expelled still.
+  `{"machine": "<machine>", "known": true, "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated
+  name taken, so the record (`expelled-machines/<machine>` beside the tokens) keeps the machine from a token again:
+  the person comes back under another user name. A machine revoked before is expelled still. An account whose name
+  ends as a longer machine's that was issued a token here (`@….x.<machine>` for `x.<machine>`) is that machine's
+  and is left; no name a token's holder registers keeps `expel` from their own accounts. A machine of which nothing
+  is known, with no token, no record and no account, is left as it is, so a name mistyped takes no name for good:
+  it answers `"known": false` with exit 0, for a lock nothing to take away. A machine whose name ends as one issued
+  a token here (`x.<machine>` while `<machine>` was) is refused (78).
 
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'

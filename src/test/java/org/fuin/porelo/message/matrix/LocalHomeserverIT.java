@@ -643,9 +643,9 @@ class LocalHomeserverIT {
         Accounts.register(nobody, "porelo.hostc", password, hostc);
         machineToken("revoke", "hostc");
         assertThatThrownBy(() -> machineToken("issue", "hostc"))
-                .as("a machine revoked whose accounts are listed")
+                .as("a machine revoked, whose accounts stay")
                 .isInstanceOf(Failure.class)
-                .hasMessageContaining("the homeserver has accounts of hostc already");
+                .hasMessageContaining("hostc's token was revoked");
         assertThatThrownBy(() -> machineToken("issue", "x.hostc"))
                 .as("a machine ending as one listed by its @porelo only")
                 .isInstanceOf(Failure.class)

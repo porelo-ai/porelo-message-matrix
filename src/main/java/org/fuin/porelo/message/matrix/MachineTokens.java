@@ -35,6 +35,13 @@ final class MachineTokens {
     /** The machines expelled, each an empty file named after it. */
     static final String EXPELLED = "expelled-machines";
 
+    /**
+     * Every machine ever issued a token here, each an empty file named after it, kept when its
+     * token is revoked: the host's own word on which names are a machine's, where the homeserver's
+     * list holds whatever names a token's holder registered.
+     */
+    static final String KNOWN = "known-machines";
+
     private static final Set<PosixFilePermission> OWNER_ONLY =
             PosixFilePermissions.fromString("rw-------");
 
@@ -57,20 +64,31 @@ final class MachineTokens {
      * homeserver reads by the time this returns.
      */
     static String issue(final Map<String, String> env, final String machine) throws Failure {
-        return issue(env, machine, "", List.of());
+        return issue(env, machine, "", List.of(), false);
     }
 
     /**
-     * As {@link #issue(Map, String)}, refused too for a machine not admitted whose accounts the
-     * homeserver lists already, and for one whose accounts' names would end as those of a machine
-     * the homeserver lists by its {@code @porelo.<machine>}. {@code ids} are the accounts listed on
-     * {@code server}.
+     * As {@link #issue(Map, String)}, refused too for a machine whose token was revoked, for one
+     * never issued a token whose accounts the homeserver lists already, and for one whose accounts'
+     * names would end as those of a machine the homeserver lists by its {@code @porelo.<machine>}.
+     * {@code ids} are the accounts listed on {@code server}; they may be older than this call, and
+     * what the files tell is decided under the lock alone.
      */
     static String issue(
             final Map<String, String> env,
             final String machine,
             final String server,
             final List<String> ids)
+            throws Failure {
+        return issue(env, machine, server, ids, true);
+    }
+
+    private static String issue(
+            final Map<String, String> env,
+            final String machine,
+            final String server,
+            final List<String> ids,
+            final boolean revokedIsFinal)
             throws Failure {
         final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
         final Path file = dir.resolve(name(machine));
@@ -90,7 +108,16 @@ final class MachineTokens {
                     FileLock held = channel.lock()) {
                 refuseExpelled(env, machine);
                 refuseAlike(env, machine, machinesListed(ids, server));
+                final Path issued = LocalHomeserver.directory(env).resolve(KNOWN);
                 if (!Files.exists(file)) {
+                    if (revokedIsFinal && Files.exists(issued.resolve(machine))) {
+                        throw new Failure(
+                                Exit.CONFIG,
+                                machine
+                                        + "'s token was revoked, and its accounts stay; expel "
+                                        + machine
+                                        + " and add the person under another machine name");
+                    }
                     refuseTaken(machine, ids, server);
                     final byte[] random = new byte[BYTES];
                     RANDOM.nextBytes(random);
@@ -99,6 +126,7 @@ final class MachineTokens {
                             Base64.getUrlEncoder().withoutPadding().encodeToString(random),
                             false);
                 }
+                mark(issued, machine);
                 combine(env);
                 return read(file);
             }
@@ -150,46 +178,43 @@ final class MachineTokens {
         NO_TOKEN
     }
 
-    /** The accounts the homeserver lists, read when it is asked. */
-    @FunctionalInterface
-    interface Listing {
-        List<String> ids() throws Failure;
-    }
-
     /**
-     * The machine recorded as expelled and its token revoked, both at once. The record lies beside
-     * the tokens and outside their directory, so it outlives the token: every account of the
-     * machine is deactivated next, and its names stay taken. Decided under the tokens' lock with
-     * the accounts listed then, so no {@code issue} or {@code revoke} changes what is known
-     * meanwhile: refused for a machine whose accounts' names would end as another known machine's.
-     * A machine of which nothing is known (no token, no record, no account) is left as it is, so a
-     * name mistyped takes no name for good.
+     * The machine recorded as expelled and its token revoked, both at once, under the tokens' lock
+     * and from its files alone, so nothing the homeserver does holds the lock. The record lies
+     * beside the tokens and outside their directory, so it outlives the token: every account of the
+     * machine is deactivated next, and its names stay taken. A machine the files know nothing of is
+     * left as it is unless {@code listed}, its accounts being listed on the homeserver, so a name
+     * mistyped takes no name for good. Refused for a machine whose name ends as another machine's
+     * the host issued a token, whose accounts' names would end as its own.
      */
-    static Expel expel(
-            final Map<String, String> env,
-            final String machine,
-            final String server,
-            final Listing listing)
+    static Expel expel(final Map<String, String> env, final String machine, final boolean listed)
             throws Failure {
         final Path file = LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine));
         final Path dir = LocalHomeserver.directory(env).resolve(EXPELLED);
         final Path record = dir.resolve(machine);
         try (FileChannel channel = lock(env);
                 FileLock held = channel.lock()) {
-            final List<String> ids = listing.ids();
-            refuseAlike(env, machine, machinesListed(ids, server));
-            final String ending = ending(machine, server);
-            if (!Files.exists(file)
+            if (!listed
+                    && !Files.exists(file)
                     && !Files.exists(record)
-                    && ids.stream().noneMatch(id -> id.endsWith(ending))) {
+                    && !Files.exists(
+                            LocalHomeserver.directory(env).resolve(KNOWN).resolve(machine))) {
                 return Expel.UNKNOWN;
             }
-            if (!Files.isDirectory(dir)) {
-                Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
+            for (final String other : issued(env)) {
+                if (machine.endsWith("." + other)) {
+                    throw new Failure(
+                            Exit.CONFIG,
+                            "the machine "
+                                    + other
+                                    + " was issued a token here, and "
+                                    + machine
+                                    + "'s accounts' names end as its own; expel "
+                                    + other
+                                    + " instead");
+                }
             }
-            if (!Files.exists(record)) {
-                Files.createFile(record, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
-            }
+            mark(dir, machine);
             final boolean had = Files.deleteIfExists(file);
             combine(env);
             return had ? Expel.REVOKED : Expel.NO_TOKEN;
@@ -198,6 +223,57 @@ final class MachineTokens {
                     Exit.CONFIG,
                     "cannot record " + machine + " as expelled in " + dir + ": " + ex.getMessage(),
                     ex);
+        }
+    }
+
+    /**
+     * The machine's accounts among those listed, {@code @porelo.<machine>} first. An account whose
+     * name ends as a longer machine's the host issued a token is that machine's, never this one's,
+     * whatever the homeserver lists besides.
+     */
+    static List<String> accounts(
+            final Map<String, String> env,
+            final String machine,
+            final String server,
+            final List<String> ids)
+            throws Failure {
+        final String ending = ending(machine, server);
+        final List<String> longer =
+                issued(env).stream()
+                        .filter(other -> other.endsWith("." + machine))
+                        .map(other -> ending(other, server))
+                        .toList();
+        final List<String> found = new ArrayList<>();
+        for (final String id : ids) {
+            if (!id.endsWith(ending) || longer.stream().anyMatch(id::endsWith)) {
+                continue;
+            }
+            if (id.equals("@" + Lifecycle.ADMIN + ending)) {
+                found.addFirst(id);
+            } else {
+                found.add(id);
+            }
+        }
+        return found;
+    }
+
+    /** Every machine the host issued a token: admitted now, revoked or expelled. */
+    private static Set<String> issued(final Map<String, String> env) throws Failure {
+        final Path home = LocalHomeserver.directory(env);
+        final Set<String> issued = new TreeSet<>(names(home.resolve(DIRECTORY)));
+        issued.addAll(names(home.resolve(EXPELLED)));
+        issued.addAll(names(home.resolve(KNOWN)));
+        return issued;
+    }
+
+    /** An empty file made in the directory given, both readable by their owner alone. */
+    private static void mark(final Path dir, final String machine) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
+        }
+        final Path file = dir.resolve(machine);
+        if (!Files.exists(file)) {
+            Files.createFile(file, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
         }
     }
 
@@ -259,14 +335,13 @@ final class MachineTokens {
 
     /**
      * As {@code admit} refuses it: two machines whose accounts' names would end alike. Every
-     * machine known is weighed: admitted, expelled, or listed on the homeserver by its
+     * machine known is weighed: issued a token here, or listed on the homeserver by its
      * {@code @porelo}.
      */
     private static void refuseAlike(
             final Map<String, String> env, final String machine, final List<String> listed)
             throws Failure {
-        final Set<String> known = new TreeSet<>(admitted(env));
-        known.addAll(names(LocalHomeserver.directory(env).resolve(EXPELLED)));
+        final Set<String> known = issued(env);
         known.addAll(listed);
         for (final String other : known) {
             if (!other.equals(machine)
@@ -316,6 +391,7 @@ final class MachineTokens {
     static void forget(final Map<String, String> env, final Lifecycle.Report report)
             throws Failure {
         forget(LocalHomeserver.directory(env).resolve(EXPELLED), report, "the record of ");
+        forget(LocalHomeserver.directory(env).resolve(KNOWN), report, "the record of ");
         forget(
                 LocalHomeserver.directory(env).resolve(DIRECTORY),
                 report,

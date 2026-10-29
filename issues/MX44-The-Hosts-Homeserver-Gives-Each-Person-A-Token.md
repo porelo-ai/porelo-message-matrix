@@ -74,6 +74,12 @@ register again, while another person's accounts stay.
 - **A machine of which nothing is known**, asked for a host's lock, which goes on when there is nothing to take
   away: `expel` answers `{"machine":"M","known":false,"revoked":false,"expelled":[]}` with exit 0, writes no record
   and changes nothing. Every other answer says `"known": true`; every refusal exits non-zero.
+- **What the third review added:** the homeserver's list holds whatever names a token's holder registers, so it
+  never decides whose an account is. The host keeps its own word: `known-machines/<M>` is made at every `issue` and
+  kept on `revoke`. `expel` decides from the files alone under the lock, and lists the homeserver outside it, so
+  nothing the homeserver does holds the lock. It leaves out accounts that end as a longer machine's that was issued a
+  token, and it is never refused on names the person registered. The helper's `issue` refuses a machine revoked
+  before; a project's `admit` still admits it again.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).

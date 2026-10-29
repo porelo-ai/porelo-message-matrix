@@ -200,10 +200,8 @@ class MachineTokensTest {
         MachineTokens.issue(env, "hosta");
         MachineTokens.revoke(env, "hosta");
 
-        assertThat(
-                        MachineTokens.expel(
-                                env, "hosta", "x", () -> List.of("@porelo.hosta:x", "@porelo:x")))
-                .as("it had a token")
+        assertThat(expel("hosta"))
+                .as("known from its record, with no account listed")
                 .isEqualTo(MachineTokens.Expel.NO_TOKEN);
 
         assertThat(MachineTokens.expelled(env, "hosta")).as("recorded").isTrue();
@@ -215,7 +213,7 @@ class MachineTokensTest {
      * the other's, and issuing both lets each take the other's names.
      */
     @Test
-    @DisplayName("Machines whose accounts' names would end alike are refused both ways")
+    @DisplayName("A machine whose accounts' names would end as an issued one's is issued no token")
     void refusesMachinesEndingAlike() throws Exception {
         MachineTokens.issue(env, "x.hosta");
 
@@ -223,10 +221,9 @@ class MachineTokensTest {
                 .as("issued")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
-        assertThatThrownBy(() -> expel("hosta"))
-                .as("expelled")
-                .isInstanceOf(Failure.class)
-                .hasMessageContaining("would end alike");
+        assertThat(expel("hosta"))
+                .as("expelled: unknown, and x.hosta left as it is")
+                .isEqualTo(MachineTokens.Expel.UNKNOWN);
         assertThatThrownBy(() -> MachineTokens.admissible(env, "hosta"))
                 .as("checked before")
                 .isInstanceOf(Failure.class)
@@ -250,7 +247,7 @@ class MachineTokensTest {
     }
 
     private MachineTokens.Expel expel(final String machine) throws Failure {
-        return MachineTokens.expel(env, machine, "x", () -> List.of("@porelo:x"));
+        return MachineTokens.expel(env, machine, false);
     }
 
     /**
@@ -307,16 +304,109 @@ class MachineTokensTest {
                 .as("against a machine listed by its @porelo")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
-        assertThatThrownBy(
-                        () ->
-                                MachineTokens.expel(
-                                        env,
-                                        "hostb",
-                                        "x",
-                                        () -> List.of("@porelo:x", "@porelo.y.hostb:x")))
-                .as("expelling, against a machine listed by its @porelo")
+        MachineTokens.issue(env, "hostc");
+        MachineTokens.revoke(env, "hostc");
+        assertThatThrownBy(() -> MachineTokens.issue(env, "x.hostc"))
+                .as("against a machine revoked")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
+    }
+
+    /**
+     * Harm guarded: the person removed registers {@code @porelo.worker.<M>} with their own token,
+     * or names a task so, and their expulsion is refused for a machine that never was.
+     */
+    @Test
+    @DisplayName("No name a token's holder registers keeps expel from their accounts")
+    void nothingRegisteredBlocksExpel() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        final List<String> listed =
+                List.of("@a.hosta:x", "@porelo.hosta:x", "@porelo.worker.hosta:x", "@porelo:x");
+
+        assertThat(expel("hosta")).as("expelled").isEqualTo(MachineTokens.Expel.REVOKED);
+        assertThat(MachineTokens.accounts(env, "hosta", "x", listed))
+                .as("every account ending so, @porelo.hosta first")
+                .containsExactly("@porelo.hosta:x", "@a.hosta:x", "@porelo.worker.hosta:x");
+    }
+
+    /**
+     * Harm guarded: a machine revoked keeps accounts of names ending as a shorter machine's, and
+     * expelling the shorter one deactivates them.
+     */
+    @Test
+    @DisplayName("The accounts of a longer machine the host issued a token are never another's")
+    void leavesALongerMachinesAccounts() throws Exception {
+        MachineTokens.issue(env, "x.hosta");
+        MachineTokens.revoke(env, "x.hosta");
+
+        assertThat(
+                        MachineTokens.accounts(
+                                env,
+                                "hosta",
+                                "x",
+                                List.of("@alice.x.hosta:x", "@porelo.x.hosta:x", "@porelo:x")))
+                .as("hosta's accounts")
+                .isEmpty();
+        assertThat(expel("hosta"))
+                .as("hosta, of which nothing is known")
+                .isEqualTo(MachineTokens.Expel.UNKNOWN);
+        assertThatThrownBy(() -> MachineTokens.expel(env, "y.x.hosta", true))
+                .as("a machine ending as one issued a token")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("expel x.hosta instead");
+    }
+
+    /**
+     * Harm guarded: a revoked machine is issued a new token while its old accounts stay, and the
+     * next person given that name takes over nothing but fails on names taken.
+     */
+    @Test
+    @DisplayName("The helper issues no token again to a machine revoked; a project's admit may")
+    void aRevokedMachineIsIssuedNoTokenAgain() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        MachineTokens.revoke(env, "hosta");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "hosta", "x", List.of("@porelo:x")))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hosta's token was revoked");
+        assertThat(MachineTokens.issue(env, "hosta")).as("admitted again").isNotBlank();
+    }
+
+    @Test
+    @DisplayName("A revoke whose token file was not written leaves the machine known to expel")
+    void aRevokeHalfDoneLeavesTheMachineKnown() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        Files.delete(dir.resolve("config/porelo/matrix/machine-tokens/hosta"));
+
+        assertThat(expel("hosta")).as("expelled").isEqualTo(MachineTokens.Expel.NO_TOKEN);
+        assertThat(Files.readString(tokens()).lines().count())
+                .as("the token file rewritten with the local token alone")
+                .isEqualTo(1);
+    }
+
+    /** Harm guarded: a refused verb prints something on stdout that is taken for an answer. */
+    @Test
+    @DisplayName("A refused revoke or expel answers nothing on stdout")
+    void aRefusalAnswersNothing() {
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        assertThatThrownBy(
+                        () ->
+                                MachineTokenVerb.run(
+                                        List.of("expel", "hosta"),
+                                        env,
+                                        new PrintStream(out, true, StandardCharsets.UTF_8),
+                                        new UnusedUnit()))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("expel needs the administrator's token");
+        assertThatThrownBy(
+                        () ->
+                                MachineTokenVerb.run(
+                                        List.of("revoke", "../hosta"),
+                                        env,
+                                        new PrintStream(out, true, StandardCharsets.UTF_8),
+                                        new UnusedUnit()))
+                .isInstanceOf(Failure.class);
+        assertThat(out.size()).as("stdout").isZero();
     }
 
     /**
@@ -351,7 +441,7 @@ class MachineTokensTest {
         expel("hosta");
         MachineTokens.issue(env, "hostb");
 
-        for (final String machine : List.of("../hostc", "hosta", "x.hostb")) {
+        for (final String machine : List.of("../hostc", "hosta", "x.hosta", "x.hostb")) {
             assertThatThrownBy(
                             () ->
                                     MachineTokenVerb.run(

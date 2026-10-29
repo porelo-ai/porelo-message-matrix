@@ -108,15 +108,17 @@ final class MachineTokenVerb {
                 Lifecycle.admin(nobody, env, local.registrationToken(), unit);
         final AdminRoom room = administrator(nobody, admin);
         final String server = AdminRoom.server(admin.userId());
-        final MachineTokens.Expel found = MachineTokens.expel(env, machine, server, room::users);
-        answer.put("known", found != MachineTokens.Expel.UNKNOWN)
-                .put("revoked", found == MachineTokens.Expel.REVOKED);
+        MachineTokens.Expel found = MachineTokens.expel(env, machine, false);
         if (found == MachineTokens.Expel.UNKNOWN) {
-            answer.putArray("expelled");
-            return;
+            // Accounts of a name the host never issued: from before its records, or a restore.
+            if (MachineTokens.accounts(env, machine, server, room.users()).isEmpty()) {
+                answer.put("known", false).put("revoked", false).putArray("expelled");
+                return;
+            }
+            found = MachineTokens.expel(env, machine, true);
         }
-        final String ending = MachineTokens.ending(machine, server);
-        List<String> left = accounts(room, ending);
+        answer.put("known", true).put("revoked", found == MachineTokens.Expel.REVOKED);
+        List<String> left = MachineTokens.accounts(env, machine, server, room.users());
         final List<String> expelled = new ArrayList<>();
         for (int round = 0; !left.isEmpty(); round++) {
             if (round == ROUNDS) {
@@ -135,22 +137,9 @@ final class MachineTokenVerb {
                     expelled.add(id);
                 }
             }
-            left = accounts(room, ending);
+            left = MachineTokens.accounts(env, machine, server, room.users());
         }
         expelled.forEach(answer.putArray("expelled")::add);
-    }
-
-    /** The machine's accounts the homeserver lists, {@code @porelo.<machine>} first. */
-    private static List<String> accounts(final AdminRoom room, final String ending) throws Failure {
-        final List<String> found = new ArrayList<>();
-        for (final String id : room.users()) {
-            if (id.equals("@" + Lifecycle.ADMIN + ending)) {
-                found.addFirst(id);
-            } else if (id.endsWith(ending)) {
-                found.add(id);
-            }
-        }
-        return found;
     }
 
     /**

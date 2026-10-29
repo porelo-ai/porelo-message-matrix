@@ -13,8 +13,8 @@ server certificate of its own beside them.
 The contract, in words:
 
 - **What the host's tooling places**, owned by the homeserver's account, beside `homeserver.conf`: `ca.crt` (the
-  CA's certificate, mode `0644`), `tls/server.crt` and `tls/server.key` (an EC key, `0600`, in `tls/` of mode `0700`). There is
-  no `ca.key`; its absence is what marks a certificate made elsewhere.
+  CA's certificate, mode `0644`), `tls/server.crt` and `tls/server.key` (an EC key, `0600`, in `tls/` of mode
+  `0700`). There is no `ca.key`; its absence is what marks a certificate made elsewhere.
 - **`publish --address <address>:<port> --name <name>` keeps them** while the server certificate verifies against
   `ca.crt`, fits its key, covers the published address and name (a wildcard such as `*.<host>.example` covers one
   label), and has not ended. It answers as today, with `ca_file` naming that `ca.crt`.

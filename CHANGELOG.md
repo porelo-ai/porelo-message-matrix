@@ -11,8 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   project and no room, and takes it out again: `issue` registers the administrator `@porelo` first if there is none
   and answers its token under `account`, then answers the machine's own registration token, the same on every call;
   `revoke` refuses that token; `expel` revokes it too and deactivates every `@….<machine>`, which logs it out and
-  takes it out of every room, and records the machine, so a later `issue` for it is refused in words. The administrator's token comes on
-  stdin among the secrets.
+  takes it out of every room, and records the machine, so a later `issue` for it is refused in words; a machine of
+  which nothing is known answers `"known": false`. The administrator's token comes on stdin among the secrets.
 - A published homeserver serves a server certificate its host's administrator made elsewhere: with `ca.crt`,
   `tls/server.crt` and `tls/server.key` placed beside `homeserver.conf` and no `ca.key`, the transport makes, renews
   and removes no certificate, not on `publish --off`, `clear` or `restore` either. Each start and `publish` refuse, as a
