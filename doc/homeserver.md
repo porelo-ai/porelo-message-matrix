@@ -128,11 +128,13 @@ administrator's helper admits each person's machine and takes it out again:
 - **The administrator's token** comes on stdin among the secrets, `{"secrets": {"PORELO_MATRIX_ADMIN_TOKEN": "…"}}`,
   as Porelo hands it to `setup`. The first `issue`, given none, registers the homeserver's administrator `@porelo`
   before any machine has a token, since the first account registered is the administrator, and answers its token
-  under `account` to be kept and handed back. Once `@porelo` exists, nothing registers a second one.
+  under `account` to be kept and handed back, even when that `issue` then fails: the answer comes on stdout beside
+  the refusal. Once `@porelo` exists, nothing registers a second one.
 - **`issue`** answers `{"machine": "<machine>", "token": "…"}`, the same token on every later call, and writes only
-  the token files the homeserver reads. It refuses a machine whose accounts' names would end as an admitted
-  machine's, a machine expelled before, and a machine not admitted whose accounts `@….<machine>` the homeserver
-  lists already: their names are taken. These are checked before `@porelo` is registered.
+  the token files the homeserver reads. It refuses a machine expelled before, a machine not admitted whose accounts
+  `@….<machine>` the homeserver lists already (their names are taken), and a machine whose accounts' names would end
+  as a known machine's: one admitted, one expelled, or one the homeserver lists by its `@porelo.<machine>`. What the
+  files tell is checked before `@porelo` is registered.
 - **`revoke`** answers `{"machine": "<machine>", "revoked": true|false}`; the homeserver refuses the token at its
   next registration. A revoked token logs no account out, so `expel` comes first.
 - **`expel`** records the machine as expelled and revokes its token at once, then deactivates every
@@ -140,7 +142,8 @@ administrator's helper admits each person's machine and takes it out again:
   `{"machine": "<machine>", "revoked": true|false, "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken, so
   the record (`expelled-machines/<machine>` beside the tokens) keeps the machine from a token again: the person
   comes back under another user name. A machine of which the homeserver knows nothing, with no token, no record
-  and no account, is refused, so a name mistyped takes no name for good.
+  and no account, is refused, so a name mistyped takes no name for good, and so is a machine whose accounts' names
+  would end as a known machine's. A machine revoked before is expelled still.
 
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'

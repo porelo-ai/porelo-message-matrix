@@ -149,7 +149,7 @@ class MachineTokensTest {
             "A machine expelled before is refused a token in words, even after its token was revoked")
     void refusesAnExpelledMachine() throws Exception {
         MachineTokens.issue(env, "hosta");
-        assertThat(MachineTokens.expel(env, "hosta")).as("its token goes").isTrue();
+        assertThat(expel("hosta")).as("its token goes").isTrue();
         final String before = Files.readString(tokens());
 
         assertThatThrownBy(() -> MachineTokens.issue(env, "hosta"))
@@ -179,7 +179,7 @@ class MachineTokensTest {
     void expellingRevokesTheToken() throws Exception {
         final String token = MachineTokens.issue(env, "hosta");
 
-        assertThat(MachineTokens.expel(env, "hosta")).as("it had a token").isTrue();
+        assertThat(expel("hosta")).as("it had a token").isTrue();
 
         assertThat(Files.readString(tokens()))
                 .as("the homeserver's token file")
@@ -187,7 +187,7 @@ class MachineTokensTest {
         assertThat(dir.resolve("config/porelo/matrix/expelled-machines/hosta"))
                 .as("the record")
                 .exists();
-        assertThat(MachineTokens.expel(env, "hosta")).as("expelled again").isFalse();
+        assertThat(expel("hosta")).as("expelled again").isFalse();
     }
 
     /**
@@ -200,7 +200,11 @@ class MachineTokensTest {
         MachineTokens.issue(env, "hosta");
         MachineTokens.revoke(env, "hosta");
 
-        assertThat(MachineTokens.expel(env, "hosta")).as("it had a token").isFalse();
+        assertThat(
+                        MachineTokens.expel(
+                                env, "hosta", "x", () -> List.of("@porelo.hosta:x", "@porelo:x")))
+                .as("it had a token")
+                .isFalse();
 
         assertThat(MachineTokens.expelled(env, "hosta")).as("recorded").isTrue();
         assertThat(MachineTokens.admitted(env, "hosta")).as("admitted").isFalse();
@@ -219,7 +223,7 @@ class MachineTokensTest {
                 .as("issued")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
-        assertThatThrownBy(() -> MachineTokens.expel(env, "hosta"))
+        assertThatThrownBy(() -> expel("hosta"))
                 .as("expelled")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("would end alike");
@@ -234,7 +238,7 @@ class MachineTokensTest {
     @DisplayName("A machine expelled or named as a path is not admissible, checked before all else")
     void refusesBeforeAllElse() throws Exception {
         MachineTokens.issue(env, "hosta");
-        MachineTokens.expel(env, "hosta");
+        expel("hosta");
 
         assertThatThrownBy(() -> MachineTokens.admissible(env, "hosta"))
                 .isInstanceOf(Failure.class)
@@ -243,5 +247,182 @@ class MachineTokensTest {
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("not a machine's name");
         assertThatCode(() -> MachineTokens.admissible(env, "hostb")).doesNotThrowAnyException();
+    }
+
+    private boolean expel(final String machine) throws Failure {
+        return MachineTokens.expel(env, machine, "x", () -> List.of("@porelo:x"));
+    }
+
+    /**
+     * Harm guarded: a name mistyped expels nobody, yet takes the name for good, and the person
+     * meant is left in.
+     */
+    @Test
+    @DisplayName("A machine of which nothing is known is not expelled, and no record is made of it")
+    void refusesToExpelAMachineUnknown() {
+        assertThatThrownBy(() -> expel("hostz"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hostz was never admitted")
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(dir.resolve("config/porelo/matrix/expelled-machines/hostz"))
+                .as("no record")
+                .doesNotExist();
+    }
+
+    /**
+     * Harm guarded: a machine admitted after another whose name ends its own takes that one's
+     * accounts' names, and expelling either deactivates the other's.
+     */
+    @Test
+    @DisplayName("A machine whose name ends as an admitted one's is refused too")
+    void refusesAMachineEndingAsAnAdmittedOne() throws Exception {
+        MachineTokens.issue(env, "hosta");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "x.hosta"))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+    }
+
+    /**
+     * Harm guarded: a machine revoked or expelled is known no more, so another whose accounts end
+     * alike is admitted, and expelling one deactivates the other's accounts.
+     */
+    @Test
+    @DisplayName(
+            "A machine expelled, or listed on the homeserver with no token, still stands against a name ending alike")
+    void weighsEveryMachineKnown() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        expel("hosta");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "x.hosta"))
+                .as("against an expelled machine")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThatThrownBy(
+                        () ->
+                                MachineTokens.issue(
+                                        env,
+                                        "y.hostb",
+                                        "x",
+                                        List.of("@porelo:x", "@porelo.hostb:x")))
+                .as("against a machine listed by its @porelo")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThatThrownBy(
+                        () ->
+                                MachineTokens.expel(
+                                        env,
+                                        "hostb",
+                                        "x",
+                                        () -> List.of("@porelo:x", "@porelo.y.hostb:x")))
+                .as("expelling, against a machine listed by its @porelo")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+    }
+
+    /**
+     * Harm guarded: a new person is given the name of accounts that exist already, and their Porelo
+     * fails later and unclearly on names it cannot take.
+     */
+    @Test
+    @DisplayName("A machine not admitted whose accounts are listed is refused; one admitted is not")
+    void refusesNamesTaken() throws Exception {
+        final List<String> listed = List.of("@porelo:x", "@porelo.hostc:x", "@task.hostc:x");
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "hostc", "x", listed))
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("the homeserver has accounts of hostc already");
+        assertThat(MachineTokens.admitted(env)).as("admitted").isEmpty();
+
+        final String token = MachineTokens.issue(env, "hostd", "x", List.of("@porelo:x"));
+        assertThat(MachineTokens.issue(env, "hostd", "x", List.of("@porelo:x", "@porelo.hostd:x")))
+                .as("issued again once its accounts exist")
+                .isEqualTo(token);
+    }
+
+    /**
+     * Harm guarded: a refused issue registers the homeserver's administrator first, whose token is
+     * then never answered.
+     */
+    @Test
+    @DisplayName(
+            "issue refuses a name, an expelled machine or one alike before the homeserver is asked")
+    void issueRefusesBeforeTheHomeserver() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        expel("hosta");
+        MachineTokens.issue(env, "hostb");
+
+        for (final String machine : List.of("../hostc", "hosta", "x.hostb")) {
+            assertThatThrownBy(
+                            () ->
+                                    MachineTokenVerb.run(
+                                            List.of("issue", machine),
+                                            env,
+                                            new PrintStream(PrintStream.nullOutputStream()),
+                                            new UnusedUnit()))
+                    .as(machine)
+                    .isInstanceOf(Failure.class)
+                    .hasMessageNotContaining("homeserver was asked");
+        }
+    }
+
+    /** A homeserver that fails the test once asked anything. */
+    private static final class UnusedUnit implements Unit {
+
+        private static Failure asked() {
+            return new Failure(Exit.TEMPORARY, "the homeserver was asked");
+        }
+
+        @Override
+        public boolean installed() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public boolean active() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public String state() {
+            return "unknown";
+        }
+
+        @Override
+        public List<String> recentLog() {
+            return List.of();
+        }
+
+        @Override
+        public void start() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public void stop() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public boolean hasDatabase() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public void removeDatabase() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public void signalBackup() throws Failure {
+            throw asked();
+        }
+
+        @Override
+        public int runOnce(final List<String> args, final Map<String, String> secrets)
+                throws Failure {
+            throw asked();
+        }
     }
 }

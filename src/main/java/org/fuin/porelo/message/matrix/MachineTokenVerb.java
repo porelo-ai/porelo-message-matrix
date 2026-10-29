@@ -35,13 +35,22 @@ final class MachineTokenVerb {
         }
         final String machine = args.get(1);
         final ObjectNode answer = MatrixClient.JSON.createObjectNode().put("machine", machine);
-        switch (args.getFirst()) {
-            case "issue" -> issue(env, machine, unit, answer);
-            case "revoke" -> answer.put("revoked", MachineTokens.revoke(env, machine));
-            case "expel" -> expel(env, machine, unit, answer);
-            default ->
-                    throw new Failure(
-                            Exit.USAGE, "usage: machine-token issue|revoke|expel <machine>");
+        try {
+            switch (args.getFirst()) {
+                case "issue" -> issue(env, machine, unit, answer);
+                case "revoke" -> answer.put("revoked", MachineTokens.revoke(env, machine));
+                case "expel" -> expel(env, machine, unit, answer);
+                default ->
+                        throw new Failure(
+                                Exit.USAGE, "usage: machine-token issue|revoke|expel <machine>");
+            }
+        } catch (final Failure failure) {
+            // The administrator registered just now has no other copy of its token: answered even
+            // so, for Porelo to keep, beside the refusal.
+            if (answer.has("account")) {
+                out.println(answer);
+            }
+            throw failure;
         }
         out.println(answer);
     }
@@ -60,33 +69,23 @@ final class MachineTokenVerb {
         MachineTokens.admissible(env, machine);
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
         final String given = env.get(Config.ADMIN_TOKEN);
-        final Accounts.Session admin = administrator(local, env, unit);
+        final MatrixClient nobody = client(local.url(), "");
+        final Accounts.Session admin =
+                Lifecycle.admin(nobody, env, local.registrationToken(), unit);
         if (given == null || given.isBlank()) {
             answer.putObject("account").put(Config.ADMIN_TOKEN, admin.accessToken());
         }
-        if (!MachineTokens.admitted(env, machine)) {
-            final List<String> taken = accounts(room(local, admin), ending(admin, machine));
-            if (!taken.isEmpty()) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        "the homeserver has accounts of "
-                                + machine
-                                + " already ("
-                                + String.join(", ", taken)
-                                + "), whose names a new Porelo cannot take; expel "
-                                + machine
-                                + ", or add the person under another machine name");
-            }
-        }
-        answer.put("token", MachineTokens.issue(env, machine));
+        final AdminRoom room = administrator(nobody, admin);
+        answer.put(
+                "token",
+                MachineTokens.issue(env, machine, AdminRoom.server(admin.userId()), room.users()));
     }
 
     /**
      * Every account of the machine deactivated, {@code @porelo.<machine>} first, and the machine
      * recorded as expelled and its token revoked first of all, so no token is issued for it while
-     * this runs. Tuwunel lists a deactivated account no more; the list is read again until none of
-     * the machine's is left. A machine of which the homeserver knows nothing is refused, so a name
-     * mistyped takes no name for good.
+     * this runs. The accounts are read after that, and again until none of the machine's is left,
+     * since Tuwunel lists a deactivated account no more.
      */
     private static void expel(
             final Map<String, String> env,
@@ -103,20 +102,14 @@ final class MachineTokenVerb {
         }
         MachineTokens.name(machine);
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
-        final Accounts.Session admin = administrator(local, env, unit);
-        final AdminRoom room = room(local, admin);
-        final String ending = ending(admin, machine);
+        final MatrixClient nobody = client(local.url(), "");
+        final Accounts.Session admin =
+                Lifecycle.admin(nobody, env, local.registrationToken(), unit);
+        final AdminRoom room = administrator(nobody, admin);
+        final String server = AdminRoom.server(admin.userId());
+        answer.put("revoked", MachineTokens.expel(env, machine, server, room::users));
+        final String ending = MachineTokens.ending(machine, server);
         List<String> left = accounts(room, ending);
-        if (left.isEmpty()
-                && !MachineTokens.admitted(env, machine)
-                && !MachineTokens.expelled(env, machine)) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    machine
-                            + " was never admitted to this homeserver, and it has no account of"
-                            + " it; name the machine as issue was given it");
-        }
-        answer.put("revoked", MachineTokens.expel(env, machine));
         final List<String> expelled = new ArrayList<>();
         for (int round = 0; !left.isEmpty(); round++) {
             if (round == ROUNDS) {
@@ -140,11 +133,6 @@ final class MachineTokenVerb {
         expelled.forEach(answer.putArray("expelled")::add);
     }
 
-    /** What every account of the machine's name ends with on this homeserver. */
-    private static String ending(final Accounts.Session admin, final String machine) {
-        return "." + machine + ":" + AdminRoom.server(admin.userId());
-    }
-
     /** The machine's accounts the homeserver lists, {@code @porelo.<machine>} first. */
     private static List<String> accounts(final AdminRoom room, final String ending) throws Failure {
         final List<String> found = new ArrayList<>();
@@ -158,21 +146,14 @@ final class MachineTokenVerb {
         return found;
     }
 
-    private static AdminRoom room(final LocalHomeserver.Running local, final Accounts.Session admin)
+    /**
+     * The administrator named and its admin room: only the first account registered is the
+     * homeserver's administrator.
+     */
+    private static AdminRoom administrator(final MatrixClient nobody, final Accounts.Session admin)
             throws Failure {
-        return AdminRoom.of(client(local.url(), admin.accessToken()), admin.userId());
-    }
-
-    private static Accounts.Session administrator(
-            final LocalHomeserver.Running local, final Map<String, String> env, final Unit unit)
-            throws Failure {
-        final MatrixClient nobody = client(local.url(), "");
-        final Accounts.Session admin =
-                Lifecycle.admin(nobody, env, local.registrationToken(), unit);
         Lifecycle.displayName(nobody, admin, "Porelo (administrator)");
-        // Only the first account registered is the homeserver's administrator.
-        AdminRoom.of(nobody.as(admin.accessToken()), admin.userId());
-        return admin;
+        return AdminRoom.of(nobody.as(admin.accessToken()), admin.userId());
     }
 
     private static MatrixClient client(final URI url, final String token) throws Failure {

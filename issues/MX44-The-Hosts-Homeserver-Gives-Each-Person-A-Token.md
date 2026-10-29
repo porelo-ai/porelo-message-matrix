@@ -67,6 +67,10 @@ register again, while another person's accounts stay.
   refuses alike names and a machine of which nothing is known (no token, no record, no account), and orders
   `@porelo.<M>` by its exact id. `AdminRoom.users` refuses an answer it cannot read whole: every line in the code
   block must be a user id, as many as it says it found, the administrator among them.
+- **What the second review added:** `expel` decides under the tokens' lock with the accounts listed then, and reads
+  them again after the token is revoked, so an account registered meanwhile is deactivated too. The machines weighed
+  for names ending alike are every one known: admitted, expelled, or listed by its `@porelo.<M>`, so a machine
+  revoked or expelled is no gap. An `issue` that fails after registering `@porelo` answers its token still.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).

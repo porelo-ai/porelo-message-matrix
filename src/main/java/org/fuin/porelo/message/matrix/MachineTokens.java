@@ -17,6 +17,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -56,6 +57,21 @@ final class MachineTokens {
      * homeserver reads by the time this returns.
      */
     static String issue(final Map<String, String> env, final String machine) throws Failure {
+        return issue(env, machine, "", List.of());
+    }
+
+    /**
+     * As {@link #issue(Map, String)}, refused too for a machine not admitted whose accounts the
+     * homeserver lists already, and for one whose accounts' names would end as those of a machine
+     * the homeserver lists by its {@code @porelo.<machine>}. {@code ids} are the accounts listed on
+     * {@code server}.
+     */
+    static String issue(
+            final Map<String, String> env,
+            final String machine,
+            final String server,
+            final List<String> ids)
+            throws Failure {
         final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
         final Path file = dir.resolve(name(machine));
         final Path tokens = HomeserverToken.file(env);
@@ -73,8 +89,9 @@ final class MachineTokens {
             try (FileChannel channel = lock(env);
                     FileLock held = channel.lock()) {
                 refuseExpelled(env, machine);
-                refuseAlike(env, machine);
+                refuseAlike(env, machine, machinesListed(ids, server));
                 if (!Files.exists(file)) {
+                    refuseTaken(machine, ids, server);
                     final byte[] random = new byte[BYTES];
                     RANDOM.nextBytes(random);
                     write(
@@ -120,21 +137,47 @@ final class MachineTokens {
     static void admissible(final Map<String, String> env, final String machine) throws Failure {
         name(machine);
         refuseExpelled(env, machine);
-        refuseAlike(env, machine);
+        refuseAlike(env, machine, List.of());
+    }
+
+    /** The accounts the homeserver lists, read when it is asked. */
+    @FunctionalInterface
+    interface Listing {
+        List<String> ids() throws Failure;
     }
 
     /**
      * The machine recorded as expelled and its token revoked, both at once; answers whether it had
      * a token. The record lies beside the tokens and outside their directory, so it outlives the
-     * token: every account of the machine is deactivated next, and its names stay taken.
+     * token: every account of the machine is deactivated next, and its names stay taken. Decided
+     * under the tokens' lock with the accounts listed then, so no {@code issue} or {@code revoke}
+     * changes what is known meanwhile: refused for a machine whose accounts' names would end as
+     * another known machine's, and for one of which nothing is known (no token, no record, no
+     * account), so a name mistyped takes no name for good.
      */
-    static boolean expel(final Map<String, String> env, final String machine) throws Failure {
+    static boolean expel(
+            final Map<String, String> env,
+            final String machine,
+            final String server,
+            final Listing listing)
+            throws Failure {
         final Path file = LocalHomeserver.directory(env).resolve(DIRECTORY).resolve(name(machine));
         final Path dir = LocalHomeserver.directory(env).resolve(EXPELLED);
         final Path record = dir.resolve(machine);
         try (FileChannel channel = lock(env);
                 FileLock held = channel.lock()) {
-            refuseAlike(env, machine);
+            final List<String> ids = listing.ids();
+            refuseAlike(env, machine, machinesListed(ids, server));
+            final String ending = ending(machine, server);
+            if (!Files.exists(file)
+                    && !Files.exists(record)
+                    && ids.stream().noneMatch(id -> id.endsWith(ending))) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        machine
+                                + " was never admitted to this homeserver, and it has no account of"
+                                + " it; name the machine as issue was given it");
+            }
             if (!Files.isDirectory(dir)) {
                 Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
             }
@@ -149,6 +192,39 @@ final class MachineTokens {
                     Exit.CONFIG,
                     "cannot record " + machine + " as expelled in " + dir + ": " + ex.getMessage(),
                     ex);
+        }
+    }
+
+    /** What every account of the machine's name ends with on the server. */
+    static String ending(final String machine, final String server) {
+        return "." + machine + ":" + server;
+    }
+
+    /** The machines the homeserver lists by their {@code @porelo.<machine>}. */
+    static List<String> machinesListed(final List<String> ids, final String server) {
+        final String prefix = "@" + Lifecycle.ADMIN + ".";
+        final String suffix = ":" + server;
+        return ids.stream()
+                .filter(id -> id.startsWith(prefix) && id.endsWith(suffix))
+                .map(id -> id.substring(prefix.length(), id.length() - suffix.length()))
+                .filter(name -> MACHINE.matcher(name).matches())
+                .toList();
+    }
+
+    private static void refuseTaken(
+            final String machine, final List<String> ids, final String server) throws Failure {
+        final String ending = ending(machine, server);
+        final List<String> taken = ids.stream().filter(id -> id.endsWith(ending)).toList();
+        if (!server.isEmpty() && !taken.isEmpty()) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the homeserver has accounts of "
+                            + machine
+                            + " already ("
+                            + String.join(", ", taken)
+                            + "), whose names a new Porelo cannot take; expel "
+                            + machine
+                            + ", or add the person under another machine name");
         }
     }
 
@@ -175,17 +251,25 @@ final class MachineTokens {
                 LocalHomeserver.directory(env).resolve(EXPELLED).resolve(name(machine)));
     }
 
-    /** As {@code admit} refuses it: two machines whose accounts' names would end alike. */
-    private static void refuseAlike(final Map<String, String> env, final String machine)
+    /**
+     * As {@code admit} refuses it: two machines whose accounts' names would end alike. Every
+     * machine known is weighed: admitted, expelled, or listed on the homeserver by its
+     * {@code @porelo}.
+     */
+    private static void refuseAlike(
+            final Map<String, String> env, final String machine, final List<String> listed)
             throws Failure {
-        for (final String other : admitted(env)) {
+        final Set<String> known = new TreeSet<>(admitted(env));
+        known.addAll(names(LocalHomeserver.directory(env).resolve(EXPELLED)));
+        known.addAll(listed);
+        for (final String other : known) {
             if (!other.equals(machine)
                     && (other.endsWith("." + machine) || machine.endsWith("." + other))) {
                 throw new Failure(
                         Exit.CONFIG,
                         "the machine "
                                 + other
-                                + " is admitted already, and its accounts' names and "
+                                + " is known to this homeserver already, and its accounts' names and "
                                 + machine
                                 + "'s would end alike; admit a machine of another name");
             }
@@ -252,7 +336,11 @@ final class MachineTokens {
 
     /** The machines admitted now, by name. */
     static List<String> admitted(final Map<String, String> env) throws Failure {
-        final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
+        return names(LocalHomeserver.directory(env).resolve(DIRECTORY));
+    }
+
+    /** The machines a directory holds a file for, by name. */
+    private static List<String> names(final Path dir) throws Failure {
         if (!Files.isDirectory(dir)) {
             return List.of();
         }
@@ -263,9 +351,7 @@ final class MachineTokens {
                     .toList();
         } catch (final IOException ex) {
             throw new Failure(
-                    Exit.CONFIG,
-                    "cannot read the admitted machines in " + dir + ": " + ex.getMessage(),
-                    ex);
+                    Exit.CONFIG, "cannot read the machines in " + dir + ": " + ex.getMessage(), ex);
         }
     }
 

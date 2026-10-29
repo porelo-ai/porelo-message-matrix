@@ -570,10 +570,32 @@ class LocalHomeserverIT {
     @DisplayName(
             "With no project, a machine is issued one token, expelled from every account and room with its token revoked, and refused again, and no other machine is touched")
     void issuesExpelsAndRevokesAMachineWithNoProject() throws Exception {
-        final JsonNode first = machineToken("issue", "hosta");
-        final String admin = first.path("account").path(Config.ADMIN_TOKEN).asText("");
-        assertThat(admin).as("the first issue answers the administrator's token").isNotBlank();
+        // The first issue fails once the administrator is registered: its token is answered still.
+        final Path blocked = LocalHomeserver.directory(env).resolve("machine-tokens");
+        Files.createDirectories(blocked.getParent());
+        Files.writeString(blocked, "");
+        final ByteArrayOutputStream failed = new ByteArrayOutputStream();
+        assertThatThrownBy(
+                        () ->
+                                MachineTokenVerb.run(
+                                        List.of("issue", "hosta"),
+                                        env,
+                                        new PrintStream(failed, true, StandardCharsets.UTF_8),
+                                        unit))
+                .as("the first issue, failing after the administrator was registered")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("cannot make the registration token of hosta");
+        final String admin =
+                MatrixClient.JSON
+                        .readTree(failed.toByteArray())
+                        .path("account")
+                        .path(Config.ADMIN_TOKEN)
+                        .asText("");
+        assertThat(admin).as("the failing issue answers the administrator's token").isNotBlank();
+        Files.delete(blocked);
         env.put(Config.ADMIN_TOKEN, admin);
+        final JsonNode first = machineToken("issue", "hosta");
+        assertThat(first.has("account")).as("given the token, no second administrator").isFalse();
         final JsonNode again = machineToken("issue", "hosta");
         assertThat(again.path("token").asText())
                 .as("issued again, the same token")
@@ -616,6 +638,22 @@ class LocalHomeserverIT {
                 .as("a machine the homeserver knows nothing of")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("hostz was never admitted");
+
+        final String hostc = machineToken("issue", "hostc").path("token").asText();
+        Accounts.register(nobody, "porelo.hostc", password, hostc);
+        machineToken("revoke", "hostc");
+        assertThatThrownBy(() -> machineToken("issue", "hostc"))
+                .as("a machine revoked whose accounts are listed")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("the homeserver has accounts of hostc already");
+        assertThatThrownBy(() -> machineToken("issue", "x.hostc"))
+                .as("a machine ending as one listed by its @porelo only")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("would end alike");
+        assertThat(machineToken("expel", "hostc").path("expelled"))
+                .as("a machine revoked before is expelled still")
+                .extracting(JsonNode::asText)
+                .containsExactly("@porelo.hostc:" + AdminRoom.server(admin(nobody)));
 
         final JsonNode expelled = machineToken("expel", "hosta");
 
