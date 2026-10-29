@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `e19cc9049611bb25` · changed 2026-10-29T12:33Z
+> **BEGIN Shared Area** · sha256 `b51c07efd20274e0` · changed 2026-10-29T12:40Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -31,6 +31,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   repositories.
 - **An ambiguous answer is asked about once, plainly, instead of guessed at.** When an answer
   changes, everything built on the old one is looked for.
+- **Only `AGENTS.md` and `.AGENTS.md` survive a session; the harness's own memory is never used.** A
+  rule, an operator decision about how to work or an open point worth keeping goes into one of them
+  at once.
 
 ### Commits and pushes
 
@@ -49,7 +52,11 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Amend, squash or rebase only when every affected commit is unpublished**, checked with
   `git ls-remote origin refs/heads/main`, never with a cached `origin/main`; several local commits
   are allowed. A pushed commit is repaired by a new commit on the remote's tip, never by a force push;
-  a task's own unmerged branch is the one exception, taking its amended commit with `--force`.
+  a task's own unmerged branch is the one exception, taking its amended commit with `--force`. A
+  commit handed over for pushing counts as published: a correction goes into a new commit on top.
+- **Issue and document changes are gathered for a push at the end of a work block.**
+- **A push handover gives `git push origin <commit>:main` when local commits follow the tested
+  commit**; a branch push only when its tip is the tested commit.
 - **A commit message is one line of at most 72 characters saying in words what changed**, never by a
   requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
   what they share, not each of them. Trailers may follow below a blank line, and nothing else.
@@ -121,10 +128,10 @@ and the UTC time that text last changed; change it in the channel first, never i
     an issues-only commit of its own with `[skip ci]` on `main`.
   - **Review** - the agent, when all is done, in the same commit as the last code; the operator tests
     what is pushed and published as a snapshot.
+  - **Rework** or **Finished** - the operator only, after the test; a rework says what was found.
 
   A state counts only on `main`, where the plan page reads it; a state set only in a worktree or branch
   does not.
-  - **Rework** or **Finished** - the operator only, after the test; a rework says what was found.
 
   An agent never sets Accepted, Rejected, Estimated, Backlog, Rework or Finished; it proposes in the channel. A
   size or plan that grows clearly while building is said before building on.
@@ -186,6 +193,14 @@ and the UTC time that text last changed; change it in the channel first, never i
   code it changed read against the repository's skills. The named *Shared rules check* workflow runs
   on a daily schedule, on a pull request and by hand, never on a push; the required document checks
   on push and pull request run in a suitable light workflow.
+- **The issues of one repository in one sprint share one full workflow run on the stack's top commit,
+  started once the last of them is ready**, with the unit suite and quick checks passing on each commit;
+  never one run per issue. Split only for an issue another agent waits on, a failed central Build or a
+  required individual red run. The handover names every issue, the tested top commit, and which checks
+  ran where with what result.
+- **After a failed run, rerun the failed step and the tests of the area the fix changes; the unit
+  suite still runs whole.** The handover names the final commit, what was rerun and why that covers
+  the fix, and keeps checks passed earlier apart from those rerun on it.
 - **How agents exchange files for a test on a local VM is defined in `.AGENTS.md`.** Where it says
   nothing, a test uses only the agent's own artifacts.
 - **A local VM is restarted only when agreed in the channel or asked of the operator.** A rented
@@ -357,6 +372,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 
 ### Code and builds
 
+- **A change is ready only after a read-only reviewer, another model than the one that built it, has
+  read its final changes against the repository's skills, and every finding has been checked.** A
+  later fix gets a reading of its added diff.
 - **Fail closed and loud**: when a dependency is unreachable, a key is unknown or a check cannot run,
   stop with a non-zero exit code and say why; inside a program, an exception that says why does the
   same. Never silently do less.
@@ -434,8 +452,13 @@ and the UTC time that text last changed; change it in the channel first, never i
   including waits.** Keep the original estimate and starting size, record measured VM and sub-agent
   times, count returns after first readiness as rework, and explain long waits or size growth. Count
   shared time and token usage only once.
+- **Every push handover includes one timing record**:
+  `VELOCITY <repo> <issue> size=<XS|S|M|L> start=<UTC> ready=<UTC> est=<min> wall=<min> vm=<min> subagents=<model-effort:sec,...> rework=<n>`.
+  Issues built together in one repository share one record, joining identifiers and starting sizes
+  with `+`: estimates summed, the earliest start and the stack's readiness, VM time and tokens counted
+  once.
 
-> **END Shared Area** · sha256 `e19cc9049611bb25`
+> **END Shared Area** · sha256 `b51c07efd20274e0`
 
 ## What this repository is
 
