@@ -32,6 +32,7 @@ public final class Main {
                     "part",
                     "admit",
                     "dismiss",
+                    "members",
                     "clear",
                     "machine-token");
 
@@ -111,7 +112,15 @@ public final class Main {
                 case "homeserver-token" -> HomeserverToken.run(rest, env, err);
                 case "publish" -> Publish.run(rest, env, out, err, new Publish.Systemd());
                 case "settings" -> SettingsCheck.run(rest, in, out);
-                case "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "clear" ->
+                case "setup",
+                        "enroll",
+                        "retire",
+                        "join",
+                        "part",
+                        "admit",
+                        "dismiss",
+                        "members",
+                        "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
                 case "machine-token" -> MachineTokenVerb.run(rest, env, out, new PodmanUnit(env));
                 case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);

@@ -80,12 +80,13 @@ class DescribeTest {
                         "part",
                         "admit",
                         "dismiss",
+                        "members",
                         "clear",
                         "settings");
         assertThat(description.path("takes"))
-                .as("central lifecycle verbs take --machine")
+                .as("central lifecycle verbs take --machine, and the admin's setup --create-room")
                 .extracting(JsonNode::asText)
-                .containsExactly("machine");
+                .containsExactly("machine", "create-room");
     }
 
     /** Harm guarded: Porelo needs the declared dependency to explain a start while it waits. */

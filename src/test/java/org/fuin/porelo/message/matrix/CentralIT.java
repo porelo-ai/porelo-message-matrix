@@ -13,7 +13,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -1624,5 +1626,272 @@ class CentralIT {
                                     .contains(roomOther);
                         });
         assertThat(status(sharedToken)).as("kept task's token still answers 200").isEqualTo(200);
+    }
+
+    private static String alias(final String project) {
+        return "#porelo-" + project + ":" + Tuwunel.SERVER_NAME;
+    }
+
+    private static String porelo(final String machine) {
+        return "@porelo." + machine + ":" + Tuwunel.SERVER_NAME;
+    }
+
+    /** A machine set up in the project, admitted, with what Porelo keeps of it. */
+    private Map<String, String> admittedMachine(
+            final String project, final String machine, final String... more) throws Exception {
+        return admittedMachine(baseEnv(), project, machine, more);
+    }
+
+    /** As {@link #admittedMachine(String, String, String...)}, from what Porelo kept before. */
+    private Map<String, String> admittedMachine(
+            final Map<String, String> kept,
+            final String project,
+            final String machine,
+            final String... more)
+            throws Exception {
+        settings = settingsJson(alias(project));
+        final List<String> args =
+                new ArrayList<>(List.of("setup", "--project", project, "--machine", machine));
+        args.addAll(List.of(more));
+        final JsonNode setup = run(kept, args.toArray(String[]::new));
+        assertThat(setup.path("admitted").asBoolean())
+                .as("%s admitted to %s: %s", machine, project, setup)
+                .isTrue();
+        return with(baseEnv(), setup.path("account"), setup.path("secrets"));
+    }
+
+    private JsonNode members(
+            final Map<String, String> admin, final String project, final String list)
+            throws IOException {
+        settings = settingsJson(alias(project));
+        return run(admin, "members", "--project", project, "--machines", list);
+    }
+
+    private String roomOf(final Map<String, String> account, final String project)
+            throws Exception {
+        return tuwunel.call(
+                        "GET",
+                        "/_matrix/client/v3/directory/room/" + MatrixClient.segment(alias(project)),
+                        account(account),
+                        null,
+                        200)
+                .path("room_id")
+                .asText();
+    }
+
+    private static Tuwunel.Account account(final Map<String, String> env) {
+        return new Tuwunel.Account("", env.get(Config.ADMIN_TOKEN));
+    }
+
+    /**
+     * Harm guarded: a developer the signed list dropped keeps reading and writing the project's
+     * room, or dropping one takes out a person, the remaining developer, or the dropped one's place
+     * in another project.
+     */
+    @Test
+    @DisplayName(
+            "The project admin's Porelo makes the room and keeps it to the list: invited, joined, then dropped from this room alone")
+    void theProjectAdminKeepsTheRoomToTheList() throws Exception {
+        final Map<String, String> admin = admittedMachine(PROJECT, "admin-m", "--create-room");
+        final String projectRoom = roomOf(admin, PROJECT);
+        final Tuwunel.Account asAdmin = account(admin);
+        assertThat(
+                        tuwunel.call(
+                                        "GET",
+                                        "/_matrix/client/v3/rooms/"
+                                                + MatrixClient.segment(projectRoom)
+                                                + "/state/m.room.join_rules",
+                                        asAdmin,
+                                        null,
+                                        200)
+                                .path("join_rule")
+                                .asText())
+                .as("the room is invite-only")
+                .isEqualTo("invite");
+        assertThat(
+                        tuwunel.call(
+                                        "GET",
+                                        "/_matrix/client/v3/rooms/"
+                                                + MatrixClient.segment(projectRoom)
+                                                + "/state/m.room.guest_access",
+                                        asAdmin,
+                                        null,
+                                        200)
+                                .path("guest_access")
+                                .asText())
+                .as("guests are forbidden")
+                .isEqualTo("forbidden");
+        final JsonNode power =
+                tuwunel.call(
+                        "GET",
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(projectRoom)
+                                + "/state/m.room.power_levels",
+                        asAdmin,
+                        null,
+                        200);
+        final JsonNode create =
+                tuwunel.call(
+                        "GET",
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(projectRoom)
+                                + "/state/m.room.create?format=event",
+                        asAdmin,
+                        null,
+                        200);
+        // Room version 12: the creator holds the room by its create event, above every level.
+        assertThat(create.path("sender").asText())
+                .as("the maker created the room: %s", create)
+                .isEqualTo(porelo("admin-m"));
+        assertThat(create.path("content").path("room_version").asText())
+                .as("a room of version 12: %s", create)
+                .isEqualTo("12");
+        assertThat(power.path("users").size()).as("nobody else holds a level: %s", power).isZero();
+        assertThat(power.path("invite").asInt(0))
+                .as("a developer's Porelo invites its own tasks: %s", power)
+                .isZero();
+        assertThat(power.path("kick").asInt()).as("but takes nobody out: %s", power).isPositive();
+
+        // dev-two is not registered yet when it is invited.
+        assertThat(members(admin, PROJECT, "admin-m,dev-one,dev-two").path("invited"))
+                .as("both developers invited, the maker not")
+                .extracting(JsonNode::asText)
+                .containsExactly(porelo("dev-one"), porelo("dev-two"));
+        final Map<String, String> one = admittedMachine(PROJECT, "dev-one");
+        final Map<String, String> two = admittedMachine(PROJECT, "dev-two");
+        settings = settingsJson(alias(PROJECT));
+        final JsonNode taskOne =
+                run(one, "enroll", "--project", PROJECT, "--task", "t1", "--machine", "dev-one");
+        run(two, "enroll", "--project", PROJECT, "--task", "t2", "--machine", "dev-two");
+        tuwunel.call(
+                "POST",
+                "/_matrix/client/v3/rooms/" + MatrixClient.segment(projectRoom) + "/invite",
+                asAdmin,
+                MatrixClient.JSON.createObjectNode().put("user_id", person.userId()),
+                200);
+        tuwunel.call(
+                "POST",
+                "/_matrix/client/v3/join/" + MatrixClient.segment(projectRoom),
+                person,
+                MatrixClient.JSON.createObjectNode(),
+                200);
+
+        final JsonNode again = members(admin, PROJECT, "dev-two,dev-one");
+        assertThat(again.path("invited").size() + again.path("removed").size())
+                .as("the same list again changes nothing: %s", again)
+                .isZero();
+
+        // dev-one in another project, which keeps it.
+        final Map<String, String> otherAdmin =
+                admittedMachine(admin, "other", "admin-m", "--create-room");
+        members(otherAdmin, "other", "dev-one");
+        admittedMachine(one, "other", "dev-one");
+        final String otherRoom = roomOf(otherAdmin, "other");
+
+        final JsonNode dropped = members(admin, PROJECT, "dev-two");
+
+        assertThat(dropped.path("removed"))
+                .as("every account of dev-one, @porelo first")
+                .extracting(JsonNode::asText)
+                .containsExactlyInAnyOrder(
+                        porelo("dev-one"),
+                        "@porelo-relay-" + PROJECT + ".dev-one:" + Tuwunel.SERVER_NAME,
+                        "@t1.dev-one:" + Tuwunel.SERVER_NAME);
+        assertThat(dropped.path("removed").get(0).asText()).isEqualTo(porelo("dev-one"));
+        for (final JsonNode id : dropped.path("removed")) {
+            assertThat(tuwunel.membership(asAdmin, projectRoom, id.asText()))
+                    .as("%s out of the project's room", id.asText())
+                    .isEqualTo("leave");
+        }
+        assertThat(tuwunel.membership(account(otherAdmin), otherRoom, porelo("dev-one")))
+                .as("dev-one still in the other project's room")
+                .isEqualTo("join");
+        for (final String stays :
+                List.of(person.userId(), porelo("dev-two"), "@t2.dev-two:" + Tuwunel.SERVER_NAME)) {
+            assertThat(tuwunel.membership(asAdmin, projectRoom, stays))
+                    .as("%s stays", stays)
+                    .isEqualTo("join");
+        }
+        final String taskToken = taskOne.path("secrets").path(Config.ACCESS_TOKEN).asText();
+        assertThat(
+                        tuwunel.callStatus(
+                                "POST",
+                                "/_matrix/client/v3/join/" + MatrixClient.segment(projectRoom),
+                                new Tuwunel.Account("", taskToken),
+                                MatrixClient.JSON.createObjectNode()))
+                .as("a kicked task cannot join the invite-only room by itself")
+                .isEqualTo(403);
+        final JsonNode none = members(admin, PROJECT, "");
+        assertThat(none.path("removed"))
+                .as("an empty list takes out every machine but the maker")
+                .extracting(JsonNode::asText)
+                .contains(porelo("dev-two"));
+        assertThat(tuwunel.membership(asAdmin, projectRoom, person.userId()))
+                .as("the person stays")
+                .isEqualTo("join");
+    }
+
+    /**
+     * Harm guarded: the project's tasks and developers are put into a room someone else made under
+     * the project's alias, and read by its maker.
+     */
+    @Test
+    @DisplayName(
+            "A room under the alias that the admin's machine did not make is refused, and nobody is invited")
+    void aRoomUnderTheAliasMadeByAnotherIsRefused() throws Exception {
+        final String theirs = tuwunel.createRoom(person);
+        tuwunel.call(
+                "PUT",
+                "/_matrix/client/v3/directory/room/" + MatrixClient.segment(alias("taken")),
+                person,
+                MatrixClient.JSON.createObjectNode().put("room_id", theirs),
+                200);
+        settings = settingsJson(alias("taken"));
+        final JsonNode first =
+                run(
+                        baseEnv(),
+                        "setup",
+                        "--project",
+                        "taken",
+                        "--machine",
+                        "admin-m",
+                        "--create-room");
+        assertThat(first.path("admitted").asBoolean())
+                .as("the first setup keeps the account, admitted nowhere")
+                .isFalse();
+
+        final Transport.Result again =
+                attempt(
+                        with(baseEnv(), first.path("account")),
+                        "setup",
+                        "--project",
+                        "taken",
+                        "--machine",
+                        "admin-m",
+                        "--create-room");
+        assertThat(again.exit()).as(again.err()).isEqualTo(Exit.CONFIG);
+        assertThat(again.err()).contains("which is not the room Porelo made");
+        final Transport.Result members =
+                attempt(
+                        with(baseEnv(), first.path("account")),
+                        "members",
+                        "--project",
+                        "taken",
+                        "--machines",
+                        "dev-one",
+                        "--machine",
+                        "admin-m");
+        assertThat(members.exit()).as(members.err()).isEqualTo(Exit.CONFIG);
+        assertThat(
+                        tuwunel.callStatus(
+                                "GET",
+                                "/_matrix/client/v3/rooms/"
+                                        + MatrixClient.segment(theirs)
+                                        + "/state/m.room.member/"
+                                        + MatrixClient.segment(porelo("dev-one")),
+                                person,
+                                MatrixClient.JSON.createObjectNode()))
+                .as("nobody invited into it")
+                .isEqualTo(404);
     }
 }

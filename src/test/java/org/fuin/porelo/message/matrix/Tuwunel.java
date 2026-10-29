@@ -419,7 +419,23 @@ final class Tuwunel implements AutoCloseable {
         return messages;
     }
 
-    private JsonNode call(
+    /** The status a request answers, for a refusal a test expects. */
+    int callStatus(
+            final String method, final String path, final Account account, final JsonNode body)
+            throws IOException, InterruptedException {
+        return http.send(
+                        HttpRequest.newBuilder(URI.create(url + path))
+                                .method(
+                                        method,
+                                        HttpRequest.BodyPublishers.ofByteArray(
+                                                MatrixClient.JSON.writeValueAsBytes(body)))
+                                .header("Authorization", "Bearer " + account.accessToken())
+                                .build(),
+                        HttpResponse.BodyHandlers.discarding())
+                .statusCode();
+    }
+
+    JsonNode call(
             final String method,
             final String path,
             final Account account,

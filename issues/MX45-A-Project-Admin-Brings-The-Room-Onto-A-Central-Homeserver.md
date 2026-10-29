@@ -42,10 +42,12 @@ this room and still in another project's, a person's account and the remaining d
 - A room under the alias that the project admin's `@porelo.<M>` did not make is refused, and nothing is invited into
   it.
 
-## To be checked
+## Measured on Tuwunel 1.9.4
 
-- Whether kicked accounts may rejoin by themselves: the room is invite-only, so not without a new invite; measured with
-  a kicked `@task.<M>` trying to join.
-- The power level the maker gives itself and the invite level of listed developers (today invite power is 0 in the
-  room, so a developer's `@porelo.<M>` can invite its own tasks; a developer could also invite another, which the
-  operator accepted under QH59).
+- **A kicked account cannot come back by itself:** a dropped developer's `@t1.<M>` that tries to join the invite-only
+  room is answered 403.
+- **The room is of version 12, so its maker holds it by the create event**, above every level, with no entry under
+  `users`. Invite is 0 and kick 50, so a developer's `@porelo.<M>` invites its own tasks, and could invite another
+  as the operator accepted under QH59, but takes nobody out.
+- **A room under the alias that another account made** is refused by `setup --create-room` with nothing invited:
+  a first setup keeps the account and answers `"admitted": false`.

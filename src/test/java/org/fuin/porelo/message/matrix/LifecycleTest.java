@@ -207,6 +207,81 @@ class LifecycleTest {
                 .isEqualTo(Exit.USAGE);
     }
 
+    /** Harm guarded: a list mistyped drops every developer from the project's room. */
+    @org.junit.jupiter.params.ParameterizedTest(name = "case {index}")
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"", "hosta,../hostb", "hosta,,hostb", "hosta;hostb", "--machines"})
+    @org.junit.jupiter.api.DisplayName(
+            "members takes a list of machines' names, or refuses with 64")
+    void membersTakesAListOfMachines(final String list) {
+        final List<String> args =
+                "".equals(list)
+                        ? List.of("members", "--project", "demo")
+                        : List.of("members", "--project", "demo", "--machines", list);
+        org.assertj.core.api.Assertions.assertThat(
+                        exit(
+                                central("https://matrix.example.org"),
+                                centralAccount(),
+                                args.toArray(String[]::new)))
+                .as("members %s", args)
+                .isEqualTo(Exit.USAGE);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("members takes no more machines than a room holds members")
+    void membersRefusesAListTooLong() {
+        final String list =
+                java.util.stream.IntStream.rangeClosed(1, 501)
+                        .mapToObj(i -> "host" + i)
+                        .collect(java.util.stream.Collectors.joining(","));
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.example.org"),
+                                centralAccount(),
+                                "members",
+                                "--project",
+                                "demo",
+                                "--machines",
+                                list))
+                .startsWith(Exit.USAGE + " --machines names at most 500 machines");
+    }
+
+    /**
+     * Harm guarded: the account's own homeserver's room, which keeps its members by {@code admit}
+     * and {@code dismiss}, has machines put out by a list meant for a central one.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members and setup --create-room are refused with 77 on the account's own homeserver")
+    void centralVerbsAreRefusedLocally() {
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                "{}",
+                                account(),
+                                "members",
+                                "--project",
+                                "demo",
+                                "--machines",
+                                "hosta"))
+                .startsWith(Exit.NOT_PERMITTED + " members keeps a central homeserver's room");
+        org.assertj.core.api.Assertions.assertThat(
+                        reason("{}", account(), "setup", "--project", "demo", "--create-room"))
+                .startsWith(
+                        Exit.NOT_PERMITTED + " --create-room makes a central homeserver's room");
+        org.assertj.core.api.Assertions.assertThat(
+                        exit(
+                                central("https://matrix.example.org"),
+                                centralAccount(),
+                                "enroll",
+                                "--project",
+                                "demo",
+                                "--task",
+                                "t",
+                                "--create-room"))
+                .as("--create-room on another verb")
+                .isEqualTo(Exit.USAGE);
+    }
+
     private Map<String, String> centralAccount() {
         final Map<String, String> env = new java.util.HashMap<>(account());
         env.put(Config.MACHINE_SECRET, "machine-secret");

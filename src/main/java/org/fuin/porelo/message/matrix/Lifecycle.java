@@ -35,7 +35,12 @@ import org.jspecify.annotations.Nullable;
 final class Lifecycle {
 
     static final List<String> VERBS =
-            List.of("setup", "enroll", "retire", "join", "part", "admit", "dismiss", "clear");
+            List.of(
+                    "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "members",
+                    "clear");
+
+    /** As many machines as {@code members} keeps in a room, each with its accounts beside it. */
+    static final int MAX_MACHINES = 500;
 
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
@@ -55,7 +60,9 @@ final class Lifecycle {
             boolean token,
             boolean loopbackOnly,
             @Nullable String display,
-            @Nullable String machine) {}
+            @Nullable String machine,
+            boolean createRoom,
+            @Nullable List<String> machines) {}
 
     /**
      * A nickname a person gives a task: shown in the room and the direct chat, what @ completes to.
@@ -119,6 +126,7 @@ final class Lifecycle {
                     case "part" -> part(options, settings, env);
                     case "admit" -> admit(options, settings, env);
                     case "dismiss" -> dismiss(options, settings, env);
+                    case "members" -> members(options, settings, env);
                     case "clear" -> clear(options, settings, env);
                     default -> throw new IllegalArgumentException(verb);
                 };
@@ -136,6 +144,28 @@ final class Lifecycle {
     // --- setup
     // ------------------------------------------------------------------------------------------
 
+    /** The central room kept to the listed machines, by the machine that made it. */
+    private static ObjectNode members(
+            final Options options, final Settings settings, final Map<String, String> env)
+            throws Failure {
+        final URI url = settings.homeserver();
+        if (url == null) {
+            throw new Failure(
+                    Exit.NOT_PERMITTED,
+                    "members keeps a central homeserver's room; on the account's own homeserver"
+                            + " admit and dismiss keep its machines");
+        }
+        final String machine = centralMachine(options, env);
+        final String token =
+                required(env, Config.ADMIN_TOKEN, "members runs as the machine that made the room");
+        return CentralRoom.members(
+                client(url, token, settings),
+                machine,
+                options.project(),
+                Objects.requireNonNull(settings.room()),
+                required(options.machines()));
+    }
+
     private static ObjectNode setup(
             final Options options,
             final Settings settings,
@@ -144,6 +174,12 @@ final class Lifecycle {
             throws Failure {
         if (settings.homeserver() != null) {
             return setupCentral(options, settings, env);
+        }
+        if (options.createRoom()) {
+            throw new Failure(
+                    Exit.NOT_PERMITTED,
+                    "--create-room makes a central homeserver's room; on the account's own"
+                            + " homeserver setup makes the project's room itself");
         }
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
         // The relay is named after the project, so the project's name is held to the same rule.
@@ -220,6 +256,35 @@ final class Lifecycle {
                 .put(Config.MACHINE_SECRET, secret)
                 .put(Config.MACHINE, machine);
 
+        if (options.createRoom()) {
+            // Whatever fails once the account is made, its generated secret must reach Porelo.
+            try {
+                final String room =
+                        CentralRoom.make(
+                                asMachine,
+                                machineAccount.userId(),
+                                options.project(),
+                                configuredRoom);
+                answer.put("created_room", true);
+                return admittedIn(
+                        options,
+                        settings,
+                        env,
+                        answer,
+                        nobody,
+                        asMachine,
+                        machineAccount,
+                        secret,
+                        registrationToken,
+                        room);
+            } catch (final Failure failure) {
+                if (keptSecret == null || keptSecret.isBlank()) {
+                    return notAdmitted(answer, machine, machineAccount, configuredRoom);
+                }
+                throw failure;
+            }
+        }
+
         // A machine just registered joins only where its name was invited before it existed, as
         // `admit` does. Whatever fails then, its generated secret must reach Porelo, or the account
         // is lost to it: so it answers not yet admitted, and the next setup, with the secret kept,
@@ -274,13 +339,40 @@ final class Lifecycle {
             final boolean leaveWhenWrong)
             throws Failure {
         final String machine = centralMachine(options, env);
-        final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final String room = joinCentralRoom(asMachine, configuredRoom);
         if (room == null) {
             return notAdmitted(answer, machine, machineAccount, configuredRoom);
         }
         checkCentralRoom(asMachine, configuredRoom, room, leaveWhenWrong);
+        return admittedIn(
+                options,
+                settings,
+                env,
+                answer,
+                nobody,
+                asMachine,
+                machineAccount,
+                secret,
+                registrationToken,
+                room);
+    }
+
+    /** In the project's room: this machine's relay admitted, and the room answered. */
+    private static ObjectNode admittedIn(
+            final Options options,
+            final Settings settings,
+            final Map<String, String> env,
+            final ObjectNode answer,
+            final MatrixClient nobody,
+            final MatrixClient asMachine,
+            final Accounts.Session machineAccount,
+            final String secret,
+            final String registrationToken,
+            final String room)
+            throws Failure {
+        final String machine = centralMachine(options, env);
+        final URI url = Objects.requireNonNull(settings.homeserver());
         displayName(nobody, machineAccount, "Porelo (administrator)");
 
         final Accounts.Session relay =
@@ -1765,7 +1857,7 @@ final class Lifecycle {
     /**
      * The project's room: found by its alias, or made invite-only, closed to guests and unlisted.
      */
-    private static String room(
+    static String room(
             final MatrixClient admin,
             final String adminId,
             final String project,
@@ -1910,8 +2002,14 @@ final class Lifecycle {
         boolean loopbackOnly = false;
         String display = null;
         String machine = null;
+        boolean createRoom = false;
+        List<String> machines = null;
         for (int i = 0; i < args.size(); i++) {
             final String arg = args.get(i);
+            if ("--create-room".equals(arg) && "setup".equals(verb) && !createRoom) {
+                createRoom = true;
+                continue;
+            }
             if ("--reset".equals(arg) && "join".equals(verb)) {
                 reset = true;
                 continue;
@@ -1936,6 +2034,12 @@ final class Lifecycle {
                 case "--task" -> task = name(value, "--task");
                 case "--person" -> person = name(value, "--person");
                 case "--machine" -> machine = machine(value);
+                case "--machines" -> {
+                    if (!"members".equals(verb) || machines != null) {
+                        throw usage(verb);
+                    }
+                    machines = machines(value);
+                }
                 case "--display" -> {
                     if (!("enroll".equals(verb) || "join".equals(verb)) || display != null) {
                         throw usage(verb);
@@ -1952,13 +2056,50 @@ final class Lifecycle {
                     case "join" -> person != null && task == null;
                     case "part" -> person != null && task == null && machine == null;
                     case "admit", "dismiss" -> machine != null && task == null && person == null;
+                    case "members" -> machines != null && task == null && person == null;
                     case "clear" -> task == null && person == null;
                     default -> false;
                 };
         if (project == null || !ok) {
             throw usage(verb);
         }
-        return new Options(project, task, person, reset, token, loopbackOnly, display, machine);
+        return new Options(
+                project,
+                task,
+                person,
+                reset,
+                token,
+                loopbackOnly,
+                display,
+                machine,
+                createRoom,
+                machines);
+    }
+
+    /**
+     * The machines {@code members} keeps in the room, comma-separated, each named as {@code
+     * --machine} is; none at all is an empty value.
+     */
+    private static List<String> machines(final String value) throws Failure {
+        if (value.isEmpty()) {
+            return List.of();
+        }
+        final List<String> machines = new ArrayList<>();
+        for (final String name : value.split(",", -1)) {
+            final String machine = machine(name);
+            if (!machines.contains(machine)) {
+                machines.add(machine);
+            }
+        }
+        if (machines.size() > MAX_MACHINES) {
+            throw new Failure(
+                    Exit.USAGE,
+                    "--machines names at most "
+                            + MAX_MACHINES
+                            + " machines, not "
+                            + machines.size());
+        }
+        return List.copyOf(machines);
     }
 
     static String display(final String value) throws Failure {
@@ -2009,7 +2150,9 @@ final class Lifecycle {
                 "usage: "
                         + switch (verb) {
                             case "setup" ->
-                                    "setup --project <project> [--machine <machine>] [--loopback-only]";
+                                    "setup --project <project> [--machine <machine>] [--create-room] [--loopback-only]";
+                            case "members" ->
+                                    "members --project <project> --machines <machine>,… [--machine <machine>]";
                             case "enroll" ->
                                     "enroll --project <project> --task <task> [--display <nickname>] [--machine <machine>] [--loopback-only]";
                             case "retire" ->
@@ -2023,6 +2166,11 @@ final class Lifecycle {
                             default ->
                                     "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--machine <machine>] [--loopback-only]";
                         });
+    }
+
+    private static List<String> required(@Nullable final List<String> machines) {
+        // The options make members only with --machines.
+        return Objects.requireNonNull(machines);
     }
 
     private static String required(@Nullable final String value, final String option)
