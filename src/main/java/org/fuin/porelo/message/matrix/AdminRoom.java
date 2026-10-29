@@ -3,6 +3,8 @@ package org.fuin.porelo.message.matrix;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -175,6 +177,25 @@ final class AdminRoom {
                             + answer.errcode()
                             + ": the password set is readable there; reset it again");
         }
+    }
+
+    /**
+     * Every local account the homeserver lists, by id; a deactivated one it lists no more. The
+     * answer holds them one a line in a code block, and a line that is no user id is passed over.
+     */
+    List<String> users() throws Failure {
+        final String answer = command("!admin users list-users");
+        if (!answer.startsWith("Found ")) {
+            throw new Failure(Exit.PROTOCOL, "listing the accounts answered: " + firstLine(answer));
+        }
+        final List<String> ids = new ArrayList<>();
+        for (final String line : answer.lines().toList()) {
+            final String id = line.strip();
+            if (id.startsWith("@") && ARGUMENT.matcher(id).matches()) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     void deactivate(final String userId) throws Failure {

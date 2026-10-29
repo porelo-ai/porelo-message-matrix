@@ -50,22 +50,19 @@ register again, while another person's accounts stay.
 - **`!admin users list-users`** lists every local account by id, one per line in a code block, with no paging option
   and no limit seen; a deactivated account is no longer listed.
 - **A deactivated name stays taken:** registering it again answers `M_USER_IN_USE`, and its access tokens answer
-  `M_UNKNOWN_TOKEN` at once.
+  `M_UNKNOWN_TOKEN` at once. A deactivated account is a member of no room any more.
 - **`reset-password` ends no session:** the account's existing access token still answers `whoami`; only the old
   password stops logging in.
 
 ## Removal is final for the name
 
+- **The administrator's token** comes on stdin among the secrets, as Porelo hands it to `setup`; the first `issue`,
+  given none, registers `@porelo` before any machine has a token and answers its token under `account`.
 - **`expel` deactivates every `@….<M>`**, which ends its sessions, and records the machine as expelled beside the
   tokens (`expelled-machines/<M>`, not in `machine-tokens`, whose every file is a token), so the record outlives
   the token `revoke` removes.
 - **A later `issue M` for an expelled machine is refused** with `Exit.CONFIG` and the words "M was expelled from
   this homeserver; add the person under another user name", and nothing is written.
 - Keeping the name on a re-admission is [MX53](README.md#mx53).
-
-## To be checked
-
-- Whether `users deactivate` also takes the account out of every room on Tuwunel 1.9.4, or `expel` must first
-  `force-leave-room` each room `list-joined-rooms` names; measured before `expel` is built.
 - Related: [MX38](README.md#mx38) (an application service per project) and the Idea of an exclusive namespace per
   person, which the operator left out under QM46 (a).

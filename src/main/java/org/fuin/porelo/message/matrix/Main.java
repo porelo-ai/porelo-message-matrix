@@ -32,7 +32,8 @@ public final class Main {
                     "part",
                     "admit",
                     "dismiss",
-                    "clear");
+                    "clear",
+                    "machine-token");
 
     private Main() {}
 
@@ -112,6 +113,7 @@ public final class Main {
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
+                case "machine-token" -> MachineTokenVerb.run(rest, env, out, new PodmanUnit(env));
                 case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");

@@ -108,7 +108,29 @@ VPN they share, over `https` with the account's own certificate:
   then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file; a placed
   server certificate stays too.
 
-## On Fedora
+## A person's machine on a host's homeserver
+
+On a host whose homeserver serves only people's machines in central mode, with no project of its own, the host
+administrator's helper admits each person's machine and takes it out again:
+
+    porelo-message-transport-matrix machine-token issue <machine>
+    porelo-message-transport-matrix machine-token revoke <machine>
+    porelo-message-transport-matrix machine-token expel <machine>
+
+- **The administrator's token** comes on stdin among the secrets, `{"secrets": {"PORELO_MATRIX_ADMIN_TOKEN": "…"}}`,
+  as Porelo hands it to `setup`. The first `issue`, given none, registers the homeserver's administrator `@porelo`
+  before any machine has a token, since the first account registered is the administrator, and answers its token
+  under `account` to be kept and handed back. Once `@porelo` exists, nothing registers a second one.
+- **`issue`** answers `{"machine": "<machine>", "token": "…"}`, the same token on every later call, and writes only
+  the token files the homeserver reads. It refuses a machine whose accounts' names would end as an admitted
+  machine's, and a machine expelled before.
+- **`revoke`** answers `{"machine": "<machine>", "revoked": true|false}`; the homeserver refuses the token at its
+  next registration. A revoked token logs no account out, so `expel` comes first.
+- **`expel`** deactivates every `@….<machine>`, `@porelo.<machine>` first, which ends its sessions and takes it out
+  of every room, and answers `{"machine": "<machine>", "expelled": [ … ]}`. Tuwunel keeps a deactivated name taken,
+  so the machine is recorded as expelled (`expelled-machines/<machine>` beside the tokens) and gets no token again:
+  the person comes back under another user name.
+
 
 The `.rpm`s install the same way. With SELinux enforcing, podman relabels the registration tokens'
 directory for the container, and the account still reads it.

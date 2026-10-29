@@ -31,6 +31,9 @@ final class MachineTokens {
 
     private static final String DIRECTORY = "machine-tokens";
 
+    /** The machines expelled, each an empty file named after it. */
+    static final String EXPELLED = "expelled-machines";
+
     private static final Set<PosixFilePermission> OWNER_ONLY =
             PosixFilePermissions.fromString("rw-------");
 
@@ -69,6 +72,14 @@ final class MachineTokens {
             }
             try (FileChannel channel = lock(env);
                     FileLock held = channel.lock()) {
+                if (Files.exists(
+                        LocalHomeserver.directory(env).resolve(EXPELLED).resolve(machine))) {
+                    throw new Failure(
+                            Exit.CONFIG,
+                            machine
+                                    + " was expelled from this homeserver, and its accounts' names"
+                                    + " stay taken; add the person under another user name");
+                }
                 if (!Files.exists(file)) {
                     final byte[] random = new byte[BYTES];
                     RANDOM.nextBytes(random);
@@ -108,6 +119,28 @@ final class MachineTokens {
         return had;
     }
 
+    /**
+     * The machine recorded as expelled, beside the tokens and outside their directory, so the
+     * record outlives its token: every account of it was deactivated, and its names stay taken.
+     */
+    static void recordExpelled(final Map<String, String> env, final String machine) throws Failure {
+        final Path dir = LocalHomeserver.directory(env).resolve(EXPELLED);
+        try {
+            if (!Files.isDirectory(dir)) {
+                Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIR));
+            }
+            final Path file = dir.resolve(name(machine));
+            if (!Files.exists(file)) {
+                Files.createFile(file, PosixFilePermissions.asFileAttribute(OWNER_ONLY));
+            }
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot record " + machine + " as expelled in " + dir + ": " + ex.getMessage(),
+                    ex);
+        }
+    }
+
     private static String name(final String machine) throws Failure {
         if (!MACHINE.matcher(machine).matches()) {
             throw new Failure(Exit.USAGE, "not a machine's name: '" + machine + "'");
@@ -135,17 +168,26 @@ final class MachineTokens {
         }
     }
 
-    /** Every other machine's token removed, once the account's homeserver goes. */
+    /**
+     * Every other machine's token and every record of an expelled one removed, once the account's
+     * homeserver goes, and its accounts' names with it.
+     */
     static void forget(final Map<String, String> env, final Lifecycle.Report report)
             throws Failure {
-        final Path dir = LocalHomeserver.directory(env).resolve(DIRECTORY);
+        forget(LocalHomeserver.directory(env).resolve(EXPELLED), report, "the record of ");
+        forget(
+                LocalHomeserver.directory(env).resolve(DIRECTORY),
+                report,
+                "the registration token of ");
+    }
+
+    private static void forget(final Path dir, final Lifecycle.Report report, final String what) {
         if (!Files.isDirectory(dir)) {
             return;
         }
         try (Stream<Path> files = Files.list(dir)) {
             for (final Path file : files.toList()) {
-                LocalHomeserver.delete(
-                        file, report, "the registration token of " + file.getFileName());
+                LocalHomeserver.delete(file, report, what + file.getFileName());
             }
         } catch (final IOException ex) {
             report.kept(dir.toString(), ex.getMessage());

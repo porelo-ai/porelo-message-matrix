@@ -309,7 +309,7 @@ final class Lifecycle {
     }
 
     /** Keeps an account recognizable when setup recovers it or reuses its room. */
-    private static void displayName(
+    static void displayName(
             final MatrixClient nobody, final Accounts.Session account, final String name)
             throws Failure {
         nobody.as(account.accessToken())
@@ -505,7 +505,7 @@ final class Lifecycle {
      * account's own homeserver just restored from a copy, whose vault did not come with it - the
      * restored one taken back. Never a second.
      */
-    private static Accounts.Session admin(
+    static Accounts.Session admin(
             final MatrixClient nobody,
             final Map<String, String> env,
             final String registrationToken,

@@ -138,4 +138,35 @@ class MachineTokensTest {
                 .containsExactly(local, b)
                 .doesNotContain(a);
     }
+
+    /**
+     * Harm guarded: a person removed from the host gets a token again, and their new Porelo cannot
+     * take its accounts' names back, which stay taken, so it fails later and unclearly.
+     */
+    @Test
+    @DisplayName(
+            "A machine expelled before is refused a token in words, even after its token was revoked")
+    void refusesAnExpelledMachine() throws Exception {
+        MachineTokens.issue(env, "hosta");
+        MachineTokens.recordExpelled(env, "hosta");
+        assertThat(MachineTokens.revoke(env, "hosta")).as("its token goes").isTrue();
+        final String before = Files.readString(tokens());
+
+        assertThatThrownBy(() -> MachineTokens.issue(env, "hosta"))
+                .as("an expelled machine's name is taken for good")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("hosta was expelled from this homeserver")
+                .hasMessageContaining("add the person under another user name")
+                .extracting(failure -> ((Failure) failure).exitCode())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(dir.resolve("config/porelo/matrix/machine-tokens/hosta"))
+                .as("no token written for it")
+                .doesNotExist();
+        assertThat(Files.readString(tokens()))
+                .as("the homeserver's token file unchanged")
+                .isEqualTo(before);
+        assertThat(MachineTokens.issue(env, "hostb"))
+                .as("another machine is issued a token")
+                .isNotBlank();
+    }
 }
