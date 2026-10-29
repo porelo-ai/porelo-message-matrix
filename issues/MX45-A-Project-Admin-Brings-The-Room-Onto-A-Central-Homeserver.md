@@ -1,6 +1,6 @@
 # MX45 — A Project Admin Brings The Room Onto A Central Homeserver
 
-**Status:** Estimated by the operator on 2026-10-28; Accepted on 2026-10-28. It builds on Porelo naming a transport's machine `<host>-<account>`.
+**Status:** Implementing since 2026-10-29. Estimated by the operator on 2026-10-28; Accepted on 2026-10-28. It builds on Porelo naming a transport's machine `<host>-<account>`.
 **Size:** M - two lifecycle verbs in central mode, read in today's local `room()`/`ours()` and central `setup`, a
 contract change porelo reads (`describe`, the answers), docs and integration tests.
 
