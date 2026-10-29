@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -13,6 +14,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code homeserver-token}: makes the local homeserver's registration token once, before its first
@@ -37,13 +39,17 @@ final class HomeserverToken {
 
     private HomeserverToken() {}
 
-    static void run(final List<String> args, final Map<String, String> env) throws Failure {
+    static void run(final List<String> args, final Map<String, String> env, final PrintStream err)
+            throws Failure {
         if (!args.isEmpty()) {
             throw new Failure(Exit.USAGE, "usage: homeserver-token");
         }
         backups(env);
         token(env);
-        Publish.prepare(env);
+        final @Nullable String notice = Publish.prepare(env);
+        if (notice != null) {
+            err.println(Main.NAME + ": " + notice);
+        }
     }
 
     private static void token(final Map<String, String> env) throws Failure {

@@ -124,6 +124,10 @@ final class Certificate {
             directory(dir.resolve(TLS));
             try (FileChannel channel = lock(dir);
                     FileLock lock = channel.lock()) {
+                if (placed(dir)) {
+                    checkPlaced(dir, address, name, now);
+                    return false;
+                }
                 final Authority ca = authority(dir, now);
                 if (current(dir.resolve(TLS), ca, address, name, now)) {
                     return false;
@@ -139,7 +143,116 @@ final class Certificate {
         }
     }
 
-    /** The server certificate and its key removed; the CA stays, so other machines keep it. */
+    /**
+     * Whether the server certificate was made elsewhere and placed here: a CA certificate without
+     * its key beside a server certificate. The transport never makes, renews or removes one.
+     */
+    static boolean placed(final Path dir) {
+        return Files.exists(dir.resolve(CA_CERTIFICATE))
+                && !Files.exists(dir.resolve(CA_KEY))
+                && Files.exists(dir.resolve(TLS).resolve(SERVER_CERTIFICATE));
+    }
+
+    /**
+     * What to say of a placed certificate within its last {@link #RENEW_WITHIN}, which nobody here
+     * renews; null for any other.
+     */
+    static @Nullable String notice(final Path dir, final Instant now) {
+        if (!placed(dir)) {
+            return null;
+        }
+        final Path file = dir.resolve(TLS).resolve(SERVER_CERTIFICATE);
+        try {
+            final Instant end = read(file).getNotAfter().toInstant();
+            return end.isBefore(now.plus(RENEW_WITHIN))
+                    ? file + ", made elsewhere, ends at " + end + "; place a new one before then"
+                    : null;
+        } catch (final IOException | GeneralSecurityException ex) {
+            return null;
+        }
+    }
+
+    /**
+     * A placed certificate checked, never changed: signed by the placed CA, valid now, fitting its
+     * key, and covering the published address and name.
+     */
+    private static void checkPlaced(
+            final Path dir,
+            final InetAddress address,
+            final @Nullable String name,
+            final Instant now)
+            throws IOException, GeneralSecurityException, Failure {
+        final Path file = dir.resolve(TLS).resolve(SERVER_CERTIFICATE);
+        final X509Certificate server = read(file);
+        try {
+            server.verify(read(dir.resolve(CA_CERTIFICATE)).getPublicKey());
+        } catch (final GeneralSecurityException ex) {
+            throw new Failure(
+                    Exit.CONFIG, file + " is not signed by " + dir.resolve(CA_CERTIFICATE));
+        }
+        if (server.getNotBefore().toInstant().isAfter(now)) {
+            throw new Failure(
+                    Exit.CONFIG, file + " holds only from " + server.getNotBefore().toInstant());
+        }
+        if (!server.getNotAfter().toInstant().isAfter(now)) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    file
+                            + " ended at "
+                            + server.getNotAfter().toInstant()
+                            + "; place a new one, the transport makes none");
+        }
+        if (!coversAddress(server, address)) {
+            throw new Failure(Exit.CONFIG, file + " does not cover " + address.getHostAddress());
+        }
+        if (name != null && !coversName(server, name)) {
+            throw new Failure(Exit.CONFIG, file + " does not cover " + name);
+        }
+        final Path key = dir.resolve(TLS).resolve(SERVER_KEY);
+        if (!fits(privateKey(key), server.getPublicKey())) {
+            throw new Failure(Exit.CONFIG, key + " does not fit " + file);
+        }
+    }
+
+    private static boolean coversAddress(final X509Certificate server, final InetAddress address)
+            throws GeneralSecurityException {
+        for (final List<?> entry : alternativeNames(server)) {
+            // 7 is iPAddress.
+            if (Integer.valueOf(7).equals(entry.get(0))
+                    && entry.get(1) instanceof String value
+                    && InetAddress.ofLiteral(value).equals(address)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The name itself, or a wildcard in place of its first label alone. */
+    private static boolean coversName(final X509Certificate server, final String name)
+            throws GeneralSecurityException {
+        final int dot = name.indexOf('.');
+        final @Nullable String wildcard = dot < 0 ? null : "*" + name.substring(dot);
+        for (final List<?> entry : alternativeNames(server)) {
+            // 2 is dNSName; a name has no case.
+            if (Integer.valueOf(2).equals(entry.get(0))
+                    && entry.get(1) instanceof String value
+                    && (value.equalsIgnoreCase(name) || value.equalsIgnoreCase(wildcard))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Collection<List<?>> alternativeNames(final X509Certificate server)
+            throws GeneralSecurityException {
+        final Collection<List<?>> names = server.getSubjectAlternativeNames();
+        return names == null ? List.of() : names;
+    }
+
+    /**
+     * The server certificate and its key removed; the CA stays, so other machines keep it. A placed
+     * certificate stays too.
+     */
     static void removeServer(final Path dir) throws Failure {
         if (!Files.isDirectory(dir)) {
             return;
@@ -147,6 +260,10 @@ final class Certificate {
         // Under the lock a start making the pair holds, so neither file is left without the other.
         try (FileChannel channel = lock(dir);
                 FileLock lock = channel.lock()) {
+            // The host's administrator placed it, and is the one to remove it.
+            if (placed(dir)) {
+                return;
+            }
             Files.deleteIfExists(dir.resolve(TLS).resolve(SERVER_CERTIFICATE));
             Files.deleteIfExists(dir.resolve(TLS).resolve(SERVER_KEY));
         } catch (final IOException ex) {

@@ -107,8 +107,8 @@ public final class Main {
                 case "read" -> Read.run(rest, Config.from(env), env);
                 case "rename" -> Rename.run(rest, Config.from(env));
                 case "room" -> Room.start(rest, env, out, err);
-                case "homeserver-token" -> HomeserverToken.run(rest, env);
-                case "publish" -> Publish.run(rest, env, out, new Publish.Systemd());
+                case "homeserver-token" -> HomeserverToken.run(rest, env, err);
+                case "publish" -> Publish.run(rest, env, out, err, new Publish.Systemd());
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));

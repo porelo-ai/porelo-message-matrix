@@ -1,6 +1,8 @@
 package org.fuin.porelo.message.matrix;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -102,7 +104,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
         if (active()) {
             return;
         }
-        HomeserverToken.run(List.of(), env);
+        HomeserverToken.run(List.of(), env, new PrintStream(OutputStream.nullOutputStream()));
         try {
             Files.createDirectories(data);
             final ProcessBuilder builder = builder(List.of(), Map.of(), true);

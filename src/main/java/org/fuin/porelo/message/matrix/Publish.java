@@ -79,6 +79,7 @@ final class Publish {
             final List<String> args,
             final Map<String, String> env,
             final PrintStream out,
+            final PrintStream err,
             final Control control)
             throws Failure {
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
@@ -104,7 +105,10 @@ final class Publish {
                                 + FIRST_UNPRIVILEGED_PORT
                                 + " on");
             }
-            on(env, address, name, control);
+            final @Nullable String notice = on(env, address, name, control);
+            if (notice != null) {
+                err.println(Main.NAME + " publish: " + notice);
+            }
             answer.put("published", address.text());
             if (name != null) {
                 answer.put("name", name);
@@ -120,7 +124,7 @@ final class Publish {
         out.println(answer);
     }
 
-    private static void on(
+    private static @Nullable String on(
             final Map<String, String> env,
             final Address address,
             final @Nullable String name,
@@ -157,11 +161,12 @@ final class Publish {
         }
         setting(conf, LocalHomeserver.PUBLISH, address.text());
         setting(conf, LocalHomeserver.PUBLISH_NAME, name);
-        prepare(env);
+        final @Nullable String notice = prepare(env);
         write(dropIn(env), "[Socket]\nListenStream=\nListenStream=" + address.text() + "\n");
         control.reload();
         control.restartHomeserver();
         control.listen();
+        return notice;
     }
 
     private static void off(final Map<String, String> env, final Control control) throws Failure {
@@ -368,17 +373,20 @@ final class Publish {
     /**
      * Before every start: the certificate made or renewed for the published address, and the TLS
      * settings written for the unit, or none when nothing is published. The {@code tls} directory
-     * always exists, since the unit mounts it.
+     * always exists, since the unit mounts it. Answers what to say of a placed certificate near its
+     * end, or null.
      */
-    static void prepare(final Map<String, String> env) throws Failure {
+    static @Nullable String prepare(final Map<String, String> env) throws Failure {
         final Path dir = LocalHomeserver.directory(env);
         final @Nullable Address address = published(dir.resolve("homeserver.conf"));
         final String settings;
+        @Nullable String notice = null;
         if (address == null) {
             settings = "";
         } else {
             Certificate.ensure(
                     dir, address.ip(), name(dir.resolve("homeserver.conf")), Instant.now());
+            notice = Certificate.notice(dir, Instant.now());
             settings =
                     "TUWUNEL_TLS__CERTS="
                             + MOUNT
@@ -406,5 +414,6 @@ final class Publish {
                     ex);
         }
         write(dir.resolve(TLS_ENV), settings);
+        return notice;
     }
 }

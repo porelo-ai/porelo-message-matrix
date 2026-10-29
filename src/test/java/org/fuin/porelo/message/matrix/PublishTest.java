@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -61,7 +62,11 @@ class PublishTest {
     private JsonNode publish(final String... args) throws Exception {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         Publish.run(
-                List.of(args), env(), new PrintStream(out, true, StandardCharsets.UTF_8), control);
+                List.of(args),
+                env(),
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(OutputStream.nullOutputStream()),
+                control);
         return MatrixClient.JSON.readTree(out.toByteArray());
     }
 
@@ -176,7 +181,7 @@ class PublishTest {
     @DisplayName("Clearing removes everything publishing made, and a second clear finds nothing")
     void clearingForgetsWhatPublishingMade() throws Exception {
         publish("--address", "192.0.2.2:8448");
-        HomeserverToken.run(List.of(), env());
+        HomeserverToken.run(List.of(), env(), new PrintStream(OutputStream.nullOutputStream()));
         MachineTokens.issue(env(), "hosta");
 
         final Lifecycle.Report report = new Lifecycle.Report();

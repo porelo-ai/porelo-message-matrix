@@ -167,7 +167,11 @@ final class Keep {
                 if (Files.isRegularFile(conf)) {
                     Files.copy(conf, dir.resolve(CONF));
                 }
-                for (final String name : CA) {
+                // A placed CA is the host administrator's, placed again wherever the copy goes.
+                for (final String name :
+                        Certificate.placed(LocalHomeserver.directory(env))
+                                ? List.<String>of()
+                                : CA) {
                     final Path file = LocalHomeserver.directory(env).resolve(name);
                     if (Files.isRegularFile(file)) {
                         ownerOnlyCopy(file, dir.resolve(name));
@@ -361,9 +365,12 @@ final class Keep {
         }
     }
 
-    /** A CA is its certificate and its key together, or neither; half of one is refused. */
+    /**
+     * A CA is its certificate and its key together, or neither; half of one is refused, unless its
+     * certificate was placed with a server certificate made elsewhere.
+     */
     private static void whole(final @Nullable Path dir, final String whose) throws Failure {
-        if (dir == null) {
+        if (dir == null || Certificate.placed(dir)) {
             return;
         }
         final long present = CA.stream().filter(name -> Files.exists(dir.resolve(name))).count();

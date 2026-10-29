@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A published homeserver serves a server certificate its host's administrator made elsewhere: with `ca.crt`,
+  `tls/server.crt` and `tls/server.key` placed beside `homeserver.conf` and no `ca.key`, the transport makes, renews
+  and removes no certificate. Each start and `publish` refuse one that is not signed by `ca.crt`, does not fit its key,
+  does not name the published address and name (a wildcard covers one label) or has ended, and warn on stderr in its
+  last 30 days. A CA of the account's own whose key is gone keeps serving its server certificate until that ends.
 - Every verb that takes a token reads the secrets Porelo kept from stdin, as `{"settings": {...}, "secrets": {...}}`,
   and `describe` says so with `"secrets": "input"`. A token handed so is never in the transport's environment, which
   another process of the account could read in `/proc` in the moment before the transport makes itself unreadable.

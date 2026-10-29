@@ -15,6 +15,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx54"></a>[MX54](MX54-The-Homeserver-Serves-A-Certificate-Made-Elsewhere.md) | M | - | A published homeserver serves a server certificate and key the host's administrator made elsewhere, signed by a CA whose key never reaches the machine, and never makes or renews one of its own beside them |
 | <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
 
 ## Backlog
@@ -36,7 +37,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx54"></a>[MX54](MX54-The-Homeserver-Serves-A-Certificate-Made-Elsewhere.md) | - | - | A published homeserver serves a server certificate and key the host's administrator made elsewhere, signed by a CA whose key never reaches the machine, and never makes or renews one of its own beside them |
 | <a id="mx53"></a>[MX53](MX53-A-Person-Added-Again-Keeps-Their-Name.md) | - | - | A person removed from a host and added again under the same user name gets their Matrix accounts back: `expel` locks instead of deactivating, and `issue` answers one-time passwords their Porelo takes the accounts back with |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | - | - | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name |
 

@@ -82,8 +82,9 @@ VPN they share, over `https` with the account's own certificate:
 - **It answers** `{"published": "192.0.2.2:8448", "ca_file": "<path of ca.crt>"}`, with `"name"` when one is given. The other machine names that CA
   file as its `ca_file`, and `https://192.0.2.2:8448` as its homeserver.
 - **The address** is one literal address of this machine, IPv6 in brackets, with a port from 1024 on. A wildcard, a
-  name, loopback or multicast is refused before anything changes, and so is a homeserver no project has set up yet:
-  `publish` keeps the port the setup chose, which this machine's transport uses.
+  name, loopback or multicast is refused before anything changes, and so is a homeserver whose `homeserver.conf`
+  names no `PORELO_MATRIX_PORT` yet: `publish` keeps the port a project's setup chose, or the one written there before
+  the first start, which this machine's transport uses.
 - **TLS:** Tuwunel's TLS covers each of its listeners and takes plain `http` beside `https`, so this machine's
   transport keeps its plain loopback port, and the published address forwards to that same port. The server certificate
   names the published address alone; the CA certificate is the one file another machine needs.
@@ -95,8 +96,17 @@ VPN they share, over `https` with the account's own certificate:
 - **A registration token per machine:** `admit` ([the contract](transport.md#the-lifecycle)) gives each other machine
   a token of its own, kept under `machine-tokens/<machine>` beside the token file, which holds this machine's own
   token first. Tuwunel reads the file at every registration, so `dismiss` refuses a machine's token at once.
+- **A certificate made elsewhere:** a host's administrator may place a server certificate signed by a CA whose key
+  never reaches this machine: `ca.crt` beside `homeserver.conf` (`0644`), and `tls/server.crt` with its EC key
+  `tls/server.key` (`0600`, in `tls/` of `0700`), all the account's own, and no `ca.key`. The transport then makes, renews
+  and removes none of them. Every start and `publish` check that the certificate is signed by that `ca.crt`, fits its
+  key, names the published address and the name (`*.<domain>` covers one label) and has not ended, and refuse in
+  words otherwise; in its last 30 days they say on stderr when it ends. A new one placed holds at the next start,
+  `systemctl --user restart porelo-matrix-homeserver`. `backup` carries no placed CA, since it is placed again
+  wherever the copy goes.
 - **`publish --off`** closes the socket and removes its address, `PORELO_MATRIX_PUBLISH` and the server certificate,
-  then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file.
+  then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file; a placed
+  server certificate stays too.
 
 ## On Fedora
 

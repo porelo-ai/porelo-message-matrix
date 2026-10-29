@@ -111,15 +111,31 @@ class CertificateTest {
                 .isEqualTo(first);
     }
 
-    /** Harm guarded: a CA certificate without its key leaves nothing to sign renewals with. */
+    /**
+     * Harm guarded: a CA certificate without its key leaves nothing to sign renewals with, and
+     * replacing it would silently lock out every machine that trusts it.
+     */
     @Test
-    @DisplayName("A CA certificate whose key is gone is refused rather than replaced")
+    @DisplayName(
+            "A CA certificate whose key is gone is never replaced: its server certificate holds until it ends, then is refused")
     void refusesACaWithoutItsKey() throws Exception {
         Certificate.ensure(dir, VPN, NOW);
+        final String ca = Files.readString(dir.resolve("ca.crt"));
         Files.delete(dir.resolve("ca.key"));
 
+        assertThat(Certificate.ensure(dir, VPN, NOW))
+                .as("the server certificate is kept while it holds")
+                .isFalse();
+        assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NOW.plus(Certificate.LIFETIME)))
+                .as("once it ends nothing here can sign another")
+                .isInstanceOf(Failure.class)
+                .hasMessageContaining("ended");
+        assertThat(Files.readString(dir.resolve("ca.crt")))
+                .as("the CA certificate the other machines name is unchanged")
+                .isEqualTo(ca);
+        Files.delete(dir.resolve(Certificate.TLS).resolve(Certificate.SERVER_CERTIFICATE));
         assertThatThrownBy(() -> Certificate.ensure(dir, VPN, NOW))
-                .as("replacing the CA would silently lock out every machine that trusts it")
+                .as("without a server certificate the CA's key is needed, and refused missing")
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("has no key beside it");
     }
