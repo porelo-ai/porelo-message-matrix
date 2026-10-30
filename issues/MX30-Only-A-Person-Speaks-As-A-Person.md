@@ -1,11 +1,11 @@
 # MX30 — Only A Person Speaks As A Person
 
-**Status:** Accepted.
-**Size:** M - a setting in the transport's contract with porelo, the room's and the direct chats' poll, and an
-integration test on the central homeserver.
+**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Size:** S - shrank from M: a person is known by the shape of their account, so no setting and no change in
+Porelo; the room's and the direct chats' poll, `send`, and the central account's secrets.
 
 **What must be true.** On a central homeserver, a task takes words as a person's - in the project's room and in
-its direct chat - only from the people the project names, so the operator's direct chat with a task is the
+its direct chat - only from a person's own account, so the operator's direct chat with a task is the
 operator's own channel: a question asked there and its answer reach that task alone, and no other machine's
 account can speak in it as the operator.
 
@@ -26,28 +26,23 @@ filter, or open a direct chat with a task, which then reads as the operator's ow
 
 ## Plan
 
-- **A setting `persons`** in `mail.transports.matrix`: the user ids whose words are a person's, listed by the
-  project rather than inferred from who invited whom, which a homeserver's administrator can shape. Required with
-  `homeserver`, refused without it (as `room` is); `Settings`, `SettingsCheck` and `doc/transport.md`.
-- **`Person.deliver`** hands over only a sender `persons` names, else skips it and names it on stderr.
-- **`Direct.answerInvitations`** takes an invitation only from a person `persons` names; any other is declined
-  and named.
-- **`send --to @user`** opens a direct chat only with a person `persons` names (78 otherwise), so a question is
-  never asked of another machine's account.
-- **Red first:** `CentralIT`, with a second machine's task account posting plain text in the room and opening a
-  direct chat with a task of the first machine; today both are handed over.
+Since every person is a host login, a person's own account is `@<login>`: a bare login, with no dot, and never
+`porelo` or `porelo-…`, while every task, relay and provisioning account holds a dot. That shape replaces the
+`persons` setting, so Porelo needs no change.
+
+- **A central account is marked** by `PORELO_MATRIX_LOGIN` in the `secrets` that `setup` and `enroll` answer
+  on a central homeserver; `poll` and `send` read it from their environment.
+- **`Person.deliver`** hands over only a sender of that shape on the polling account's server, else skips it
+  and names it on stderr.
+- **`Direct.answerInvitations`** declines an invitation from any other account and names it.
+- **`send --to @user`** opens a direct chat only with such an account (78 otherwise).
+- **Red first:** `LoginTest`, and cases in `PersonTest`, `DirectTest` and `SendTest` with another person's task,
+  relay and the administrator.
 
 ## Acceptance
 
-- On the central homeserver, a person named in `persons` speaks in the room and in a direct chat with a task, and
+- On the central homeserver, a person's own account speaks in the room and in a direct chat with a task, and
   each is handed over as today.
 - Seen to fail: plain text from another machine's task account in the room, and a direct chat it opens, are
   handed over before the change and skipped and named after it.
-- Settings with `homeserver` and no `persons` are refused (78), by `settings` too.
 - On the account's own homeserver nothing changes.
-
-## To be checked
-
-- With Agent Core: whether porelo already checks a person file's `sender` against people it knows, and how it
-  addresses an agent's question to the operator (`send --to` the operator's user id), on both kinds of
-  homeserver; and whether `persons` reaches the transport unread, as `room` does.

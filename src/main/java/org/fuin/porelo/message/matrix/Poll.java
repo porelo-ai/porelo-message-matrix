@@ -122,6 +122,7 @@ final class Poll {
                     poll(
                             client,
                             userId,
+                            Login.central(env) ? AdminRoom.server(userId) : null,
                             mode,
                             wait,
                             inbound,
@@ -146,6 +147,7 @@ final class Poll {
     private static List<String> poll(
             final MatrixClient client,
             final String self,
+            @Nullable final String central,
             final String mode,
             final int wait,
             final Path inbound,
@@ -186,8 +188,8 @@ final class Poll {
                     from == null ? 0 : Math.max(0, (deadline - System.nanoTime()) / 1_000_000L);
             final int handed =
                     once(
-                            client, self, persons, direct, remaining, from, joined, inbound,
-                            stateDir, state, skipped);
+                            client, self, central, persons, direct, remaining, from, joined,
+                            inbound, stateDir, state, skipped);
             // A homeserver ends its wait on anything new for the account, a read receipt too,
             // though the filter
             // leaves it out of the answer: an answer with nothing in it is no news, and the wait
@@ -210,6 +212,7 @@ final class Poll {
     private static int once(
             final MatrixClient client,
             final String self,
+            @Nullable final String central,
             final boolean persons,
             final boolean direct,
             final long timeoutMillis,
@@ -240,7 +243,8 @@ final class Poll {
         final Map<String, Set<String>> directRooms = new java.util.HashMap<>();
         if (direct) {
             skipped.addAll(
-                    Direct.answerInvitations(client, self, sync.path("rooms").path("invite")));
+                    Direct.answerInvitations(
+                            client, self, central, sync.path("rooms").path("invite")));
             directRooms.putAll(Direct.rooms(client, self));
         }
         // Paging back from a cut-short timeline can return events the timeline holds too: each is
@@ -289,6 +293,7 @@ final class Poll {
                                         event,
                                         inbound,
                                         stateDir,
+                                        central,
                                         self);
                         if (why == null) {
                             handed++;
@@ -312,7 +317,14 @@ final class Poll {
                 final String why =
                         persons
                                 ? Person.deliver(
-                                        client, self, room.getKey(), event, inbound, stateDir, null)
+                                        client,
+                                        self,
+                                        room.getKey(),
+                                        event,
+                                        inbound,
+                                        stateDir,
+                                        central,
+                                        null)
                                 : "not a Porelo message (poll --persons hands a person's words over): from "
                                         + event.path("sender").asText("?")
                                         + " in "

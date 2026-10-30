@@ -377,6 +377,9 @@ record Settings(
         // configured wins - an inherited "off" must not switch the check off unasked.
         env.put(Config.CA_FILE, caFile == null ? "" : caFile.toString());
         env.put(Config.TLS_VERIFY, verifyTls ? "on" : "off");
+        // Empty unless a central account's: an inherited login must not make the account's own
+        // homeserver's poll and send take it for a central one.
+        env.put(Config.LOGIN, "");
         return env;
     }
 }

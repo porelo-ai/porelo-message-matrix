@@ -27,7 +27,10 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
      */
     static final String MACHINE_SECRET = "PORELO_MATRIX_MACHINE_SECRET";
 
-    /** The person's login on a central homeserver, kept by setup for the verbs that follow. */
+    /**
+     * The person's login on a central homeserver, kept by setup for the verbs that follow, and in a
+     * central account's secrets the mark that only a person's own account speaks as a person.
+     */
     static final String LOGIN = "PORELO_MATRIX_LOGIN";
 
     /** A homeserver's registration token, for one that is not the account's own. */

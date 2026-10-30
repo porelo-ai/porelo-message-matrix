@@ -102,7 +102,8 @@ the person's client puts into the event; the text itself is handed over as typed
 are still told by the transport's marks, the message field and the signature beside it. A person's file
 has no `.sig`, and its name says whose it is. Whether and how it reaches a task is Porelo's.
 A direct chat is taken only from somebody who already shares the project's room with the task's account,
-so no stranger opens a way in, and only unencrypted: a task holds no keys, so an encrypted chat is declined
+and on a central homeserver only from a person's own account, so no stranger and no other person's task opens a
+way in, and only unencrypted: a task holds no keys, so an encrypted chat is declined
 with a reason the person's client shows, and an encrypted message is named on stderr, never lost
 silently. `describe` announces both, so a Porelo that knows neither never gets such a
 file.

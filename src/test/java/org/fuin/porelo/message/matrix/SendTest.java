@@ -394,6 +394,92 @@ class SendTest {
                                                 "/_matrix/client/v3/rooms/" + inPath + "/send/"));
     }
 
+    /** Harm guarded: a question for the operator goes to another person's task or relay. */
+    @ParameterizedTest(name = "--to {0}")
+    @CsvSource({
+        "@t.bob:matrix.test",
+        "@porelo.bob:matrix.test",
+        "@porelo:matrix.test",
+        "@bob:other.test"
+    })
+    @DisplayName("on a central homeserver a direct chat goes only to a person's own account")
+    void centralDirectChatOnlyToAPerson(final String to) {
+        homeserver.answer(200, "{\"user_id\":\"@t.alice:matrix.test\"}");
+
+        final int exit =
+                send(
+                        Map.of(
+                                Config.HOMESERVER,
+                                homeserver.url(),
+                                Config.ACCESS_TOKEN,
+                                TOKEN,
+                                Config.LOGIN,
+                                "alice"),
+                        message.toString(),
+                        signature.toString(),
+                        "--to",
+                        to);
+
+        assertThat(exit).as("refused").isEqualTo(Exit.CONFIG);
+        assertThat(stderr()).as("why").contains(to);
+        assertThat(homeserver.requests())
+                .as("only whoami was asked, no chat opened and nothing sent")
+                .singleElement()
+                .satisfies(r -> assertThat(r.rawPath()).contains("whoami"));
+    }
+
+    /** Harm guarded: the check refuses the person the question is for. */
+    @Test
+    @DisplayName("on a central homeserver a person's own account gets the message in its chat")
+    void centralDirectChatToAPerson() {
+        homeserver
+                .answer(200, "{\"user_id\":\"@t.alice:matrix.test\"}")
+                .answer(200, "{\"@bob:matrix.test\":[\"!d:matrix.test\"]}")
+                .answer(200, "{\"membership\":\"join\"}")
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        final int exit =
+                send(
+                        Map.of(
+                                Config.HOMESERVER,
+                                homeserver.url(),
+                                Config.ACCESS_TOKEN,
+                                TOKEN,
+                                Config.LOGIN,
+                                "alice"),
+                        message.toString(),
+                        signature.toString(),
+                        "--to",
+                        "@bob:matrix.test");
+
+        assertThat(exit).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(homeserver.requests().getLast().rawPath())
+                .as("into the chat with the person")
+                .startsWith("/_matrix/client/v3/rooms/%21d%3Amatrix.test/send/");
+    }
+
+    /** Harm guarded: a central send blames the person for a homeserver that named nobody. */
+    @Test
+    void centralSendWithoutWhoseTokenIsAProtocolFault() {
+        homeserver.answer(200, "{}");
+
+        final int exit =
+                send(
+                        Map.of(
+                                Config.HOMESERVER,
+                                homeserver.url(),
+                                Config.ACCESS_TOKEN,
+                                TOKEN,
+                                Config.LOGIN,
+                                "alice"),
+                        message.toString(),
+                        signature.toString(),
+                        "--to",
+                        "@bob:matrix.test");
+
+        assertThat(exit).isEqualTo(Exit.PROTOCOL);
+    }
+
     @Nested
     @DisplayName("When the homeserver cannot take it now")
     class Temporary {

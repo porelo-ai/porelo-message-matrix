@@ -356,4 +356,33 @@ class PollTest {
                             assertThat(queries.get(5)).contains("since=s42");
                         });
     }
+
+    /**
+     * Harm guarded: a central relay's poll hands another person's task's text over as a person's,
+     * because the mark in its secrets never reaches the check.
+     */
+    @Test
+    void aCentralPollTakesOnlyAPersonsOwnAccountForAPerson() throws IOException {
+        homeserver
+                .answer(200, "{\"user_id\":\"@porelo-relay-p.alice:matrix.test\"}")
+                .answer(200, JOINED)
+                .answer(
+                        200,
+                        """
+                        {"next_batch":"s1","rooms":{"join":{"!room:matrix.test":{"timeline":{
+                         "limited":false,"events":[
+                          {"type":"m.room.message","event_id":"$1","sender":"@t.bob:matrix.test",
+                           "origin_server_ts":1790000000000,"content":{"msgtype":"m.text","body":"a"}},
+                          {"type":"m.room.message","event_id":"$2","sender":"@carol:matrix.test",
+                           "origin_server_ts":1790000000001,"content":{"msgtype":"m.text","body":"b"}}
+                        ]}}}}}
+                        """);
+        final Map<String, String> env = env();
+        env.put(Config.LOGIN, "alice");
+
+        assertThat(poll(env, "--into", inbound.toString(), "--persons")).isEqualTo(Exit.OK);
+
+        assertThat(filesIn(inbound)).as("only the person's words are handed over").isEqualTo(1);
+        assertThat(stderr()).as("the task's words are named").contains("@t.bob:matrix.test");
+    }
 }

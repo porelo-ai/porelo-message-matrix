@@ -33,7 +33,8 @@ final class Person {
     /**
      * Writes a person's message for the accounts it names, and answers null; or answers why it was
      * not, for stderr. Only text a person typed is taken: a notice is a bot's, an edit changes
-     * words already delivered, and an image or a file is no text to hand over.
+     * words already delivered, and an image or a file is no text to hand over. With {@code
+     * central}, the server of a central homeserver, only a login's own account there is a person.
      */
     static @Nullable String deliver(
             final MatrixClient client,
@@ -42,9 +43,18 @@ final class Person {
             final JsonNode event,
             final Path inbound,
             final Path stateDir,
+            @Nullable final String central,
             @Nullable final String directTo)
             throws Failure {
         final String sender = event.path("sender").asText("?");
+        // On a central homeserver the room holds every other person's tasks and relays too, whose
+        // plain text would otherwise read as this project's person speaking.
+        if (central != null && !Login.person(sender, central)) {
+            return "words from "
+                    + sender
+                    + ", which is no person's own account on this homeserver, in "
+                    + room;
+        }
         final JsonNode content = event.path("content");
         final String type = content.path("msgtype").asText("");
         // Signed but without the message field: Porelo's own, in the form before the person's line

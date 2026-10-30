@@ -64,7 +64,15 @@ final class Send {
 
     private Send() {}
 
-    static void run(final List<String> args, final Config config, final PrintStream out)
+    /**
+     * With {@code central}, a central homeserver's account, {@code --to} a user reaches only a
+     * login's own account: a question is never asked of another person's task or relay.
+     */
+    static void run(
+            final List<String> args,
+            final Config config,
+            final boolean central,
+            final PrintStream out)
             throws Failure {
         @Nullable String room = null;
         @Nullable Path shown = null;
@@ -132,8 +140,24 @@ final class Send {
         }
 
         // To a person: into this account's direct chat with them, opened now if there is none.
-        final String target =
-                person ? Direct.chatWith(client, Accounts.whoami(client), room) : room;
+        final String target;
+        if (person) {
+            final String self = Accounts.whoami(client);
+            if (central && (!self.startsWith("@") || self.indexOf(':') < 2)) {
+                throw new Failure(Exit.PROTOCOL, "the homeserver did not say whose token this is");
+            }
+            if (central && !Login.person(room, AdminRoom.server(self))) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "--to "
+                                + room
+                                + " is no person's own account on this homeserver: a direct chat"
+                                + " goes only to a person's bare account, never to a task or a relay");
+            }
+            target = Direct.chatWith(client, self, room);
+        } else {
+            target = room;
+        }
         final String path =
                 "/_matrix/client/v3/rooms/"
                         + MatrixClient.segment(target)

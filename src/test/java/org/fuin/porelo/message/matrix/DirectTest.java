@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * A task's direct chats as its account's {@code m.direct} keeps them. Harm guarded: a {@code send
@@ -49,6 +51,45 @@ class DirectTest {
                     .as("the other writer's chat")
                     .isEqualTo("[\"!q\"]");
             assertThat(last.path("@p:x").toString()).as("this chat").isEqualTo("[\"!p\"]");
+        }
+    }
+
+    /** Harm guarded: another person's task opens a direct chat that reads as the operator's. */
+    @ParameterizedTest
+    @ValueSource(strings = {"@t.bob:x", "@porelo:x", "@porelo-relay-p.bob:x", "@bob:other"})
+    @DisplayName("On a central homeserver a chat from no person's own account is declined unasked")
+    void centralInvitationFromATaskIsDeclined(final String inviter) throws IOException, Failure {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, "{}");
+            final MatrixClient client =
+                    new MatrixClient(
+                            Config.from(
+                                    Map.of(
+                                            Config.HOMESERVER,
+                                            homeserver.url(),
+                                            Config.ACCESS_TOKEN,
+                                            "t")));
+            final JsonNode invites =
+                    MatrixClient.JSON.readTree(
+                            """
+                            {"!d:x":{"invite_state":{"events":[{"type":"m.room.member",
+                             "state_key":"@t.alice:x","sender":"%s",
+                             "content":{"membership":"invite","is_direct":true}}]}}}
+                            """
+                                    .formatted(inviter));
+
+            final List<String> declined =
+                    Direct.answerInvitations(client, "@t.alice:x", "x", invites);
+
+            assertThat(declined)
+                    .as("what was declined")
+                    .singleElement()
+                    .asString()
+                    .contains(inviter);
+            assertThat(homeserver.requests())
+                    .as("left at once, without asking which rooms the inviter shares")
+                    .singleElement()
+                    .satisfies(r -> assertThat(r.rawPath()).endsWith("/leave"));
         }
     }
 }

@@ -104,7 +104,7 @@ public final class Main {
             switch (args[0]) {
                 case "describe" -> Describe.run(rest, out);
                 case "check" -> Check.run(rest, env);
-                case "send" -> Send.run(rest, Config.from(env), out);
+                case "send" -> Send.run(rest, Config.from(env), Login.central(env), out);
                 case "poll" -> Poll.run(rest, Config.from(env), env, err);
                 case "receipt" -> Receipt.run(rest, Config.from(env), env, out, err);
                 case "read" -> Read.run(rest, Config.from(env), env);

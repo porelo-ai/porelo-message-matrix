@@ -14,7 +14,8 @@ import org.jspecify.annotations.Nullable;
  * A task's direct chats with the people of its project. Which rooms are direct chats is what Matrix
  * keeps for every client, the account's {@code m.direct}: a person's client writes it on their
  * side, this transport on the task's. An invitation is taken only from somebody who already shares
- * a room with the task's account - the project's room - so nobody else can open a way in.
+ * a room with the task's account - the project's room - and on a central homeserver only from a
+ * person's own account, so nobody else can open a way in.
  */
 final class Direct {
 
@@ -87,11 +88,16 @@ final class Direct {
 
     /**
      * Answers the invitations of a sync: a direct chat from somebody who shares a room with this
-     * account is joined and remembered; any other invitation is declined. Answers what was
-     * declined, for stderr.
+     * account is joined and remembered; any other invitation is declined. With {@code central}, the
+     * server of a central homeserver, only a login's own account there may open one. Answers what
+     * was declined, for stderr.
      */
     static List<String> answerInvitations(
-            final MatrixClient client, final String self, final JsonNode invites) throws Failure {
+            final MatrixClient client,
+            final String self,
+            @Nullable final String central,
+            final JsonNode invites)
+            throws Failure {
         final List<String> declined = new ArrayList<>();
         for (final Map.Entry<String, JsonNode> invite : invites.properties()) {
             final String room = invite.getKey();
@@ -121,6 +127,16 @@ final class Direct {
                                 + room
                                 + ", declined: "
                                 + ENCRYPTED);
+                continue;
+            }
+            if (central != null && inviter != null && !Login.person(inviter, central)) {
+                client.post(path + "/leave", MatrixClient.JSON.createObjectNode());
+                declined.add(
+                        "an invitation from "
+                                + inviter
+                                + ", which is no person's own account on this homeserver, to "
+                                + room
+                                + ", declined");
                 continue;
             }
             if (inviter == null || !direct || !sharesARoom(client, inviter)) {

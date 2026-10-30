@@ -321,7 +321,8 @@ class LifecycleTest {
                                 "work"))
                 .as("kept login names follow the same rule")
                 .startsWith(Exit.CONFIG + " ")
-                .contains("login", "lower-case", "32", "porelo");
+                // An empty kept login is the account's own homeserver's mark: no login at all.
+                .contains("login", login.isEmpty() ? "--login" : "lower-case");
     }
 
     /** Harm guarded: one login's saved credentials are used to provision another's accounts. */

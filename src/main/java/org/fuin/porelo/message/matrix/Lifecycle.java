@@ -393,7 +393,9 @@ final class Lifecycle {
         displayName(nobody, relay, "Porelo (delivery)");
         admit(asLogin, room, relay, nobody);
 
-        put(answer.putObject("secrets"), settings.environment(url, relay.accessToken()));
+        put(
+                answer.putObject("secrets"),
+                central(settings.environment(url, relay.accessToken()), login));
         answer.put("conversation", room);
         answer.putArray("reaches").add(reaches(url));
         answer.put("login", login);
@@ -719,7 +721,9 @@ final class Lifecycle {
                                         options.display() == null ? task : options.display()));
         admit(asLogin, room, account, nobody);
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
-        put(answer.putObject("secrets"), settings.environment(url, account.accessToken()));
+        put(
+                answer.putObject("secrets"),
+                central(settings.environment(url, account.accessToken()), login));
         answer.put("address", account.userId());
         return answer;
     }
@@ -736,10 +740,17 @@ final class Lifecycle {
         return task;
     }
 
+    /** A central account's poll and send take only a login's own account for a person. */
+    private static Map<String, String> central(
+            final Map<String, String> environment, final String login) {
+        environment.put(Config.LOGIN, login);
+        return environment;
+    }
+
     private static String centralLogin(final Options options, final Map<String, String> env)
             throws Failure {
         final String keptLogin = env.get(Config.LOGIN);
-        if (keptLogin != null) {
+        if (keptLogin != null && !keptLogin.isBlank()) {
             Login.name(keptLogin);
         }
         if (options.login() != null

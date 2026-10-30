@@ -100,6 +100,7 @@ class PersonTest {
                                 event,
                                 inbound,
                                 state,
+                                null,
                                 null))
                 .as("the person's words are handed over")
                 .isNull();
@@ -134,7 +135,7 @@ class PersonTest {
                                             "t")));
 
             final String skipped =
-                    Person.deliver(client, "@relay:x", "!room", event, inbound, state, null);
+                    Person.deliver(client, "@relay:x", "!room", event, inbound, state, null, null);
 
             assertThat(skipped).as("why the message was not delivered").isNull();
             final List<Path> files;
@@ -148,5 +149,55 @@ class PersonTest {
                     .containsExactly("@task-one:x");
             assertThat(homeserver.requests()).as("requests to the homeserver").isEmpty();
         }
+    }
+
+    /** Harm guarded: another person's task speaks in a central homeserver's room as a person. */
+    @ParameterizedTest
+    @ValueSource(strings = {"@t.bob:x", "@porelo.bob:x", "@porelo-relay-demo.bob:x", "@porelo:x"})
+    void onACentralHomeserverOnlyALoginsOwnAccountIsAPerson(final String sender) throws Exception {
+        final var event =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("event_id", "$other")
+                        .put("sender", sender)
+                        .put("origin_server_ts", 1790000000000L);
+        event.putObject("content").put("msgtype", "m.text").put("body", "hello");
+        final MatrixClient client =
+                new MatrixClient(
+                        Config.from(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        "http://127.0.0.1:8008",
+                                        Config.ACCESS_TOKEN,
+                                        "t")));
+
+        final String skipped =
+                Person.deliver(
+                        client,
+                        "@porelo-relay-demo.alice:x",
+                        "!room",
+                        event,
+                        inbound,
+                        state,
+                        "x",
+                        null);
+
+        assertThat(skipped).as("why the words were not handed over").contains(sender);
+        try (Stream<Path> list = Files.list(inbound)) {
+            assertThat(list.toList()).as("nothing is handed over").isEmpty();
+        }
+        event.put("sender", "@bob:x");
+        assertThat(
+                        Person.deliver(
+                                client,
+                                "@porelo-relay-demo.alice:x",
+                                "!room",
+                                event,
+                                inbound,
+                                state,
+                                "x",
+                                null))
+                .as("a login's own account is a person")
+                .isNull();
     }
 }
