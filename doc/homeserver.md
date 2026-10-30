@@ -61,6 +61,7 @@ whose helper admitted people's machines, their tokens and records go too, since 
 with the database: `porelo-message-transport-matrix machine-token revoke <machine>` for each file in
 `~/.config/porelo/matrix/machine-tokens/`, which takes its token out of the file the homeserver reads, then
 `rm -r ~/.config/porelo/matrix/expelled-machines ~/.config/porelo/matrix/known-machines`.
+A host using login accounts also removes `~/.config/porelo/matrix/expelled-logins` when its database is reset.
 
 ## Onto another machine
 
@@ -116,7 +117,7 @@ VPN they share, over `https` with the account's own certificate:
   then restarts the homeserver without TLS. The CA stays, so a machine admitted later trusts the same file; a placed
   server certificate stays too.
 
-## A person's machine on a host's homeserver
+## Legacy machine registration
 
 On a host whose homeserver serves only people's machines in central mode, with no project of its own, the host
 administrator's helper admits each person's machine and takes it out again:
@@ -159,35 +160,47 @@ directory for the container, and the account still reads it.
 
 ## A central homeserver
 
-When a project's tasks run across several machines, or share one Tuwunel server over `https`, the project's
-settings name `homeserver` and `room` (an alias `#local:server` or a room id). Each machine provisions only its
-own accounts there (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`), and people
-manage their own accounts on the homeserver (`join` is refused with 77).
+When a project shares a central homeserver, its settings name `homeserver` and `room` (an alias
+`#local:server` or a room id). Every person uses `--login <login>`, kept by `setup` as `PORELO_MATRIX_LOGIN`,
+and provisions only their own accounts: `@porelo.<login>`, `@porelo-relay-<project>.<login>` and
+`@<task>.<login>`. Their own account is `@<login>`. A second machine uses that same login.
+
+A login starts with a lower-case letter, contains only lower-case letters, digits and `-`, and is at
+most 32 characters. It has no dot and is neither `porelo` nor a name beginning with `porelo-`; invalid logins
+are refused with 78. On a host's gate (`*.localhost`) registration needs no client-held token; on an external
+homeserver it still needs `registration_token_file` or `PORELO_MATRIX_REGISTRATION_TOKEN`.
+
+The host's helper runs `porelo-message-transport-matrix expel <login>` as the homeserver's account, with its
+administrator token among the secrets on stdin. It records a known login in `expelled-logins/<login>` beside
+`homeserver.conf`, then deactivates the person's own account and every account whose final dot suffix is
+that login, `@porelo.<login>` first. It never takes `@task.x-bob` for `bob`'s. The answer is
+`{"login":"…","known":true|false,"expelled":[…]}`; running it again exits 0 with `known: true` and nothing
+left to expel. An unknown login is left available. The gate refuses registrations for an expelled login;
+the person returns under a new login. Locking a login or one project's access deactivates nothing: the gate
+refuses a locked login, and `members` removes persons absent from that project's access list.
 
 What a person does on the central homeserver:
 
-- **Or let the project admin's Porelo make the room and keep it:** its `setup --create-room` makes
-  `#porelo-<project>:<server>` as `@porelo.<machine>`, and its `members` keeps the room to the machines of the
-  project's signed developer list, inviting each and taking out every account of a machine the list drops
-  ([the contract](transport.md#the-lifecycle)). Every `@<name>.<machine>` in that room counts as the machine's, so
-  a person takes a name that ends as no machine's. The project's settings then name that alias as `room`, and nobody needs
-  to invite the machines by hand.
+- **Let the project admin's Porelo make the room and keep it:** `setup --login <login> --create-room` makes
+  `#porelo-<project>:<server>` as `@porelo.<login>`. `members --project <project> --persons alice,bob` invites
+  each listed person's bare account and provisioning account. It removes every account of a login the list
+  drops from that room, preserving other logins and the maker. Running it again with the same list changes
+  nothing ([the contract](transport.md#the-lifecycle)). The project's settings name that alias as `room`.
 - **Make the project's room** from a Matrix client as invite-only (`join_rule: invite`, such as the
   `private_chat` preset, whose invite power level is 0) with guests forbidden (`m.room.guest_access` set to
   `forbidden`), and set its alias or room id as `room` in the project's settings.
-- **Issue each machine its own registration token** as the homeserver's administrator:
-  `POST /_synapse/admin/v1/registration_tokens/new` with an administrator Bearer token, and revoke a machine's
-  token when that machine leaves with `DELETE /_synapse/admin/v1/registration_tokens/<token>`. Put each
-  machine's token in the file named by `registration_token_file` on that machine, readable by that account
-  alone (`chmod 600`).
-- **Invite each machine's `@porelo.<machine>` into the room.** A machine's first `setup` registers
-  `@porelo.<machine>` and prints `"admitted": false` while it is not yet invited; once a person in the room
-  invites `@porelo.<machine>` (with the power to invite), the next `setup` joins the room, admits
-  `@porelo-relay-<project>.<machine>`, and prints `"admitted": true`.
+- **On an external homeserver, issue each login a registration token** as the homeserver's administrator:
+  `POST /_synapse/admin/v1/registration_tokens/new` with an administrator Bearer token. Put the token in the
+  file named by `registration_token_file`, readable by that account alone (`chmod 600`). A host's gate needs
+  none of this client-held token setup.
+- **Invite each person's `@porelo.<login>` into the room.** The first `setup` registers it and prints
+  `"admitted": false` until invited; the next `setup` joins the room, admits
+  `@porelo-relay-<project>.<login>`, and prints `"admitted": true`. Central `join` remains refused (77);
+  the host's gate supplies the person's own sign-in.
 
 ### Moving a project from a homeserver elsewhere
 
 A project whose settings named `homeserver` without `room` is refused (78) by `setup` and `settings` until
-`room` is set. Once `room` is set and a person invites `@porelo.<machine>` into it, the machine makes its new
-accounts (`@porelo.<machine>`, `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`); the old accounts stay
+`room` is set. Once `room` is set and a person invites `@porelo.<login>` into it, Porelo makes the login's new
+accounts (`@porelo.<login>`, `@porelo-relay-<project>.<login>`, `@<task>.<login>`); the old accounts stay
 on the homeserver until a person removes them.

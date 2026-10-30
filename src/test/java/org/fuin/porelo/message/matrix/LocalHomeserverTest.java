@@ -706,10 +706,10 @@ class LocalHomeserverTest {
         assertAccountCleared(plain);
 
         prepareAccountClear();
-        final Transport.Result named = clearAccount(List.of("--machine", "node-1"));
+        final Transport.Result named = clearAccount(List.of("--login", "node-1"));
         assertAccountCleared(named);
         assertThat(named.out())
-                .as("the machine name changes no account-level answer")
+                .as("the login changes no account-level answer")
                 .isEqualTo(plain.out());
     }
 
@@ -719,13 +719,15 @@ class LocalHomeserverTest {
         prepareAccountClear();
         for (final List<String> args :
                 List.of(
-                        List.of("--machine", "a b"),
+                        List.of("--login", "a b"),
                         List.of("--task", "t"),
-                        List.of("--machine"),
-                        List.of("--machine", "node-1", "--task", "t"),
-                        List.of("--machine", "node-1", "--machine", "node-2"))) {
+                        List.of("--login"),
+                        List.of("--login", "node-1", "--task", "t"),
+                        List.of("--login", "node-1", "--login", "node-2"))) {
             final Transport.Result result = clearAccount(args);
-            assertThat(result.exit()).as("invalid account clear: %s", args).isEqualTo(Exit.USAGE);
+            assertThat(result.exit())
+                    .as("invalid account clear: %s", args)
+                    .isEqualTo(args.equals(List.of("--login", "a b")) ? Exit.CONFIG : Exit.USAGE);
             for (final String file : accountFiles()) {
                 assertThat(dir.resolve(file))
                         .as("%s remains after %s", file, args)
@@ -743,7 +745,7 @@ class LocalHomeserverTest {
     @Test
     void aProjectClearNamingItsMachineLeavesTheAccountAlone() throws Exception {
         prepareAccountClear();
-        clearAccount(List.of("--project", "p", "--machine", "node-1"));
+        clearAccount(List.of("--project", "p", "--login", "node-1"));
         for (final String file : accountFiles()) {
             assertThat(dir.resolve(file))
                     .as("%s remains after a project's clear", file)

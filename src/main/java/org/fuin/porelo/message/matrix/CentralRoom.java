@@ -12,10 +12,10 @@ import java.util.TreeSet;
 
 /**
  * The project's room on a central homeserver, made and kept by the project admin's Porelo: made by
- * its {@code @porelo.<machine>} as the account's own homeserver makes its room, and kept to the
- * machines of the project's signed developer list. Each listed machine's {@code @porelo.<machine>}
- * is invited, and every account of a machine the list no longer names is taken out of this one
- * room; nothing else in the room or on the server is touched.
+ * its {@code @porelo.<login>} as the account's own homeserver makes its room, and kept to the
+ * logins of the project's signed developer list. Each listed login's {@code @porelo.<login>} and
+ * its person's own account are invited, and every account of a login the list no longer names is
+ * taken out of this one room; nothing else in the room or on the server is touched.
  */
 final class CentralRoom {
 
@@ -28,7 +28,7 @@ final class CentralRoom {
 
     /**
      * The room under the project's alias, made by {@code maker} or taken only if {@code maker} made
-     * it. The project's settings name that alias, so every developer's machine joins the room made
+     * it. The project's settings name that alias, so every developer's login joins the room made
      * here.
      */
     static String make(
@@ -54,27 +54,27 @@ final class CentralRoom {
     }
 
     /**
-     * Declarative and idempotent: invites each listed machine's {@code @porelo.<machine>} not yet
-     * invited or joined, then, for every machine ever in the room the list no longer names, kicks
-     * every {@code @….<machine>} from this room, {@code @porelo.<machine>} first, reading the room
-     * again until none of them is left, so a dropped machine invites no other back. The maker's own
-     * machine is never taken out, nor any account a listed machine's name could claim. Refused
-     * before anything is done for a listed machine banned from the room.
+     * Declarative and idempotent: invites each listed login's {@code @porelo.<login>} not yet
+     * invited or joined, then, for every login ever in the room the list no longer names, kicks
+     * every {@code @….<login>} from this room, {@code @porelo.<login>} first, reading the room
+     * again until none of them is left, so a dropped login invites no other back. The maker's own
+     * login is never taken out, nor any account a listed login's name could claim. Refused before
+     * anything is done for a listed login banned from the room.
      */
     static ObjectNode members(
             final MatrixClient asMaker,
-            final String machine,
+            final String login,
             final String project,
             final String configuredRoom,
-            final List<String> machines)
+            final List<String> logins)
             throws Failure {
         final String maker = Accounts.whoami(asMaker);
         final String server = AdminRoom.server(maker);
-        if (!maker.equals(porelo(machine, server))) {
+        if (!maker.equals(porelo(login, server))) {
             throw new Failure(
                     Exit.CONFIG,
                     "members runs as "
-                            + porelo(machine, server)
+                            + porelo(login, server)
                             + ", and the token Porelo kept is "
                             + maker
                             + "'s");
@@ -98,42 +98,44 @@ final class CentralRoom {
         final String room = Lifecycle.ours(asMaker, maker, alias, found.path("room_id").asText());
         final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
 
-        final List<String> listed = new ArrayList<>(machines);
-        listed.remove(machine);
+        final List<String> listed = new ArrayList<>(new TreeSet<>(logins));
         final Set<String> kept = new TreeSet<>(listed);
-        kept.add(machine);
+        kept.add(login);
         Map<String, String> members = members(asMaker, path);
         for (final String other : listed) {
-            final String id = porelo(other, server);
-            if ("ban".equals(members.get(id))) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        id
-                                + " is banned from "
-                                + alias
-                                + "; a person with the power to do so lifts the ban, then members"
-                                + " invites it");
+            for (final String id : List.of("@" + other + ":" + server, porelo(other, server))) {
+                if ("ban".equals(members.get(id))) {
+                    throw new Failure(
+                            Exit.CONFIG,
+                            id
+                                    + " is banned from "
+                                    + alias
+                                    + "; a person with the power to do so lifts the ban, then members"
+                                    + " invites it");
+                }
             }
         }
 
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         final var invited = answer.putArray("invited");
         for (final String other : listed) {
-            final String id = porelo(other, server);
-            if (!in(members.getOrDefault(id, ""))) {
-                asMaker.post(
-                        path + "/invite", MatrixClient.JSON.createObjectNode().put("user_id", id));
-                invited.add(id);
+            for (final String id : List.of("@" + other + ":" + server, porelo(other, server))) {
+                if (!in(members.getOrDefault(id, ""))) {
+                    asMaker.post(
+                            path + "/invite",
+                            MatrixClient.JSON.createObjectNode().put("user_id", id));
+                    invited.add(id);
+                }
             }
         }
 
         final var removed = answer.putArray("removed");
-        List<String> left = left(members, kept, project, server);
+        List<String> left = left(members, kept, server);
         for (int round = 0; !left.isEmpty(); round++) {
             if (round == ROUNDS) {
                 throw new Failure(
                         Exit.TEMPORARY,
-                        "accounts of machines dropped are still in "
+                        "accounts of logins dropped are still in "
                                 + alias
                                 + " after "
                                 + ROUNDS
@@ -157,23 +159,20 @@ final class CentralRoom {
                 }
             }
             members = members(asMaker, path);
-            left = left(members, kept, project, server);
+            left = left(members, kept, server);
         }
         return answer;
     }
 
     /**
-     * The accounts in the room of every machine ever in it that is not kept, read anew each round,
-     * so a machine a dropped one invited meanwhile is taken out too.
+     * The accounts in the room of every login ever in it that is not kept, read anew each round, so
+     * a login a dropped one invited meanwhile is taken out too.
      */
     private static List<String> left(
-            final Map<String, String> members,
-            final Set<String> kept,
-            final String project,
-            final String server) {
-        final Set<String> dropped = machines(members, server);
+            final Map<String, String> members, final Set<String> kept, final String server) {
+        final Set<String> dropped = logins(members, server);
         dropped.removeAll(kept);
-        return accounts(members, dropped, kept, project, server);
+        return accounts(members, dropped, kept, server);
     }
 
     /** Every member of the room by id, with its membership. */
@@ -189,55 +188,44 @@ final class CentralRoom {
     }
 
     /**
-     * Every machine ever in the room by its {@code @porelo.<machine>} of any membership, a left one
-     * too, so a machine whose {@code @porelo} went while its tasks stayed is still seen. A relay's
-     * name is not read, since a project's name may hold a dot.
+     * Every login ever in the room, including one whose provisioning account already left. The last
+     * dot separates the login from a task or relay name that may itself hold dots.
      */
-    static Set<String> machines(final Map<String, String> members, final String server) {
-        final Set<String> machines = new TreeSet<>();
-        final String prefix = "@" + Lifecycle.ADMIN + ".";
-        final String suffix = ":" + server;
+    static Set<String> logins(final Map<String, String> members, final String server) {
+        final Set<String> logins = new TreeSet<>();
         for (final String id : members.keySet()) {
-            if (id.startsWith(prefix) && id.endsWith(suffix)) {
-                final String name = id.substring(prefix.length(), id.length() - suffix.length());
-                if (!name.isEmpty()) {
-                    machines.add(name);
-                }
+            final String login = Login.owner(id, server);
+            if (login != null) {
+                logins.add(login);
             }
         }
-        return machines;
+        return logins;
     }
 
     /**
-     * The dropped machines' accounts invited to or joined in the room, their
-     * {@code @porelo.<machine>} first, so none invites its tasks back while they go. A machine's
-     * {@code @porelo} and its relay in this project are its own by name. Any other
-     * {@code @….<machine>} is the machine's, a person taking no name ending as a machine's, unless
-     * its name ends as a kept machine's too ({@code @job.x.hosta} with {@code x.hosta} kept and
-     * {@code hosta} dropped): a kept machine's account is never touched.
+     * The dropped logins' own accounts, relays and tasks in the room, every provisioning account
+     * first, so none invites its tasks back. A kept login's accounts are never touched.
      */
     static List<String> accounts(
             final Map<String, String> members,
             final Set<String> dropped,
             final Set<String> kept,
-            final String project,
             final String server) {
         final Set<String> porelos = new LinkedHashSet<>();
         final Set<String> others = new LinkedHashSet<>();
-        for (final String machine : dropped) {
-            final String own = porelo(machine, server);
-            final String relay = "@porelo-relay-" + project + "." + machine + ":" + server;
-            final String ending = "." + machine + ":" + server;
+        for (final String login : dropped) {
+            final String own = porelo(login, server);
+            if (kept.contains(login)) {
+                continue;
+            }
             for (final Map.Entry<String, String> member : members.entrySet()) {
                 final String id = member.getKey();
-                if (!in(member.getValue()) || !id.endsWith(ending)) {
+                if (!in(member.getValue()) || !Login.owns(login, id, server)) {
                     continue;
                 }
                 if (id.equals(own)) {
                     porelos.add(id);
-                } else if (id.equals(relay)
-                        || kept.stream()
-                                .noneMatch(other -> id.endsWith("." + other + ":" + server))) {
+                } else {
                     others.add(id);
                 }
             }
@@ -252,7 +240,7 @@ final class CentralRoom {
         return "join".equals(membership) || "invite".equals(membership);
     }
 
-    private static String porelo(final String machine, final String server) {
-        return "@" + Lifecycle.ADMIN + "." + machine + ":" + server;
+    private static String porelo(final String login, final String server) {
+        return "@" + Lifecycle.ADMIN + "." + login + ":" + server;
     }
 }

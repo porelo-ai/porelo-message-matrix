@@ -40,8 +40,8 @@ final class Lifecycle {
                     "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "members",
                     "clear");
 
-    /** As many machines as {@code members} keeps in a room, each with its accounts beside it. */
-    static final int MAX_MACHINES = 500;
+    /** As many persons as {@code members} keeps in a room, each with its accounts beside it. */
+    static final int MAX_PERSONS = 500;
 
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
@@ -61,9 +61,10 @@ final class Lifecycle {
             boolean token,
             boolean loopbackOnly,
             @Nullable String display,
+            @Nullable String login,
             @Nullable String machine,
             boolean createRoom,
-            @Nullable List<String> machines) {}
+            @Nullable List<String> persons) {}
 
     /**
      * A nickname a person gives a task: shown in the room and the direct chat, what @ completes to.
@@ -81,12 +82,12 @@ final class Lifecycle {
             throws Failure {
         if ("clear".equals(verb) && !args.contains("--project")) {
             if (!args.isEmpty()) {
-                if (args.size() != 2 || !"--machine".equals(args.getFirst())) {
+                if (args.size() != 2 || !"--login".equals(args.getFirst())) {
                     throw usage(verb);
                 }
-                machine(args.get(1));
+                Login.name(args.get(1));
             }
-            // Porelo names the machine, but the account's own homeserver has no machine name.
+            // The account's own homeserver does not suffix its accounts with a login.
             print(out, LocalHomeserver.clear(env).answer());
             return;
         }
@@ -145,7 +146,7 @@ final class Lifecycle {
     // --- setup
     // ------------------------------------------------------------------------------------------
 
-    /** The central room kept to the listed machines, by the machine that made it. */
+    /** The central room kept to the listed logins, by the login that made it. */
     private static ObjectNode members(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
@@ -156,15 +157,15 @@ final class Lifecycle {
                     "members keeps a central homeserver's room; on the account's own homeserver"
                             + " admit and dismiss keep its machines");
         }
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final String token =
-                required(env, Config.ADMIN_TOKEN, "members runs as the machine that made the room");
+                required(env, Config.ADMIN_TOKEN, "members runs as the login that made the room");
         return CentralRoom.members(
                 client(url, token, settings),
-                machine,
+                login,
                 options.project(),
                 Objects.requireNonNull(settings.room()),
-                required(options.machines()));
+                required(options.persons()));
     }
 
     private static ObjectNode setup(
@@ -228,16 +229,16 @@ final class Lifecycle {
     }
 
     /**
-     * Central {@code setup}: registers (or logs in as) this machine's provisioning account {@code
-     * @porelo.<machine>} with its derived password. On the first setup it joins only a room its
+     * Central {@code setup}: registers (or logs in as) this login's provisioning account {@code
+     * @porelo.<login>} with its derived password. On the first setup it joins only a room its
      * name was invited into already, and answers not yet admitted on anything else, so the account
      * is kept before anything can fail; on later setups it joins the room named in the settings,
-     * checks that it is invite-only and forbids guests, and admits this machine's relay.
+     * checks that it is invite-only and forbids guests, and admits this login's relay.
      */
     private static ObjectNode setupCentral(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final String registrationToken = elsewhereToken(settings, env);
@@ -256,26 +257,22 @@ final class Lifecycle {
                             + "; name that alias as the project's room");
         }
 
-        final Accounts.Session machineAccount =
-                machineAccount(
-                        nobody, machine, secret, env.get(Config.ADMIN_TOKEN), registrationToken);
-        final MatrixClient asMachine = nobody.as(machineAccount.accessToken());
+        final Accounts.Session loginAccount =
+                loginAccount(nobody, login, secret, env.get(Config.ADMIN_TOKEN), registrationToken);
+        final MatrixClient asLogin = nobody.as(loginAccount.accessToken());
 
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         answer.putObject("account")
-                .put(Config.ADMIN_TOKEN, machineAccount.accessToken())
+                .put(Config.ADMIN_TOKEN, loginAccount.accessToken())
                 .put(Config.MACHINE_SECRET, secret)
-                .put(Config.MACHINE, machine);
+                .put(Config.LOGIN, login);
 
         if (options.createRoom()) {
             // Whatever fails once the account is made, its generated secret must reach Porelo.
             try {
                 final String room =
                         CentralRoom.make(
-                                asMachine,
-                                machineAccount.userId(),
-                                options.project(),
-                                configuredRoom);
+                                asLogin, loginAccount.userId(), options.project(), configuredRoom);
                 answer.put("created_room", true);
                 return admittedIn(
                         options,
@@ -283,40 +280,40 @@ final class Lifecycle {
                         env,
                         answer,
                         nobody,
-                        asMachine,
-                        machineAccount,
+                        asLogin,
+                        loginAccount,
                         secret,
                         registrationToken,
                         room);
             } catch (final Failure failure) {
                 if (keptSecret == null || keptSecret.isBlank()) {
-                    return notAdmitted(answer, machine, machineAccount, configuredRoom);
+                    return notAdmitted(answer, login, loginAccount, configuredRoom);
                 }
                 throw failure;
             }
         }
 
-        // A machine just registered joins only where its name was invited before it existed, as
+        // A login just registered joins only where its name was invited before it existed, as
         // `admit` does. Whatever fails then, its generated secret must reach Porelo, or the account
         // is lost to it: so it answers not yet admitted, and the next setup, with the secret kept,
         // joins or refuses the room in words.
         if (keptSecret == null || keptSecret.isBlank()) {
             try {
-                return invited(asMachine, configuredRoom)
+                return invited(asLogin, configuredRoom)
                         ? admitted(
                                 options,
                                 settings,
                                 env,
                                 answer,
                                 nobody,
-                                asMachine,
-                                machineAccount,
+                                asLogin,
+                                loginAccount,
                                 secret,
                                 registrationToken,
                                 false)
-                        : notAdmitted(answer, machine, machineAccount, configuredRoom);
+                        : notAdmitted(answer, login, loginAccount, configuredRoom);
             } catch (final Failure failure) {
-                return notAdmitted(answer, machine, machineAccount, configuredRoom);
+                return notAdmitted(answer, login, loginAccount, configuredRoom);
             }
         }
         return admitted(
@@ -325,8 +322,8 @@ final class Lifecycle {
                 env,
                 answer,
                 nobody,
-                asMachine,
-                machineAccount,
+                asLogin,
+                loginAccount,
                 secret,
                 registrationToken,
                 true);
@@ -334,7 +331,7 @@ final class Lifecycle {
 
     /**
      * Joins the room named in the settings, checks that it is invite-only and forbids guests, and
-     * admits this machine's relay; not yet invited, it answers not yet admitted. A room found wrong
+     * admits this login's relay; not yet invited, it answers not yet admitted. A room found wrong
      * is left when {@code leaveWhenWrong} is true.
      */
     private static ObjectNode admitted(
@@ -343,63 +340,63 @@ final class Lifecycle {
             final Map<String, String> env,
             final ObjectNode answer,
             final MatrixClient nobody,
-            final MatrixClient asMachine,
-            final Accounts.Session machineAccount,
+            final MatrixClient asLogin,
+            final Accounts.Session loginAccount,
             final String secret,
             final String registrationToken,
             final boolean leaveWhenWrong)
             throws Failure {
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final String configuredRoom = Objects.requireNonNull(settings.room());
-        final String room = joinCentralRoom(asMachine, configuredRoom);
+        final String room = joinCentralRoom(asLogin, configuredRoom);
         if (room == null) {
-            return notAdmitted(answer, machine, machineAccount, configuredRoom);
+            return notAdmitted(answer, login, loginAccount, configuredRoom);
         }
-        checkCentralRoom(asMachine, configuredRoom, room, leaveWhenWrong);
+        checkCentralRoom(asLogin, configuredRoom, room, leaveWhenWrong);
         return admittedIn(
                 options,
                 settings,
                 env,
                 answer,
                 nobody,
-                asMachine,
-                machineAccount,
+                asLogin,
+                loginAccount,
                 secret,
                 registrationToken,
                 room);
     }
 
-    /** In the project's room: this machine's relay admitted, and the room answered. */
+    /** In the project's room: this login's relay admitted, and the room answered. */
     private static ObjectNode admittedIn(
             final Options options,
             final Settings settings,
             final Map<String, String> env,
             final ObjectNode answer,
             final MatrixClient nobody,
-            final MatrixClient asMachine,
-            final Accounts.Session machineAccount,
+            final MatrixClient asLogin,
+            final Accounts.Session loginAccount,
             final String secret,
             final String registrationToken,
             final String room)
             throws Failure {
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final URI url = Objects.requireNonNull(settings.homeserver());
-        displayName(nobody, machineAccount, "Porelo (administrator)");
+        displayName(nobody, loginAccount, "Porelo (administrator)");
 
         final Accounts.Session relay =
                 derivedAccount(
                         nobody,
-                        "porelo-relay-" + options.project() + "." + machine,
+                        "porelo-relay-" + options.project() + "." + login,
                         secret,
                         env.get(Config.ACCESS_TOKEN),
                         registrationToken);
         displayName(nobody, relay, "Porelo (delivery)");
-        admit(asMachine, room, relay, nobody);
+        admit(asLogin, room, relay, nobody);
 
         put(answer.putObject("secrets"), settings.environment(url, relay.accessToken()));
         answer.put("conversation", room);
         answer.putArray("reaches").add(reaches(url));
-        answer.put("machine", machine);
+        answer.put("login", login);
         answer.put("admitted", true);
         return answer;
     }
@@ -427,17 +424,17 @@ final class Lifecycle {
     }
 
     /**
-     * This machine's provisioning account {@code @porelo.<machine>}, registered or taken back
-     * through {@link #derivedAccount}.
+     * This person's provisioning account {@code @porelo.<login>}, registered or taken back through
+     * {@link #derivedAccount}.
      */
-    private static Accounts.Session machineAccount(
+    private static Accounts.Session loginAccount(
             final MatrixClient nobody,
-            final String machine,
+            final String login,
             final String secret,
             @Nullable final String keptToken,
             final String registrationToken)
             throws Failure {
-        return derivedAccount(nobody, ADMIN + "." + machine, secret, keptToken, registrationToken);
+        return derivedAccount(nobody, ADMIN + "." + login, secret, keptToken, registrationToken);
     }
 
     /**
@@ -446,23 +443,23 @@ final class Lifecycle {
      */
     private static ObjectNode notAdmitted(
             final ObjectNode answer,
-            final String machine,
-            final Accounts.Session machineAccount,
+            final String login,
+            final Accounts.Session loginAccount,
             final String configuredRoom) {
-        answer.put("machine", machine);
-        answer.put("address", machineAccount.userId());
+        answer.put("login", login);
+        answer.put("address", loginAccount.userId());
         answer.put("room", configuredRoom);
         answer.put("admitted", false);
         return answer;
     }
 
-    /** Whether the machine's account holds an invitation into the configured room. */
-    private static boolean invited(final MatrixClient asMachine, final String configuredRoom)
+    /** Whether the login's account holds an invitation into the configured room. */
+    private static boolean invited(final MatrixClient asLogin, final String configuredRoom)
             throws Failure {
         final String roomId;
         if (configuredRoom.startsWith("#")) {
             final JsonNode found =
-                    asMachine.find(
+                    asLogin.find(
                             "/_matrix/client/v3/directory/room/"
                                     + MatrixClient.segment(configuredRoom));
             if (found == null) {
@@ -477,21 +474,21 @@ final class Lifecycle {
                         + "\"ephemeral\":{\"types\":[]},\"account_data\":{\"types\":[]}},"
                         + "\"presence\":{\"types\":[]},\"account_data\":{\"types\":[]}}";
         final JsonNode sync =
-                asMachine.get(
+                asLogin.get(
                         "/_matrix/client/v3/sync?timeout=0&filter=" + MatrixClient.segment(filter));
         return sync.path("rooms").path("invite").has(roomId);
     }
 
     /**
      * Resolves {@code configuredRoom} if it is an alias and attempts to join it; returns {@code
-     * null} when the alias does not resolve or the machine's account is not invited yet.
+     * null} when the alias does not resolve or the login's account is not invited yet.
      */
     private static @Nullable String joinCentralRoom(
-            final MatrixClient asMachine, final String configuredRoom) throws Failure {
+            final MatrixClient asLogin, final String configuredRoom) throws Failure {
         final String roomId;
         if (configuredRoom.startsWith("#")) {
             final JsonNode found =
-                    asMachine.find(
+                    asLogin.find(
                             "/_matrix/client/v3/directory/room/"
                                     + MatrixClient.segment(configuredRoom));
             if (found == null) {
@@ -502,7 +499,7 @@ final class Lifecycle {
             roomId = configuredRoom;
         }
         final MatrixClient.Answer join =
-                asMachine.exchange(
+                asLogin.exchange(
                         "POST",
                         "/_matrix/client/v3/join/" + MatrixClient.segment(roomId),
                         MatrixClient.JSON.createObjectNode());
@@ -522,7 +519,7 @@ final class Lifecycle {
      * true, leaves the room before refusing with 78.
      */
     private static void checkCentralRoom(
-            final MatrixClient asMachine,
+            final MatrixClient asLogin,
             final String configuredRoom,
             final String roomId,
             final boolean leaveWhenWrong)
@@ -531,15 +528,15 @@ final class Lifecycle {
         final @Nullable JsonNode joinRules;
         final @Nullable JsonNode guestAccess;
         try {
-            joinRules = asMachine.find(path + "/state/m.room.join_rules");
-            guestAccess = asMachine.find(path + "/state/m.room.guest_access");
+            joinRules = asLogin.find(path + "/state/m.room.join_rules");
+            guestAccess = asLogin.find(path + "/state/m.room.guest_access");
         } catch (final Failure failure) {
             if (failure.exitCode() != Exit.NOT_PERMITTED) {
                 throw failure;
             }
             throw new Failure(
                     Exit.CONFIG,
-                    "the machine's account is not in the project's room "
+                    "the login's account is not in the project's room "
                             + configuredRoom
                             + ": invite it and run setup again",
                     failure);
@@ -555,7 +552,7 @@ final class Lifecycle {
         }
         if (!wrong.isEmpty()) {
             if (leaveWhenWrong) {
-                asMachine.post(path + "/leave", MatrixClient.JSON.createObjectNode());
+                asLogin.post(path + "/leave", MatrixClient.JSON.createObjectNode());
             }
             throw new Failure(
                     Exit.CONFIG,
@@ -681,15 +678,15 @@ final class Lifecycle {
     }
 
     /**
-     * Central {@code enroll}: registers (or logs in alone as) {@code @<task>.<machine>} with its
+     * Central {@code enroll}: registers (or logs in alone as) {@code @<task>.<login>} with its
      * derived password, sets its display name, and invites and joins it into the project's room
-     * after checking that no other room this machine's account is in holds it.
+     * after checking that no other room this login's account is in holds it.
      */
     private static ObjectNode enrollCentral(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
         final String task = centralTask(options);
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final String secret =
                 required(
                         env, Config.MACHINE_SECRET, "the account's secrets from setup are missing");
@@ -699,14 +696,14 @@ final class Lifecycle {
         final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final MatrixClient nobody = client(url, "", settings);
-        final MatrixClient asMachine = nobody.as(adminToken);
-        final String machineId = machineId(nobody, asMachine, machine);
-        final String server = AdminRoom.server(machineId);
+        final MatrixClient asLogin = nobody.as(adminToken);
+        final String loginId = loginId(nobody, asLogin, login);
+        final String server = AdminRoom.server(loginId);
 
-        final String room = resolveCentralRoom(asMachine, configuredRoom);
-        final String localpart = task + "." + machine;
-        refuseAnotherProjectsCentral(asMachine, server, room, options.project(), localpart);
-        checkCentralRoom(asMachine, configuredRoom, room, false);
+        final String room = resolveCentralRoom(asLogin, configuredRoom);
+        final String localpart = task + "." + login;
+        refuseAnotherProjectsCentral(asLogin, server, room, options.project(), localpart);
+        checkCentralRoom(asLogin, configuredRoom, room, false);
 
         final Accounts.Session account =
                 derivedAccount(nobody, localpart, secret, null, registrationToken);
@@ -720,7 +717,7 @@ final class Lifecycle {
                                 .put(
                                         "displayname",
                                         options.display() == null ? task : options.display()));
-        admit(asMachine, room, account, nobody);
+        admit(asLogin, room, account, nobody);
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         put(answer.putObject("secrets"), settings.environment(url, account.accessToken()));
         answer.put("address", account.userId());
@@ -729,8 +726,7 @@ final class Lifecycle {
 
     private static String centralTask(final Options options) throws Failure {
         final String task = required(options.task(), "--task");
-        // Kept out of the machine's own provisioning and relay localparts; a task @porelo.x.<M>
-        // would read as the machine x.<M>'s @porelo.
+        // Provisioning and relay names are reserved for the transport.
         if (ADMIN.equals(task)
                 || task.startsWith("porelo-relay-")
                 || task.startsWith(ADMIN + ".")) {
@@ -740,37 +736,41 @@ final class Lifecycle {
         return task;
     }
 
-    private static String centralMachine(final Options options, final Map<String, String> env)
+    private static String centralLogin(final Options options, final Map<String, String> env)
             throws Failure {
-        final String keptMachine = env.get(Config.MACHINE);
-        if (options.machine() != null
-                && keptMachine != null
-                && !keptMachine.isBlank()
-                && !options.machine().equals(keptMachine)) {
+        final String keptLogin = env.get(Config.LOGIN);
+        if (keptLogin != null) {
+            Login.name(keptLogin);
+        }
+        if (options.login() != null
+                && keptLogin != null
+                && !keptLogin.isBlank()
+                && !options.login().equals(keptLogin)) {
             throw new Failure(
                     Exit.CONFIG,
-                    "--machine "
-                            + options.machine()
+                    "--login "
+                            + options.login()
                             + " does not match "
-                            + Config.MACHINE
+                            + Config.LOGIN
                             + " ("
-                            + keptMachine
+                            + keptLogin
                             + ") in the environment");
         }
-        return options.machine() != null
-                ? options.machine()
-                : required(
-                        env,
-                        Config.MACHINE,
-                        "a central homeserver needs --machine to name this machine");
+        return Login.name(
+                options.login() != null
+                        ? options.login()
+                        : required(
+                                env,
+                                Config.LOGIN,
+                                "a central homeserver needs --login to name this person"));
     }
 
-    private static String machineId(
-            final MatrixClient nobody, final MatrixClient asMachine, final String machine)
+    private static String loginId(
+            final MatrixClient nobody, final MatrixClient asLogin, final String login)
             throws Failure {
         final String id;
         try {
-            id = Accounts.whoami(asMachine);
+            id = Accounts.whoami(asLogin);
         } catch (final Failure failure) {
             if (failure.exitCode() == Exit.TEMPORARY) {
                 // Not reached, or busy: not a token that is wrong, and worth trying again.
@@ -778,22 +778,22 @@ final class Lifecycle {
             }
             throw new Failure(
                     Exit.CONFIG,
-                    "the machine's token Porelo holds is not valid on "
+                    "the login's token Porelo holds is not valid on "
                             + nobody.config().homeserver()
                             + ": "
                             + failure.getMessage(),
                     failure);
         }
-        final String prefix = "@" + ADMIN + "." + machine + ":";
+        final String prefix = "@" + ADMIN + "." + login + ":";
         if (!id.startsWith(prefix) || id.length() == prefix.length()) {
             throw new Failure(
                     Exit.CONFIG,
-                    "the machine's token Porelo holds is for "
+                    "the login's token Porelo holds is for "
                             + id
                             + ", not @"
                             + ADMIN
                             + "."
-                            + machine);
+                            + login);
         }
         return id;
     }
@@ -876,15 +876,15 @@ final class Lifecycle {
     }
 
     /**
-     * Central {@code retire}: checks that {@code @<task>.<machine>} is in no other room this
-     * machine's account is in, then logs in as it with its derived password, leaves the project's
-     * room, and logs out every session.
+     * Central {@code retire}: checks that {@code @<task>.<login>} is in no other room this login's
+     * account is in, then logs in as it with its derived password, leaves the project's room, and
+     * logs out every session.
      */
     private static ObjectNode retireCentral(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
         final String task = centralTask(options);
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final String secret =
                 required(
                         env, Config.MACHINE_SECRET, "the account's secrets from setup are missing");
@@ -893,13 +893,13 @@ final class Lifecycle {
         final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final MatrixClient nobody = client(url, "", settings);
-        final MatrixClient asMachine = nobody.as(adminToken);
-        final String machineId = machineId(nobody, asMachine, machine);
-        final String server = AdminRoom.server(machineId);
+        final MatrixClient asLogin = nobody.as(adminToken);
+        final String loginId = loginId(nobody, asLogin, login);
+        final String server = AdminRoom.server(loginId);
 
-        final String room = resolveCentralRoom(asMachine, configuredRoom);
-        final String localpart = task + "." + machine;
-        refuseAnotherProjectsCentral(asMachine, server, room, options.project(), localpart);
+        final String room = resolveCentralRoom(asLogin, configuredRoom);
+        final String localpart = task + "." + login;
+        refuseAnotherProjectsCentral(asLogin, server, room, options.project(), localpart);
         try {
             Accounts.retire(nobody, localpart, Accounts.password(secret, localpart), room);
         } catch (final Failure failure) {
@@ -910,7 +910,7 @@ final class Lifecycle {
                                 + localpart
                                 + " on "
                                 + nobody.config().homeserver()
-                                + " is not this machine's: "
+                                + " is not this login's: "
                                 + failure.getMessage(),
                         failure);
             }
@@ -1518,16 +1518,16 @@ final class Lifecycle {
     }
 
     /**
-     * Central {@code clear --project}: has this machine's relay and tasks in the project's room
-     * that are in no other room this machine's account is in leave the room and log out every
-     * session, each as itself with its derived password, and forgets the relay's poll position;
-     * leaves {@code @porelo.<machine>}, the room, people and other machines' accounts alone.
+     * Central {@code clear --project}: has this login's relay and tasks in the project's room that
+     * are in no other room this login's account is in leave the room and log out every session,
+     * each as itself with its derived password, and forgets the relay's poll position; leaves
+     * {@code @porelo.<login>}, the room, people and other logins' accounts alone.
      */
     private static ObjectNode clearCentral(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
         final String project = options.project();
-        final String machine = centralMachine(options, env);
+        final String login = centralLogin(options, env);
         final String secret =
                 required(
                         env, Config.MACHINE_SECRET, "the account's secrets from setup are missing");
@@ -1536,43 +1536,41 @@ final class Lifecycle {
         final URI url = Objects.requireNonNull(settings.homeserver());
         final String configuredRoom = Objects.requireNonNull(settings.room());
         final MatrixClient nobody = client(url, "", settings);
-        final MatrixClient asMachine = nobody.as(adminToken);
+        final MatrixClient asLogin = nobody.as(adminToken);
         final Report report = new Report();
-        final String machineId;
+        final String loginId;
         try {
-            machineId = machineId(nobody, asMachine, machine);
+            loginId = loginId(nobody, asLogin, login);
         } catch (final Failure failure) {
-            // A token the homeserver no longer knows: it let this machine go, dismissed or reset,
+            // A token the homeserver no longer knows: it let this login go, dismissed or reset,
             // and nothing of it is left there to clear.
             if (!(failure.getCause() instanceof Failure refused
                     && refused.exitCode() == Exit.NOT_PERMITTED)) {
                 throw failure;
             }
             report.kept(
-                    "this machine's accounts on " + url,
-                    "the homeserver had let this machine go already: " + refused.getMessage());
+                    "this login's accounts on " + url,
+                    "the homeserver had let this login go already: " + refused.getMessage());
             return report.answer();
         }
-        final String server = AdminRoom.server(machineId);
-        final String relay = "@porelo-relay-" + project + "." + machine + ":" + server;
+        final String server = AdminRoom.server(loginId);
+        final String relay = "@porelo-relay-" + project + "." + login + ":" + server;
         final String suffix = ":" + server;
-        final String machineSuffix = "." + machine + suffix;
+        final String loginSuffix = "." + login + suffix;
         try {
-            final String room = resolveCentralRoom(asMachine, configuredRoom);
-            final Map<String, String> elsewhere = membersElsewhereCentral(asMachine, room);
+            final String room = resolveCentralRoom(asLogin, configuredRoom);
+            final Map<String, String> elsewhere = membersElsewhereCentral(asLogin, room);
             for (final JsonNode member :
-                    asMachine
-                            .get(
+                    asLogin.get(
                                     "/_matrix/client/v3/rooms/"
                                             + MatrixClient.segment(room)
                                             + "/members")
                             .path("chunk")) {
                 final String id = member.path("state_key").asText("");
                 final String membership = member.path("content").path("membership").asText("");
-                // Only this machine's relay and tasks (porelo-*.M), never @porelo.M or a person
-                // such as @carol.M.
+                // Task and relay prefixes distinguish them from the person's own account.
                 if (!id.startsWith("@porelo-")
-                        || !id.endsWith(machineSuffix)
+                        || !id.endsWith(loginSuffix)
                         || !("join".equals(membership) || "invite".equals(membership))) {
                     continue;
                 }
@@ -1773,6 +1771,9 @@ final class Lifecycle {
      */
     private static String elsewhereToken(final Settings settings, final Map<String, String> env)
             throws Failure {
+        if (settings.hosted()) {
+            return "";
+        }
         final Path file = settings.registrationTokenFile();
         final String given = env.get(Config.REGISTRATION_TOKEN);
         if (file != null && given != null && !given.isBlank()) {
@@ -2019,9 +2020,10 @@ final class Lifecycle {
         boolean token = false;
         boolean loopbackOnly = false;
         String display = null;
+        String login = null;
         String machine = null;
         boolean createRoom = false;
-        List<String> machines = null;
+        List<String> persons = null;
         for (int i = 0; i < args.size(); i++) {
             final String arg = args.get(i);
             if ("--create-room".equals(arg) && "setup".equals(verb) && !createRoom) {
@@ -2051,12 +2053,23 @@ final class Lifecycle {
                 case "--project" -> project = name(value, "--project");
                 case "--task" -> task = name(value, "--task");
                 case "--person" -> person = name(value, "--person");
-                case "--machine" -> machine = machine(value);
-                case "--machines" -> {
-                    if (!"members".equals(verb) || machines != null) {
+                case "--login" -> {
+                    if (login != null || "admit".equals(verb) || "dismiss".equals(verb)) {
                         throw usage(verb);
                     }
-                    machines = machines(value);
+                    login = Login.name(value);
+                }
+                case "--machine" -> {
+                    if (!("admit".equals(verb) || "dismiss".equals(verb))) {
+                        throw usage(verb);
+                    }
+                    machine = machine(value);
+                }
+                case "--persons" -> {
+                    if (!"members".equals(verb) || persons != null) {
+                        throw usage(verb);
+                    }
+                    persons = persons(value);
                 }
                 case "--display" -> {
                     if (!("enroll".equals(verb) || "join".equals(verb)) || display != null) {
@@ -2074,7 +2087,7 @@ final class Lifecycle {
                     case "join" -> person != null && task == null;
                     case "part" -> person != null && task == null && machine == null;
                     case "admit", "dismiss" -> machine != null && task == null && person == null;
-                    case "members" -> machines != null && task == null && person == null;
+                    case "members" -> persons != null && task == null && person == null;
                     case "clear" -> task == null && person == null;
                     default -> false;
                 };
@@ -2089,35 +2102,26 @@ final class Lifecycle {
                 token,
                 loopbackOnly,
                 display,
+                login,
                 machine,
                 createRoom,
-                machines);
+                persons);
     }
 
-    /**
-     * The machines {@code members} keeps in the room, comma-separated, each named as {@code
-     * --machine} is; none at all is an empty value.
-     */
-    private static List<String> machines(final String value) throws Failure {
-        if (value.isEmpty()) {
-            return List.of();
-        }
-        final List<String> machines = new ArrayList<>();
-        for (final String name : value.split(",", -1)) {
-            final String machine = machine(name);
-            if (!machines.contains(machine)) {
-                machines.add(machine);
+    /** The sorted logins kept in the room; an empty value keeps only the maker. */
+    private static List<String> persons(final String value) throws Failure {
+        final Set<String> persons = new java.util.TreeSet<>();
+        if (!value.isEmpty()) {
+            for (final String name : value.split(",", -1)) {
+                persons.add(Login.name(name));
             }
         }
-        if (machines.size() > MAX_MACHINES) {
+        if (persons.size() > MAX_PERSONS) {
             throw new Failure(
                     Exit.USAGE,
-                    "--machines names at most "
-                            + MAX_MACHINES
-                            + " machines, not "
-                            + machines.size());
+                    "--persons names at most " + MAX_PERSONS + " persons, not " + persons.size());
         }
-        return List.copyOf(machines);
+        return List.copyOf(persons);
     }
 
     static String display(final String value) throws Failure {
@@ -2168,27 +2172,27 @@ final class Lifecycle {
                 "usage: "
                         + switch (verb) {
                             case "setup" ->
-                                    "setup --project <project> [--machine <machine>] [--create-room] [--loopback-only]";
+                                    "setup --project <project> [--login <login>] [--create-room] [--loopback-only]";
                             case "members" ->
-                                    "members --project <project> --machines <machine>,… [--machine <machine>]";
+                                    "members --project <project> --persons <login>,… [--login <login>]";
                             case "enroll" ->
-                                    "enroll --project <project> --task <task> [--display <nickname>] [--machine <machine>] [--loopback-only]";
+                                    "enroll --project <project> --task <task> [--display <nickname>] [--login <login>] [--loopback-only]";
                             case "retire" ->
-                                    "retire --project <project> --task <task> [--machine <machine>]";
-                            case "clear" -> "clear [--project <project>] [--machine <machine>]";
+                                    "retire --project <project> --task <task> [--login <login>]";
+                            case "clear" -> "clear [--project <project>] [--login <login>]";
                             case "part" ->
-                                    "part --project <project> --person <person> [--loopback-only]";
+                                    "part --project <project> --person <person> [--login <login>] [--loopback-only]";
                             case "admit" ->
                                     "admit --project <project> --machine <machine> [--loopback-only]";
                             case "dismiss" -> "dismiss --project <project> --machine <machine>";
                             default ->
-                                    "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--machine <machine>] [--loopback-only]";
+                                    "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--login <login>] [--loopback-only]";
                         });
     }
 
-    private static List<String> required(@Nullable final List<String> machines) {
-        // The options make members only with --machines.
-        return Objects.requireNonNull(machines);
+    private static List<String> required(@Nullable final List<String> persons) {
+        // The options make members only with --persons.
+        return Objects.requireNonNull(persons);
     }
 
     private static String required(@Nullable final String value, final String option)

@@ -45,7 +45,7 @@ final class Accounts {
     }
 
     /**
-     * 32 random bytes, 256 bits, as base64url without padding: the secret a machine keeps on a
+     * 32 random bytes, 256 bits, as base64url without padding: the secret a person keeps on a
      * central homeserver to derive its accounts' passwords.
      */
     static String secret() {
@@ -55,8 +55,8 @@ final class Accounts {
     }
 
     /**
-     * Derives the password of {@code localpart} from the machine's {@code secret}, so every
-     * lifecycle verb on that machine can act as its own accounts without keeping each password.
+     * Derives the password of {@code localpart} from the person's {@code secret}, so every
+     * lifecycle verb for that login can act as its own accounts without keeping each password.
      */
     static String password(final String secret, final String localpart) {
         try {
@@ -94,8 +94,8 @@ final class Accounts {
     }
 
     /**
-     * Registers with the homeserver's registration token, in the two steps its user-interactive
-     * auth takes.
+     * Registers through the gate without a token, or completes an external homeserver's token
+     * challenge.
      */
     static Session register(
             final MatrixClient anybody,
@@ -111,13 +111,20 @@ final class Accounts {
                         .put("inhibit_login", false);
         final MatrixClient.Answer first =
                 anybody.exchange("POST", "/_matrix/client/v3/register", request);
+        if (registrationToken.isEmpty() && first.status() == 200) {
+            return session(first);
+        }
         if (first.status() != 401 || !first.body().path("session").isTextual()) {
             throw refused("registering " + localpart, first);
         }
-        request.putObject("auth")
-                .put("type", "m.login.registration_token")
-                .put("token", registrationToken)
-                .put("session", first.body().path("session").asText());
+        // A host's gate asks only for the dummy stage: who registers is the caller's login.
+        final ObjectNode auth =
+                request.putObject("auth").put("session", first.body().path("session").asText());
+        if (registrationToken.isEmpty()) {
+            auth.put("type", "m.login.dummy");
+        } else {
+            auth.put("type", "m.login.registration_token").put("token", registrationToken);
+        }
         final MatrixClient.Answer second =
                 anybody.exchange("POST", "/_matrix/client/v3/register", request);
         if (second.status() != 200) {

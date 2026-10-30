@@ -2,12 +2,86 @@ package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AccountsTest {
+
+    /** Harm guarded: a gate's completed registration is refused because it needs no token stage. */
+    @Test
+    void registrationThroughTheGateNeedsNoToken() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    200,
+                    "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            final Accounts.Session account =
+                    Accounts.register(client, "porelo.bob", "derived-password", "");
+            assertThat(account.userId())
+                    .as("the gate's account is accepted")
+                    .isEqualTo("@porelo.bob:example.org");
+            assertThat(homeserver.requests())
+                    .as("the gate handled registration in one request")
+                    .hasSize(1);
+            assertThat(
+                            MatrixClient.JSON
+                                    .readTree(homeserver.requests().getFirst().body())
+                                    .has("auth"))
+                    .as("the client sends no registration token to the gate")
+                    .isFalse();
+        }
+    }
+
+    /** Harm guarded: the gate's dummy stage is answered with an empty token it refuses. */
+    @Test
+    void registrationThroughTheGateAnswersItsDummyStage() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.dummy\"]}],\"session\":\"porelo-gate\"}");
+            homeserver.answer(
+                    200,
+                    "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            Accounts.register(client, "porelo.bob", "derived-password", "");
+            final var auth =
+                    MatrixClient.JSON.readTree(homeserver.requests().getLast().body()).path("auth");
+            assertThat(auth.path("type").asText()).as("the dummy stage").isEqualTo("m.login.dummy");
+            assertThat(auth.has("token")).as("no token is sent to the gate").isFalse();
+        }
+    }
+
+    /**
+     * Harm guarded: the central server's token challenge is bypassed after registration changes.
+     */
+    @Test
+    void registrationElsewhereStillCompletesTheTokenStage() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(401, "{\"session\":\"challenge\"}");
+            homeserver.answer(
+                    200,
+                    "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            Accounts.register(client, "porelo.bob", "derived-password", "registration-token");
+            assertThat(homeserver.requests())
+                    .as("the server's token challenge is answered")
+                    .hasSize(2);
+            final var auth =
+                    MatrixClient.JSON.readTree(homeserver.requests().getLast().body()).path("auth");
+            assertThat(auth.path("type").asText())
+                    .as("the token stage is preserved")
+                    .isEqualTo("m.login.registration_token");
+            assertThat(auth.path("token").asText())
+                    .as("the configured token is used")
+                    .isEqualTo("registration-token");
+        }
+    }
 
     @Test
     @DisplayName(

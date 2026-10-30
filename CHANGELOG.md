@@ -5,16 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Central accounts are named by the person's login: `--login` and `PORELO_MATRIX_LOGIN` replace the machine
+  option and name, and `setup` answers `login`; `describe` lists `login` among `takes`. Logins have at most
+  32 lower-case letters, digits and `-`, start with a letter, and exclude `porelo` and `porelo-` names.
+- `members --persons` replaces `--machines`, invites each person's bare and provisioning accounts, and
+  removes every account of a login no longer listed while keeping the room maker and other listed logins.
+- A host's gate handles registration without a client-held registration token; external homeservers keep
+  the token flow. The legacy machine-token, publish, admit and dismiss commands remain available.
+
 ### Added
 
 - Central homeservers accept `unix:<absolute path>` for HTTP over a Unix socket; `*.localhost` names reach loopback without DNS and retain the listener ownership check.
-
-- On a central homeserver, `setup --project P --machine M --create-room` makes the project's room
-  `#porelo-<P>:<server>` as `@porelo.<M>`, invite-only, closed to guests and unlisted, or takes the room under that
-  alias only if `@porelo.<M>` made it, and answers `"created_room": true`. `members --project P --machines M1,M2,…`,
-  run by that machine, keeps the room to the list: it invites each listed machine's `@porelo` not yet in, and takes
-  every account of a machine ever in the room that the list drops out of that room alone, `@porelo` first, never
-  one a listed machine's name could claim; a central task named `porelo.…` is refused; `describe` offers both.
+- `expel <login>` deactivates a person's bare account and every account with that final login suffix,
+  provisioning first, and records the login under `expelled-logins` for the host's gate. Unknown logins stay
+  available, repeated calls exit 0, and other logins' accounts remain active.
+- On a central homeserver, `setup --project P --login L --create-room` makes the project's room
+  `#porelo-<P>:<server>` as `@porelo.<login>`, invite-only, closed to guests and unlisted, or takes the room under that
+  alias only if `@porelo.<login>` made it, and answers `"created_room": true`. `members --project P --persons A,B,…`,
+  run by that login, keeps the room to the list: it invites each listed person's own account and `@porelo` not yet in, and takes
+  every account of a login ever in the room that the list drops out of that room alone, `@porelo` first, never
+  one a listed login owns; a central task named `porelo.…` is refused; `describe` offers both.
 - `machine-token issue|revoke|expel <machine>` admits a person's machine to the account's own homeserver with no
   project and no room, and takes it out again: `issue` registers the administrator `@porelo` first if there is none
   and answers its token under `account`, then answers the machine's own registration token, the same on every call;

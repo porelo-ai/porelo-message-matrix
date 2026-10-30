@@ -18,7 +18,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [A homeserver's certificate: public, the operator's own, or - for development - unchecked](#a-homeservers-certificate-public-the-operators-own-or-for-development-unchecked) | A public certificate, a CA file, or the check switched off loudly for development. |
 | [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
-| [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each machine acts only as the accounts it made, with passwords derived by HMAC-SHA256 from the machine's secret in `account`. |
+| [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each person's Porelo acts only as the accounts of its login, with passwords derived by HMAC-SHA256 from the person's secret in `account`. |
 | [A task account of another project is refused, not renamed](#a-task-account-of-another-project-is-refused-not-renamed) | `enroll` and `retire` answer 78 for a task account in another project's room; an account's id stays its task's name. |
 | [The homeserver on the VPN: TLS by Tuwunel, a token per machine](#the-homeserver-on-the-vpn-tls-by-tuwunel-a-token-per-machine) | Tuwunel serves TLS on every listener with `dual_protocol`; each admitted machine gets a registration token of its own, removed when the machine is dropped. |
 
@@ -322,37 +322,37 @@ replace the environment; Porelo's vault coming with the copy, which would make t
 
 ## No administrator on a central homeserver
 
-**Decided:** on a central homeserver (`homeserver` and `room` set), no machine registers or uses the
-homeserver's administrator account. Each machine registers `@porelo.<machine>`, its relay
-`@porelo-relay-<project>.<machine>` and its tasks `@<task>.<machine>` with its registration token, and acts
-only as the accounts it made, through the client API. Every account's password on that machine is derived as
-the HMAC-SHA256 of the machine's secret over the account's localpart; `setup` makes the secret once and prints
+**Decided:** on a central homeserver (`homeserver` and `room` set), no person's Porelo registers or uses the
+homeserver's administrator account. Each person's Porelo registers `@porelo.<login>`, its relay
+`@porelo-relay-<project>.<login>` and its tasks `@<task>.<login>`, through a host's gate or with the
+registration token of a homeserver elsewhere, and acts only as the accounts it made, through the client API.
+Every account's password is derived as the HMAC-SHA256 of the person's secret over the account's localpart; `setup` makes the secret once and prints
 it in `account` as `PORELO_MATRIX_MACHINE_SECRET`, kept in Porelo's vault as one key of `account` and handed to
-every lifecycle verb on that machine.
+every lifecycle verb of that login.
 
 **Why:**
-- **No machine may act on another machine's accounts.** On the account's own homeserver, `@porelo` is the
+- **No person's Porelo may act on another person's accounts.** On the account's own homeserver, `@porelo` is the
   server's administrator and resets passwords or deactivates accounts through the admin room. On a central
-  homeserver shared by several machines, an administrator token on each machine would let any one machine take
-  over or deactivate another machine's tasks and people's accounts.
+  homeserver shared by several persons, an administrator token in each person's Porelo would let any one of them
+  take over or deactivate another person's tasks and accounts.
 - **Porelo hands a task's own secrets only to its `retire`.** `enroll` run again for a task receives no
   earlier task map, and `clear --project` receives only `setup`'s maps, never a task's. A random password
   printed in a task's `secrets` would be lost to both, so a task whose token was lost could not be taken back
   by `enroll` and a task Porelo forgot without a `retire` could not be removed by `clear --project`.
   Deriving each password from `PORELO_MATRIX_MACHINE_SECRET` lets `setup`, `enroll`, `retire` and
-  `clear --project` log in as any account of that machine, leave the project's room and log out every session,
+  `clear --project` log in as any account of that login, leave the project's room and log out every session,
   so no administrator is needed and the name can be used again.
 
-**Risk accepted:** whoever holds a machine's `account` (`PORELO_MATRIX_MACHINE_SECRET`) can derive the
-password of every account that machine made - `@porelo.<machine>`, its relays and its tasks - and act as any
-of them on the central homeserver. It gives no reach over another machine's accounts, which are derived from
-that other machine's secret, nor over a person's account. Porelo keeps `account` in the machine's vault. A
-machine whose `account` is lost cannot take its names back; the homeserver's administrator removes them, or
-the machine takes another name.
+**Risk accepted:** whoever holds a person's `account` (`PORELO_MATRIX_MACHINE_SECRET`) can derive the
+password of every account of that login - `@porelo.<login>`, its relays and its tasks - and act as any
+of them on the central homeserver. It gives no reach over another login's accounts, which are derived from
+that person's secret, nor over the person's own account. Porelo keeps `account` in the person's vault. A
+person whose `account` is lost cannot take the names back; the host's `expel` removes them, and the person comes back
+under another login.
 
 **What would change the answer:** Porelo handing every task's kept secrets to `enroll` and `clear --project`
 too, so each account could have an independent random password of its own; or Matrix offering scoped
-provisioning credentials per machine namespace.
+provisioning credentials per login namespace.
 
 ## A task account of another project is refused, not renamed
 

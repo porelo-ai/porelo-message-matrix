@@ -192,7 +192,7 @@ class LifecycleTest {
                                 "setup",
                                 "--project",
                                 "demo",
-                                "--machine",
+                                "--login",
                                 "hosta"))
                 .as("which of the two was meant cannot be told")
                 .isEqualTo(Exit.CONFIG);
@@ -210,25 +210,25 @@ class LifecycleTest {
     /** Harm guarded: a list mistyped drops every developer from the project's room. */
     @org.junit.jupiter.params.ParameterizedTest(name = "case {index}")
     @org.junit.jupiter.params.provider.ValueSource(
-            strings = {"", "hosta,../hostb", "hosta,,hostb", "hosta;hostb", "--machines"})
+            strings = {"", "hosta,../hostb", "hosta,,hostb", "hosta;hostb", "--persons"})
     @org.junit.jupiter.api.DisplayName(
-            "members takes a list of machines' names, or refuses with 64")
-    void membersTakesAListOfMachines(final String list) {
+            "members refuses malformed login lists before changing a room")
+    void membersTakesAListOfPersons(final String list) {
         final List<String> args =
                 "".equals(list)
                         ? List.of("members", "--project", "demo")
-                        : List.of("members", "--project", "demo", "--machines", list);
+                        : List.of("members", "--project", "demo", "--persons", list);
         org.assertj.core.api.Assertions.assertThat(
                         exit(
                                 central("https://matrix.example.org"),
                                 centralAccount(),
                                 args.toArray(String[]::new)))
                 .as("members %s", args)
-                .isEqualTo(Exit.USAGE);
+                .isEqualTo(list.isEmpty() ? Exit.USAGE : Exit.CONFIG);
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("members takes no more machines than a room holds members")
+    @org.junit.jupiter.api.DisplayName("members takes no more persons than a room holds members")
     void membersRefusesAListTooLong() {
         final String list =
                 java.util.stream.IntStream.rangeClosed(1, 501)
@@ -241,9 +241,9 @@ class LifecycleTest {
                                 "members",
                                 "--project",
                                 "demo",
-                                "--machines",
+                                "--persons",
                                 list))
-                .startsWith(Exit.USAGE + " --machines names at most 500 machines");
+                .startsWith(Exit.USAGE + " --persons names at most 500 persons");
     }
 
     /**
@@ -261,7 +261,7 @@ class LifecycleTest {
                                 "members",
                                 "--project",
                                 "demo",
-                                "--machines",
+                                "--persons",
                                 "hosta"))
                 .startsWith(Exit.NOT_PERMITTED + " members keeps a central homeserver's room");
         org.assertj.core.api.Assertions.assertThat(
@@ -282,11 +282,114 @@ class LifecycleTest {
                 .isEqualTo(Exit.USAGE);
     }
 
+    /** Harm guarded: an invalid suffix can claim another login's accounts. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {
+                "a.b",
+                "Bob",
+                "porelo",
+                "porelo-x",
+                "a12345678901234567890123456789012",
+                "1bob",
+                "bob=",
+                ""
+            })
+    void invalidLoginsAreRefusedBeforeAnyRequest(final String login) {
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.example.org"),
+                                account(),
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                login))
+                .as("the suffix '%s' must never reach the homeserver", login)
+                .startsWith(Exit.CONFIG + " ")
+                .contains("login", "lower-case", "32", "porelo");
+        final Map<String, String> env = new java.util.HashMap<>(centralAccount());
+        env.put("PORELO_MATRIX_LOGIN", login);
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.example.org"),
+                                env,
+                                "retire",
+                                "--project",
+                                "demo",
+                                "--task",
+                                "work"))
+                .as("kept login names follow the same rule")
+                .startsWith(Exit.CONFIG + " ")
+                .contains("login", "lower-case", "32", "porelo");
+    }
+
+    /** Harm guarded: one login's saved credentials are used to provision another's accounts. */
+    @Test
+    void aLoginMustMatchTheKeptLogin() {
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.example.org"),
+                                centralAccount(),
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                "bob"))
+                .as("a mismatched login is refused before registration")
+                .startsWith(Exit.CONFIG + " --login bob does not match PORELO_MATRIX_LOGIN");
+    }
+
+    /**
+     * Harm guarded: a caller using the obsolete option provisions accounts with the wrong scope.
+     */
+    @Test
+    void centralVerbsRefuseTheMachineOption() {
+        for (final String verb :
+                List.of("setup", "enroll", "retire", "join", "part", "members", "clear")) {
+            org.assertj.core.api.Assertions.assertThat(
+                            reason("{}", account(), verb, "--project", "demo", "--machine", "bob"))
+                    .as("%s no longer takes --machine", verb)
+                    .startsWith(Exit.USAGE + " usage:");
+        }
+    }
+
+    /**
+     * Harm guarded: the host's gate is treated as an external server needing a client-held token.
+     */
+    @Test
+    void theHostsGateNeedsNoRegistrationToken() {
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.localhost"),
+                                account(),
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                "bob",
+                                "--create-room"))
+                .as("gate registration needs no token before the room settings are checked")
+                .startsWith(Exit.CONFIG + " --create-room makes the room");
+        org.assertj.core.api.Assertions.assertThat(
+                        reason(
+                                central("https://matrix.example.org"),
+                                account(),
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                "bob",
+                                "--create-room"))
+                .as("an external homeserver still requires its registration token")
+                .startsWith(Exit.CONFIG + " " + Config.REGISTRATION_TOKEN + " is not set");
+    }
+
     private Map<String, String> centralAccount() {
         final Map<String, String> env = new java.util.HashMap<>(account());
         env.put(Config.MACHINE_SECRET, "machine-secret");
         env.put(Config.ADMIN_TOKEN, "machine-token");
-        env.put(Config.MACHINE, "hosta");
+        env.put("PORELO_MATRIX_LOGIN", "hosta");
         return env;
     }
 
@@ -312,10 +415,10 @@ class LifecycleTest {
                                     "clear",
                                     "--project",
                                     "demo",
-                                    "--machine",
+                                    "--login",
                                     "hosta"))
                     .as("nothing is left on the homeserver to clear, and it says so")
-                    .contains("the homeserver had let this machine go already");
+                    .contains("the homeserver had let this login go already");
         }
     }
 
@@ -339,7 +442,7 @@ class LifecycleTest {
                                 "clear",
                                 "--project",
                                 "demo",
-                                "--machine",
+                                "--login",
                                 "hosta"))
                 .as("a homeserver not reached is temporary")
                 .startsWith(Exit.TEMPORARY + " ")
@@ -366,7 +469,7 @@ class LifecycleTest {
                                     "clear",
                                     "--project",
                                     "demo",
-                                    "--machine",
+                                    "--login",
                                     "hosta"))
                     .as("busy is temporary, worth trying again")
                     .isEqualTo(Exit.TEMPORARY);

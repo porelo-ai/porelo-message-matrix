@@ -76,9 +76,9 @@ final class Describe {
         // Offered so a project file's draft can be checked against this transport before it is
         // committed.
         lifecycle.add("settings");
-        // --machine scopes the accounts made on a central homeserver to one machine.
+        // --login scopes the accounts made on a central homeserver to one person.
         // create-room: on a central homeserver, the project admin's setup makes the project's room.
-        description.putArray("takes").add("machine").add("create-room");
+        description.putArray("takes").add("login").add("create-room");
         try {
             out.println(MatrixClient.JSON.writeValueAsString(description));
         } catch (final JacksonException ex) {

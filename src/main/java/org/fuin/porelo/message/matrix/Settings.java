@@ -17,6 +17,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -50,6 +51,21 @@ record Settings(
                     "tls_verify",
                     "registration_token_file",
                     "room");
+
+    /** A host's gate supplies the registration token itself. */
+    boolean hosted() {
+        return homeserver != null
+                && ("unix".equals(homeserver.getScheme())
+                        || (homeserver.getHost() != null
+                                && homeserver
+                                        .getHost()
+                                        .toLowerCase(Locale.ROOT)
+                                        .endsWith(".localhost")));
+    }
+
+    static final String TOKEN_FILE_ON_A_HOST =
+            "the project's registration_token_file is for a homeserver elsewhere; a host's"
+                    + " homeserver behind its gate takes no registration token";
 
     static final String TEXT_CONTRADICTION =
             "the project's ca_certificate and tls_verify off contradict each other; set one";
@@ -136,6 +152,10 @@ record Settings(
         }
         // A central homeserver's room is made by a person there; without it, setup has none to
         // join.
+        // A host's gate registers without a token; one named here would silently do nothing.
+        if (settings.registrationTokenFile() != null && settings.hosted()) {
+            throw new Failure(Exit.CONFIG, TOKEN_FILE_ON_A_HOST);
+        }
         if (settings.homeserver() != null && settings.room() == null) {
             throw new Failure(Exit.CONFIG, HOMESERVER_WITHOUT_ROOM);
         }

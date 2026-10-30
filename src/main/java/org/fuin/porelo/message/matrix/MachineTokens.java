@@ -435,6 +435,11 @@ final class MachineTokens {
     static void forget(final Map<String, String> env, final Lifecycle.Report report)
             throws Failure {
         forget(LocalHomeserver.directory(env).resolve(EXPELLED), report, "the record of ");
+        forget(
+                LocalHomeserver.directory(env)
+                        .resolve(org.fuin.porelo.message.matrix.Expel.DIRECTORY),
+                report,
+                "the record of ");
         forget(LocalHomeserver.directory(env).resolve(KNOWN), report, "the record of ");
         forget(
                 LocalHomeserver.directory(env).resolve(DIRECTORY),

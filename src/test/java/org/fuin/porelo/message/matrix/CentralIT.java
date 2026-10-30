@@ -218,14 +218,14 @@ class CentralIT {
                         + "\"}";
 
         final JsonNode answer =
-                run(new HashMap<>(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(new HashMap<>(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         final String adminToken = answer.path("account").path(Config.ADMIN_TOKEN).asText();
         assertThat(adminToken).as("machine account token").isNotEmpty();
         assertThat(answer.path("account").path(Config.MACHINE_SECRET).asText())
                 .as("machine secret kept in account")
                 .isNotEmpty();
-        assertThat(answer.path("machine").asText())
+        assertThat(answer.path("login").asText())
                 .as("machine reported by setup")
                 .isEqualTo(MACHINE_ONE);
         assertThat(status(adminToken)).as("machine token accepted by homeserver").isEqualTo(200);
@@ -242,20 +242,20 @@ class CentralIT {
             "setup before the person invites the machine prints admitted false; after the invite it prints admitted true and the room, and the relay is in the room")
     void setupBeforeAndAfterInviteAdmitsMachineAndRelay() throws Exception {
         final JsonNode before =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(before.path("admitted").isBoolean()).as("admitted is a boolean").isTrue();
         assertThat(before.path("admitted").asBoolean())
                 .as("not admitted before the person invites the machine")
                 .isFalse();
-        assertThat(before.path("machine").asText()).as("machine name").isEqualTo(MACHINE_ONE);
+        assertThat(before.path("login").asText()).as("machine name").isEqualTo(MACHINE_ONE);
         assertThat(before.path("account").path(Config.ADMIN_TOKEN).asText())
                 .as("machine token kept before admission")
                 .isNotEmpty();
         assertThat(before.path("account").path(Config.MACHINE_SECRET).asText())
                 .as("machine secret kept before admission")
                 .isNotEmpty();
-        assertThat(before.path("account").path(Config.MACHINE).asText())
+        assertThat(before.path("account").path(Config.LOGIN).asText())
                 .as("machine name kept in account")
                 .isEqualTo(MACHINE_ONE);
         assertThat(before.has("conversation")).as("no conversation while not admitted").isFalse();
@@ -275,13 +275,13 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         assertThat(after.path("admitted").asBoolean())
                 .as("admitted after the person invited the machine")
                 .isTrue();
-        assertThat(after.path("machine").asText()).as("machine name").isEqualTo(MACHINE_ONE);
+        assertThat(after.path("login").asText()).as("machine name").isEqualTo(MACHINE_ONE);
         assertThat(after.path("conversation").asText()).as("the room id").isEqualTo(room);
         assertThat(after.path("reaches").get(0).asText())
                 .as("the central homeserver's host and port")
@@ -313,7 +313,7 @@ class CentralIT {
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
 
         final JsonNode first =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(first.path("admitted").asBoolean()).as("admitted at the first setup").isTrue();
         assertThat(first.path("conversation").asText()).as("the room id").isEqualTo(room);
@@ -334,7 +334,7 @@ class CentralIT {
         allowGuests(person, room);
 
         final JsonNode first =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(first.path("admitted").asBoolean()).as("not admitted").isFalse();
         assertThat(first.path("account").path(Config.MACHINE_SECRET).asText())
@@ -346,68 +346,21 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(second.exit())
                 .as("the next setup refuses the room in words: %s", second.err())
                 .isEqualTo(Exit.CONFIG);
     }
 
-    /**
-     * Harm guarded: upper-case host names must not prevent a machine and its tasks from joining
-     * their project's conversation or disagree with the machine name kept in the account.
-     */
+    /** Harm guarded: a login is folded into another person's account name. */
     @Test
-    @DisplayName("A machine named in upper case is taken in lower case for setup and enroll")
-    void aMachineNamedInUpperCaseIsTakenInLowerCase() throws Exception {
-        final JsonNode before =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", "Host-A");
-
-        assertThat(before.path("machine").asText())
-                .as("setup reports the host name in lower case")
-                .isEqualTo("host-a");
-        assertThat(before.path("account").path(Config.MACHINE).asText())
-                .as("the kept machine name agrees with the normalized host name")
-                .isEqualTo("host-a");
-
-        final String machineUserId = "@porelo.host-a:" + Tuwunel.SERVER_NAME;
-        final String adminToken = before.path("account").path(Config.ADMIN_TOKEN).asText();
-        final HttpResponse<String> identity =
-                http.send(
-                        HttpRequest.newBuilder(
-                                        URI.create(
-                                                tuwunel.url()
-                                                        + "/_matrix/client/v3/account/whoami"))
-                                .header("Authorization", "Bearer " + adminToken)
-                                .build(),
-                        HttpResponse.BodyHandlers.ofString());
-        assertThat(identity.statusCode())
-                .as("the homeserver accepts the registered machine account's token")
-                .isEqualTo(200);
-        assertThat(MatrixClient.JSON.readTree(identity.body()).path("user_id").asText())
-                .as("the homeserver registered the machine with a lower-case localpart")
-                .isEqualTo(machineUserId);
-
-        invite(person, room, machineUserId);
-        final Map<String, String> account = with(baseEnv(), before.path("account"));
-        final JsonNode setup = run(account, "setup", "--project", PROJECT, "--machine", "Host-A");
-        assertThat(setup.path("admitted").asBoolean(false))
-                .as("the machine invited as @porelo.host-a is admitted to the project's room")
-                .isTrue();
-        final JsonNode enrolled =
-                run(
-                        with(account, setup.path("account"), setup.path("secrets")),
-                        "enroll",
-                        "--project",
-                        PROJECT,
-                        "--task",
-                        "porelo-demo-alice",
-                        "--machine",
-                        "HOST-A");
-
-        assertThat(enrolled.path("address").asText())
-                .as("enroll accepts the same host in upper case with the kept account secrets")
-                .endsWith(".host-a:" + Tuwunel.SERVER_NAME);
+    @DisplayName("An upper-case login is refused before registering an account")
+    void anUpperCaseLoginIsRefused() throws Exception {
+        final Transport.Result result =
+                attempt(baseEnv(), "setup", "--project", PROJECT, "--login", "Host-A");
+        assertThat(result.exit()).as("host logins are case-sensitive").isEqualTo(Exit.CONFIG);
+        assertThat(result.err()).as("the refusal explains the login rule").contains("lower-case");
     }
 
     /**
@@ -418,11 +371,11 @@ class CentralIT {
     @DisplayName("setup with a machine name another machine holds is refused with 78")
     void setupWithAMachineNameAnotherMachineHoldsIsRefused() throws Exception {
         final JsonNode first =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final String firstToken = first.path("account").path(Config.ADMIN_TOKEN).asText();
 
         final Transport.Result otherMachine =
-                attempt(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                attempt(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(otherMachine.exit())
                 .as("second machine claiming %s: %s", MACHINE_ONE, otherMachine.err())
@@ -441,7 +394,7 @@ class CentralIT {
         final String openToGuests = createCentralRoom(person, false);
         settings = settingsJson(openToGuests);
         final JsonNode before =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final String machineUserId = "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME;
         invite(person, openToGuests, machineUserId);
 
@@ -451,7 +404,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         assertThat(result.exit())
@@ -497,7 +450,7 @@ class CentralIT {
         setJoinRule(person, room, "public");
 
         final JsonNode first =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(first.path("admitted").asBoolean())
                 .as("first setup is not admitted before an invite")
@@ -508,13 +461,13 @@ class CentralIT {
         assertThat(first.path("account").path(Config.ADMIN_TOKEN).asText())
                 .as("machine token printed on first setup")
                 .isNotEmpty();
-        assertThat(first.path("account").path(Config.MACHINE).asText())
+        assertThat(first.path("account").path(Config.LOGIN).asText())
                 .as("machine name printed in account on first setup")
                 .isEqualTo(MACHINE_ONE);
 
         final Map<String, String> withAccount = with(baseEnv(), first.path("account"));
         final Transport.Result second =
-                attempt(withAccount, "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                attempt(withAccount, "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(second.exit())
                 .as("second setup against public room refused: %s", second.err())
@@ -524,7 +477,7 @@ class CentralIT {
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
 
         final JsonNode third =
-                run(withAccount, "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(withAccount, "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(third.path("admitted").asBoolean())
                 .as("admitted once room is invite-only and machine is invited")
@@ -542,9 +495,9 @@ class CentralIT {
             "enroll registers @T.M and a task of each machine sends to and is read by the other's")
     void enrolledTasksAcrossTwoMachinesTalk() throws Exception {
         final JsonNode preOne =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final JsonNode preTwo =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_TWO);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_TWO);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         invite(person, room, "@porelo." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setupOne =
@@ -553,7 +506,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final JsonNode setupTwo =
                 run(
@@ -561,7 +514,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
 
         final Map<String, String> lifecycleOne =
@@ -577,7 +530,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final JsonNode enrolledBob =
                 run(
@@ -587,7 +540,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-bob",
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
 
         assertThat(enrolledAlice.path("address").asText())
@@ -654,8 +607,7 @@ class CentralIT {
     @Test
     @DisplayName("Enrolling the same task again gets a new token and the old token answers 401")
     void enrollAgainReplacesTokenAndInvalidatesTheOldOne() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setup =
                 run(
@@ -663,7 +615,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Map<String, String> lifecycle =
                 with(baseEnv(), setup.path("account"), setup.path("secrets"));
@@ -676,7 +628,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-alice",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -691,7 +643,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final String second = again.path("secrets").path(Config.ACCESS_TOKEN).asText();
 
@@ -715,17 +667,16 @@ class CentralIT {
         final String roomA = room;
         final String roomAb = createCentralRoom(person, true);
         settings = settingsJson(roomA);
-        final JsonNode pre = run(baseEnv(), "setup", "--project", "a", "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", "a", "--login", MACHINE_ONE);
         final String machineUserId = "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME;
         invite(person, roomA, machineUserId);
         invite(person, roomAb, machineUserId);
 
         final Map<String, String> accountEnv = with(baseEnv(), pre.path("account"));
-        final JsonNode setupA =
-                run(accountEnv, "setup", "--project", "a", "--machine", MACHINE_ONE);
+        final JsonNode setupA = run(accountEnv, "setup", "--project", "a", "--login", MACHINE_ONE);
         settings = settingsJson(roomAb);
         final JsonNode setupAb =
-                run(accountEnv, "setup", "--project", "a-b", "--machine", MACHINE_ONE);
+                run(accountEnv, "setup", "--project", "a-b", "--login", MACHINE_ONE);
 
         settings = settingsJson(roomA);
         final String firstToken =
@@ -736,7 +687,7 @@ class CentralIT {
                                 "a",
                                 "--task",
                                 "porelo-a-b-c",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -751,7 +702,7 @@ class CentralIT {
                         "a-b",
                         "--task",
                         "porelo-a-b-c",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         assertThat(collision.exit())
@@ -777,7 +728,7 @@ class CentralIT {
                         PROJECT,
                         "--person",
                         "dave",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         assertThat(result.exit())
@@ -804,11 +755,11 @@ class CentralIT {
     }
 
     /**
-     * Harm guarded: without --machine on a central homeserver, setup would have no machine suffix
-     * to namespace its accounts and must refuse with 78.
+     * Harm guarded: without --login on a central homeserver, setup would have no machine suffix to
+     * namespace its accounts and must refuse with 78.
      */
     @Test
-    @DisplayName("setup without --machine on a central homeserver exits with 78")
+    @DisplayName("setup without --login on a central homeserver exits with 78")
     void setupWithoutMachineIsRefused() throws Exception {
         // Fresh homeserver so non-central setup would otherwise register @porelo as admin and exit
         // 0.
@@ -818,21 +769,21 @@ class CentralIT {
         final Transport.Result result = attempt(baseEnv(), "setup", "--project", PROJECT);
 
         assertThat(result.exit())
-                .as("central setup without --machine: %s", result.err())
+                .as("central setup without --login: %s", result.err())
                 .isEqualTo(Exit.CONFIG);
     }
 
     /**
      * Harm guarded: the secret and token in the environment belong to one machine; if setup is
-     * called with a different --machine than PORELO_MATRIX_MACHINE, registering or logging in under
+     * called with a different --login than PORELO_MATRIX_MACHINE, registering or logging in under
      * the new name with the first machine's secret would bind two machine names to one secret.
      */
     @Test
     @DisplayName(
-            "setup refuses with 78 when --machine differs from PORELO_MATRIX_MACHINE in the environment")
+            "setup refuses with 78 when --login differs from PORELO_MATRIX_MACHINE in the environment")
     void setupWithDifferentMachineThanEnvironmentIsRefused() throws Exception {
         final JsonNode first =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
 
         final Transport.Result mismatch =
                 attempt(
@@ -840,12 +791,12 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
 
         assertThat(mismatch.exit())
                 .as(
-                        "setup with --machine %s while env has %s: %s",
+                        "setup with --login %s while env has %s: %s",
                         MACHINE_TWO, MACHINE_ONE, mismatch.err())
                 .isEqualTo(Exit.CONFIG);
         final HttpResponse<Void> available =
@@ -864,15 +815,14 @@ class CentralIT {
 
     /**
      * Harm guarded: the secret and token in the environment belong to one machine; if enroll is
-     * called with a different --machine than PORELO_MATRIX_MACHINE, deriving accounts for that
-     * other machine from this machine's secret would forge accounts under the wrong secret.
+     * called with a different --login than PORELO_MATRIX_MACHINE, deriving accounts for that other
+     * machine from this machine's secret would forge accounts under the wrong secret.
      */
     @Test
     @DisplayName(
-            "enroll refuses with 78 when --machine differs from PORELO_MATRIX_MACHINE in the environment")
+            "enroll refuses with 78 when --login differs from PORELO_MATRIX_MACHINE in the environment")
     void enrollWithDifferentMachineThanEnvironmentIsRefused() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setup =
                 run(
@@ -880,7 +830,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Map<String, String> lifecycle =
                 with(baseEnv(), setup.path("account"), setup.path("secrets"));
@@ -893,12 +843,12 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
 
         assertThat(mismatch.exit())
                 .as(
-                        "enroll with --machine %s while env has %s: %s",
+                        "enroll with --login %s while env has %s: %s",
                         MACHINE_TWO, MACHINE_ONE, mismatch.err())
                 .isEqualTo(Exit.CONFIG);
         final HttpResponse<Void> available =
@@ -923,8 +873,7 @@ class CentralIT {
     @DisplayName(
             "setup run again with what it printed keeps the machine account, the room and the relay")
     void setupAgainKeepsEverything() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode first =
                 run(
@@ -932,7 +881,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         final JsonNode second =
@@ -941,7 +890,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
 
         assertThat(second).as("second setup with kept account and secrets").isEqualTo(first);
@@ -956,8 +905,7 @@ class CentralIT {
     @DisplayName(
             "setup with the account kept but the relay token dropped gets a new relay token and invalidates the old one")
     void setupWithoutKeptRelayTokenReplacesItAndInvalidatesTheOldOne() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode first =
                 run(
@@ -965,7 +913,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final String firstRelay = first.path("secrets").path(Config.ACCESS_TOKEN).asText();
         assertThat(status(firstRelay))
@@ -978,7 +926,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final String secondRelay = second.path("secrets").path(Config.ACCESS_TOKEN).asText();
 
@@ -999,8 +947,7 @@ class CentralIT {
     @DisplayName(
             "retire of a task logs out its token and leaves the room, retire twice exits 0, and enroll of the same task name again succeeds with a new token")
     void retireLogsTheTaskOutAndASecondRetireSucceeds() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setup =
                 run(
@@ -1008,7 +955,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Map<String, String> lifecycle =
                 with(baseEnv(), setup.path("account"), setup.path("secrets"));
@@ -1023,37 +970,21 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 taskName,
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
                         .asText();
         assertThat(status(token)).as("task token valid before retire").isEqualTo(200);
 
-        run(
-                lifecycle,
-                "retire",
-                "--project",
-                PROJECT,
-                "--task",
-                taskName,
-                "--machine",
-                MACHINE_ONE);
+        run(lifecycle, "retire", "--project", PROJECT, "--task", taskName, "--login", MACHINE_ONE);
 
         assertThat(status(token)).as("retired task token refused with 401").isEqualTo(401);
         assertThat(tuwunel.membership(person, room, taskUserId))
                 .as("retired task left the project's room")
                 .isEqualTo("leave");
 
-        run(
-                lifecycle,
-                "retire",
-                "--project",
-                PROJECT,
-                "--task",
-                taskName,
-                "--machine",
-                MACHINE_ONE);
+        run(lifecycle, "retire", "--project", PROJECT, "--task", taskName, "--login", MACHINE_ONE);
 
         final String newToken =
                 run(
@@ -1063,7 +994,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 taskName,
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1079,17 +1010,17 @@ class CentralIT {
 
     /**
      * Harm guarded: if PORELO_MATRIX_ADMIN_TOKEN belongs to another machine than the machine named
-     * in the environment or --machine, enroll must refuse with 78 before touching any task account
-     * of the named machine.
+     * in the environment or --login, enroll must refuse with 78 before touching any task account of
+     * the named machine.
      */
     @Test
     @DisplayName(
             "enroll with another machine's token for this machine is refused with 78 and leaves this machine's task untouched")
     void enrollWithAnotherMachinesTokenIsRefused() throws Exception {
         final JsonNode preOne =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final JsonNode preTwo =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_TWO);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_TWO);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         invite(person, room, "@porelo." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setupOne =
@@ -1098,7 +1029,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final JsonNode setupTwo =
                 run(
@@ -1106,7 +1037,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
         final Map<String, String> lifecycleOne =
                 with(baseEnv(), setupOne.path("account"), setupOne.path("secrets"));
@@ -1119,7 +1050,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-alice",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1136,7 +1067,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(wrongToken.exit())
                 .as("enroll with beta's token for machine alpha: %s", wrongToken.err())
@@ -1155,8 +1086,7 @@ class CentralIT {
     @DisplayName(
             "enroll with --task porelo or --task porelo-relay-... on a central homeserver is refused with 78")
     void enrollReservedTaskNameIsRefused() throws Exception {
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setup =
                 run(
@@ -1164,7 +1094,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Map<String, String> lifecycle =
                 with(baseEnv(), setup.path("account"), setup.path("secrets"));
@@ -1177,7 +1107,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(reservedPorelo.exit())
                 .as("enroll --task porelo: %s", reservedPorelo.err())
@@ -1194,7 +1124,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-relay-" + PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(reservedRelay.exit())
                 .as("enroll --task porelo-relay-...: %s", reservedRelay.err())
@@ -1214,9 +1144,9 @@ class CentralIT {
             "retire through another machine's account or another project's room is refused with 78 and leaves the task active")
     void retireThroughAnotherMachinesAccountIsRefused() throws Exception {
         final JsonNode preOne =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final JsonNode preTwo =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_TWO);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_TWO);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         invite(person, room, "@porelo." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setupOne =
@@ -1225,7 +1155,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final JsonNode setupTwo =
                 run(
@@ -1233,7 +1163,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
         final Map<String, String> lifecycleOne =
                 with(baseEnv(), setupOne.path("account"), setupOne.path("secrets"));
@@ -1248,7 +1178,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-alice",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1263,7 +1193,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
         assertThat(betaOwnMachine.exit())
                 .as("beta retiring alpha's task name under beta: %s", betaOwnMachine.err())
@@ -1277,16 +1207,16 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(betaMismatchMachine.exit())
                 .as(
-                        "beta retiring with --machine %s against beta's env: %s",
+                        "beta retiring with --login %s against beta's env: %s",
                         MACHINE_ONE, betaMismatchMachine.err())
                 .isEqualTo(Exit.CONFIG);
 
         final Map<String, String> betaForgingAlpha = new HashMap<>(lifecycleTwo);
-        betaForgingAlpha.put(Config.MACHINE, MACHINE_ONE);
+        betaForgingAlpha.put(Config.LOGIN, MACHINE_ONE);
         final Transport.Result betaWrongSecret =
                 attempt(
                         betaForgingAlpha,
@@ -1295,7 +1225,7 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(betaWrongSecret.exit())
                 .as(
@@ -1315,7 +1245,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         "other",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Transport.Result otherProject =
                 attempt(
@@ -1325,7 +1255,7 @@ class CentralIT {
                         "other",
                         "--task",
                         "porelo-demo-alice",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         assertThat(otherProject.exit())
                 .as(
@@ -1344,7 +1274,7 @@ class CentralIT {
                 PROJECT,
                 "--task",
                 "porelo-demo-alice",
-                "--machine",
+                "--login",
                 MACHINE_ONE);
         assertThat(status(aliceToken)).as("alpha's own retire logs its task out").isEqualTo(401);
     }
@@ -1360,9 +1290,9 @@ class CentralIT {
             "clear --project logs out this machine's relay and tasks, including a forgotten one, and leaves the other machine's tasks, the person and the room; clear twice exits 0")
     void clearLogsThisMachinesAccountsOutAndLeavesOthersAndTheRoom() throws Exception {
         final JsonNode preOne =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         final JsonNode preTwo =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_TWO);
+                run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_TWO);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         invite(person, room, "@porelo." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setupOne =
@@ -1371,7 +1301,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final JsonNode setupTwo =
                 run(
@@ -1379,7 +1309,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_TWO);
         final Map<String, String> lifecycleOne =
                 with(baseEnv(), setupOne.path("account"), setupOne.path("secrets"));
@@ -1394,7 +1324,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-alice",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1408,7 +1338,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-forgotten",
-                                "--machine",
+                                "--login",
                                 MACHINE_ONE)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1421,7 +1351,7 @@ class CentralIT {
                                 PROJECT,
                                 "--task",
                                 "porelo-demo-bob",
-                                "--machine",
+                                "--login",
                                 MACHINE_TWO)
                         .path("secrets")
                         .path(Config.ACCESS_TOKEN)
@@ -1433,7 +1363,7 @@ class CentralIT {
                 .isEqualTo(Exit.OK);
 
         final JsonNode cleared =
-                run(lifecycleOne, "clear", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(lifecycleOne, "clear", "--project", PROJECT, "--login", MACHINE_ONE);
 
         final String relayOneId =
                 "@porelo-relay-" + PROJECT + "." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME;
@@ -1484,7 +1414,7 @@ class CentralIT {
                 .isEqualTo("join");
 
         final JsonNode again =
-                run(lifecycleOne, "clear", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(lifecycleOne, "clear", "--project", PROJECT, "--login", MACHINE_ONE);
         assertThat(again.path("removed")).as("second clear removes nothing").isEmpty();
         assertThat(again.path("kept")).as("second clear keeps nothing").isEmpty();
 
@@ -1495,7 +1425,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final String newRelayToken = setupAgain.path("secrets").path(Config.ACCESS_TOKEN).asText();
         assertThat(setupAgain.path("admitted").asBoolean())
@@ -1538,8 +1468,7 @@ class CentralIT {
                         HttpResponse.BodyHandlers.ofString());
         assertThat(joined.statusCode()).as("carol.alpha joins room").isEqualTo(200);
 
-        final JsonNode pre =
-                run(baseEnv(), "setup", "--project", PROJECT, "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
         invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
         final JsonNode setup =
                 run(
@@ -1547,13 +1476,13 @@ class CentralIT {
                         "setup",
                         "--project",
                         PROJECT,
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final Map<String, String> lifecycle =
                 with(baseEnv(), setup.path("account"), setup.path("secrets"));
 
         final JsonNode cleared =
-                run(lifecycle, "clear", "--project", PROJECT, "--machine", MACHINE_ONE);
+                run(lifecycle, "clear", "--project", PROJECT, "--login", MACHINE_ONE);
 
         assertThat(cleared.path("removed"))
                 .as("removed does not contain @carol.alpha")
@@ -1578,17 +1507,16 @@ class CentralIT {
     void clearKeepsAnAccountInAnotherRoomOfThisMachine() throws Exception {
         final String roomA = room;
         final String roomOther = createCentralRoom(person, true);
-        final JsonNode pre = run(baseEnv(), "setup", "--project", "a", "--machine", MACHINE_ONE);
+        final JsonNode pre = run(baseEnv(), "setup", "--project", "a", "--login", MACHINE_ONE);
         final String machineUserId = "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME;
         invite(person, roomA, machineUserId);
         invite(person, roomOther, machineUserId);
 
         final Map<String, String> accountEnv = with(baseEnv(), pre.path("account"));
         settings = settingsJson(roomA);
-        final JsonNode setupA =
-                run(accountEnv, "setup", "--project", "a", "--machine", MACHINE_ONE);
+        final JsonNode setupA = run(accountEnv, "setup", "--project", "a", "--login", MACHINE_ONE);
         settings = settingsJson(roomOther);
-        run(accountEnv, "setup", "--project", "other", "--machine", MACHINE_ONE);
+        run(accountEnv, "setup", "--project", "other", "--login", MACHINE_ONE);
 
         settings = settingsJson(roomA);
         final Map<String, String> lifecycleA = with(accountEnv, setupA.path("secrets"));
@@ -1600,14 +1528,13 @@ class CentralIT {
                         "a",
                         "--task",
                         "porelo-a-shared",
-                        "--machine",
+                        "--login",
                         MACHINE_ONE);
         final String sharedUserId = sharedTask.path("address").asText();
         final String sharedToken = sharedTask.path("secrets").path(Config.ACCESS_TOKEN).asText();
         invite(person, roomOther, sharedUserId);
 
-        final JsonNode cleared =
-                run(lifecycleA, "clear", "--project", "a", "--machine", MACHINE_ONE);
+        final JsonNode cleared = run(lifecycleA, "clear", "--project", "a", "--login", MACHINE_ONE);
 
         assertThat(cleared.path("removed"))
                 .as("only the relay not in the other room is removed")
@@ -1651,7 +1578,7 @@ class CentralIT {
             throws Exception {
         settings = settingsJson(alias(project));
         final List<String> args =
-                new ArrayList<>(List.of("setup", "--project", project, "--machine", machine));
+                new ArrayList<>(List.of("setup", "--project", project, "--login", machine));
         args.addAll(List.of(more));
         final JsonNode setup = run(kept, args.toArray(String[]::new));
         assertThat(setup.path("admitted").asBoolean())
@@ -1667,7 +1594,7 @@ class CentralIT {
             final Map<String, String> admin, final String project, final String list)
             throws IOException {
         settings = settingsJson(alias(project));
-        return run(admin, "members", "--project", project, "--machines", list);
+        return run(admin, "members", "--project", project, "--persons", list);
     }
 
     private String roomOf(final Map<String, String> account, final String project)
@@ -1763,23 +1690,31 @@ class CentralIT {
                         PROJECT,
                         "--task",
                         "porelo.worker",
-                        "--machine",
+                        "--login",
                         "admin-m");
         assertThat(fakeMachine.exit())
                 .as("a task that would read as a machine's @porelo: %s", fakeMachine.err())
                 .isEqualTo(Exit.CONFIG);
 
         // dev-two is not registered yet when it is invited.
-        assertThat(members(admin, PROJECT, "admin-m,dev-one,dev-two").path("invited"))
-                .as("both developers invited, the maker not")
+        assertThat(members(admin, PROJECT, "admin-m,carol,dev-one,dev-two").path("invited"))
+                .as(
+                        "both accounts of each listed login invited, including the maker's bare account")
                 .extracting(JsonNode::asText)
-                .containsExactly(porelo("dev-one"), porelo("dev-two"));
+                .containsExactly(
+                        "@admin-m:" + Tuwunel.SERVER_NAME,
+                        person.userId(),
+                        porelo("carol"),
+                        "@dev-one:" + Tuwunel.SERVER_NAME,
+                        porelo("dev-one"),
+                        "@dev-two:" + Tuwunel.SERVER_NAME,
+                        porelo("dev-two"));
         final Map<String, String> one = admittedMachine(PROJECT, "dev-one");
         final Map<String, String> two = admittedMachine(PROJECT, "dev-two");
         settings = settingsJson(alias(PROJECT));
         final JsonNode taskOne =
-                run(one, "enroll", "--project", PROJECT, "--task", "t1", "--machine", "dev-one");
-        run(two, "enroll", "--project", PROJECT, "--task", "t2", "--machine", "dev-two");
+                run(one, "enroll", "--project", PROJECT, "--task", "t1", "--login", "dev-one");
+        run(two, "enroll", "--project", PROJECT, "--task", "t2", "--login", "dev-two");
         tuwunel.call(
                 "POST",
                 "/_matrix/client/v3/rooms/" + MatrixClient.segment(projectRoom) + "/invite",
@@ -1798,18 +1733,18 @@ class CentralIT {
                 "POST",
                 "/_matrix/client/v3/rooms/" + MatrixClient.segment(projectRoom) + "/invite",
                 person,
-                MatrixClient.JSON.createObjectNode().put("user_id", porelo("x.dev-two")),
+                MatrixClient.JSON.createObjectNode().put("user_id", porelo("x-dev-two")),
                 200);
-        final JsonNode cleared = members(admin, PROJECT, "dev-two,dev-one");
+        final JsonNode cleared = members(admin, PROJECT, "carol,dev-two,dev-one");
         assertThat(cleared.path("removed"))
                 .as("the invitation taken back, nothing of dev-two's touched")
                 .extracting(JsonNode::asText)
-                .containsExactly(porelo("x.dev-two"));
+                .containsExactly(porelo("x-dev-two"));
         assertThat(tuwunel.membership(asAdmin, projectRoom, "@t2.dev-two:" + Tuwunel.SERVER_NAME))
                 .as("dev-two's task stays")
                 .isEqualTo("join");
 
-        final JsonNode again = members(admin, PROJECT, "dev-two,dev-one");
+        final JsonNode again = members(admin, PROJECT, "carol,dev-two,dev-one");
         assertThat(again.path("invited").size() + again.path("removed").size())
                 .as("the same list again changes nothing: %s", again)
                 .isZero();
@@ -1821,13 +1756,14 @@ class CentralIT {
         admittedMachine(one, "other", "dev-one");
         final String otherRoom = roomOf(otherAdmin, "other");
 
-        final JsonNode dropped = members(admin, PROJECT, "dev-two");
+        final JsonNode dropped = members(admin, PROJECT, "carol,dev-two");
 
         assertThat(dropped.path("removed"))
                 .as("every account of dev-one, @porelo first")
                 .extracting(JsonNode::asText)
                 .containsExactlyInAnyOrder(
                         porelo("dev-one"),
+                        "@dev-one:" + Tuwunel.SERVER_NAME,
                         "@porelo-relay-" + PROJECT + ".dev-one:" + Tuwunel.SERVER_NAME,
                         "@t1.dev-one:" + Tuwunel.SERVER_NAME);
         assertThat(dropped.path("removed").get(0).asText()).isEqualTo(porelo("dev-one"));
@@ -1869,7 +1805,8 @@ class CentralIT {
         assertThat(none.path("removed"))
                 .as("an empty list takes out every machine but the maker, its @porelo gone too")
                 .extracting(JsonNode::asText)
-                .containsExactly(t2);
+                .containsExactlyInAnyOrder(
+                        t2, "@dev-two:" + Tuwunel.SERVER_NAME, person.userId(), porelo("carol"));
         for (final String id :
                 List.of(
                         t2,
@@ -1881,7 +1818,6 @@ class CentralIT {
         }
         for (final String stays :
                 List.of(
-                        person.userId(),
                         porelo("admin-m"),
                         "@porelo-relay-" + PROJECT + ".admin-m:" + Tuwunel.SERVER_NAME)) {
             assertThat(tuwunel.membership(asAdmin, projectRoom, stays))
@@ -1916,7 +1852,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         "taken",
-                        "--machine",
+                        "--login",
                         "admin-m",
                         "--create-room");
         assertThat(first.path("admitted").asBoolean())
@@ -1942,7 +1878,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         "taken",
-                        "--machine",
+                        "--login",
                         "admin-m",
                         "--create-room");
         assertThat(again.exit()).as(again.err()).isEqualTo(Exit.CONFIG);
@@ -1953,9 +1889,9 @@ class CentralIT {
                         "members",
                         "--project",
                         "taken",
-                        "--machines",
+                        "--persons",
                         "dev-one",
-                        "--machine",
+                        "--login",
                         "admin-m");
         assertThat(members.exit()).as(members.err()).isEqualTo(Exit.CONFIG);
         assertThat(members.err()).contains("it was made by");
@@ -1987,7 +1923,7 @@ class CentralIT {
                         "setup",
                         "--project",
                         "wrong",
-                        "--machine",
+                        "--login",
                         "admin-w",
                         "--create-room");
 

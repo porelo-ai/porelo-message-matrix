@@ -253,13 +253,13 @@ class LocalHomeserverIT {
                         .put("ca_certificate", admission.path("ca_certificate").asText())
                         .toString();
         final JsonNode first =
-                lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
+                lifecycle(hostb, settings, "setup", "--project", "demo", "--login", "hostb");
         assertThat(first.path("admitted").asBoolean(false))
                 .as("admitted before it registered, the machine joins at its first setup")
                 .isTrue();
         keep(hostb, first.path("account"));
         final JsonNode second =
-                lifecycle(hostb, settings, "setup", "--project", "demo", "--machine", "hostb");
+                lifecycle(hostb, settings, "setup", "--project", "demo", "--login", "hostb");
         assertThat(second.path("admitted").asBoolean(false))
                 .as("the admitted machine's second setup joins the room")
                 .isTrue();
@@ -272,7 +272,7 @@ class LocalHomeserverIT {
                 "demo",
                 "--task",
                 "worker",
-                "--machine",
+                "--login",
                 "hostb");
         // Renamed, the task is still the machine's: its name says so, and nothing else can.
         lifecycle(
@@ -285,7 +285,7 @@ class LocalHomeserverIT {
                 "worker",
                 "--display",
                 "Grace",
-                "--machine",
+                "--login",
                 "hostb");
         assertThat(
                         lifecycle("admit", "--project", "demo", "--machine", "hostb")
@@ -558,7 +558,7 @@ class LocalHomeserverIT {
         assertThatThrownBy(() -> lifecycle(env, settings, "setup", "--project", "demo"))
                 .as(
                         "without a published address this machine takes the central path, which needs its name")
-                .hasMessageContaining(Config.MACHINE + " is not set");
+                .hasMessageContaining(Config.LOGIN + " is not set");
     }
 
     /**

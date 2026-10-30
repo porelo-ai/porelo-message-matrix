@@ -34,6 +34,7 @@ public final class Main {
                     "dismiss",
                     "members",
                     "clear",
+                    "expel",
                     "machine-token");
 
     private Main() {}
@@ -123,6 +124,7 @@ public final class Main {
                         "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
                 case "machine-token" -> MachineTokenVerb.run(rest, env, out, new PodmanUnit(env));
+                case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env));
                 case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");

@@ -84,9 +84,9 @@ class DescribeTest {
                         "clear",
                         "settings");
         assertThat(description.path("takes"))
-                .as("central lifecycle verbs take --machine, and the admin's setup --create-room")
+                .as("central lifecycle verbs take --login, and the admin's setup --create-room")
                 .extracting(JsonNode::asText)
-                .containsExactly("machine", "create-room");
+                .containsExactly("login", "create-room");
     }
 
     /** Harm guarded: Porelo needs the declared dependency to explain a start while it waits. */
@@ -103,21 +103,19 @@ class DescribeTest {
     }
 
     /**
-     * Harm guarded: central lifecycle verbs must accept {@code --machine <name>} so each machine
-     * can manage its own accounts; an unsanitized name would go into a Matrix user id's localpart.
+     * Harm guarded: central lifecycle verbs must accept {@code --login <name>} so each person can
+     * manage its own accounts; an unsanitized name would go into a Matrix user id's localpart.
      */
     @Test
-    @DisplayName(
-            "Central lifecycle verbs take --machine without regard to case, and refuse invalid"
-                    + " characters with 64")
-    void lifecycleVerbsTakeMachine() {
+    @DisplayName("Central lifecycle verbs take --login and refuse invalid" + " characters with 78")
+    void lifecycleVerbsTakeLogin() {
         for (final String[] args :
                 new String[][] {
-                    {"setup", "--project", "p", "--machine", "Node-1"},
-                    {"enroll", "--project", "p", "--task", "t", "--machine", "Node-1"},
-                    {"retire", "--project", "p", "--task", "t", "--machine", "Node-1"},
-                    {"join", "--project", "p", "--person", "n", "--machine", "Node-1"},
-                    {"clear", "--project", "p", "--machine", "Node-1"}
+                    {"setup", "--project", "p", "--login", "node-1"},
+                    {"enroll", "--project", "p", "--task", "t", "--login", "node-1"},
+                    {"retire", "--project", "p", "--task", "t", "--login", "node-1"},
+                    {"join", "--project", "p", "--person", "n", "--login", "node-1"},
+                    {"clear", "--project", "p", "--login", "node-1"}
                 }) {
             final ByteArrayOutputStream err = new ByteArrayOutputStream();
             final int exit =
@@ -134,12 +132,12 @@ class DescribeTest {
         for (final String bad : new String[] {"", "Has Spaces", "-dash", "a:b", "a@b", "\u212A"}) {
             final int exit =
                     Main.run(
-                            new String[] {"setup", "--project", "p", "--machine", bad},
+                            new String[] {"setup", "--project", "p", "--login", bad},
                             Map.of(),
                             new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)),
                             new PrintStream(OutputStream.nullOutputStream()),
                             new PrintStream(OutputStream.nullOutputStream()));
-            assertThat(exit).as(bad).isEqualTo(Exit.USAGE);
+            assertThat(exit).as(bad).isEqualTo(Exit.CONFIG);
         }
     }
 

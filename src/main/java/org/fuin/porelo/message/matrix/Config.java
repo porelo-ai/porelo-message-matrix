@@ -27,8 +27,8 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
      */
     static final String MACHINE_SECRET = "PORELO_MATRIX_MACHINE_SECRET";
 
-    /** The machine's name on a central homeserver, kept by setup for the verbs that follow. */
-    static final String MACHINE = "PORELO_MATRIX_MACHINE";
+    /** The person's login on a central homeserver, kept by setup for the verbs that follow. */
+    static final String LOGIN = "PORELO_MATRIX_LOGIN";
 
     /** A homeserver's registration token, for one that is not the account's own. */
     static final String REGISTRATION_TOKEN = "PORELO_MATRIX_REGISTRATION_TOKEN";
