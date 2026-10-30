@@ -10,8 +10,6 @@ sequence.
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
-| <a id="mx54"></a>[MX54](MX54-The-Homeserver-Serves-A-Certificate-Made-Elsewhere.md) | M | - | A published homeserver serves a server certificate and key the host's administrator made elsewhere, signed by a CA whose key never reaches the machine, and never makes or renews one of its own beside them |
-| <a id="mx44"></a>[MX44](MX44-The-Hosts-Homeserver-Gives-Each-Person-A-Token.md) | M | - | A prepared host's shared homeserver gives each person a registration token of their own and takes it away (`machine-token issue`, `revoke`, `expel`), with no project or room |
 | <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | - | On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 
 ## Implementing
@@ -56,6 +54,8 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx44"></a>[MX44](README.md#mx44) | The Host's Homeserver Gives Each Person A Token | `machine-token issue`, `revoke` and `expel` give each person's machine on a prepared host's shared homeserver a registration token of its own and take it and every account of that machine away, with no project or room |
+| <a id="mx54"></a>[MX54](README.md#mx54) | The Homeserver Serves A Certificate Made Elsewhere | A published homeserver serves a server certificate and key the host's administrator made elsewhere, signed by a CA whose key never reaches the machine, and makes no certificate of its own beside them |
 | <a id="mx41"></a>[MX41](README.md#mx41) | The Agents Talk In The Project's Room | `room read`, `post` and `wait` let an agent on this machine read, post to and wait on the project's room as a person, with its login read from porelo's vault over a pipe, and `join --token` makes such an account |
 | <a id="mx42"></a>[MX42](README.md#mx42) | The Host's Tasks Reach The Room Over The VPN | `publish` serves the account's own homeserver over `https` on this machine's VPN address with a certificate of its own, and `admit`/`dismiss` give another machine a registration token of its own and a place in the project's room |
 | <a id="mx46"></a>[MX46](README.md#mx46) | A Machine's Token Holds At Once | The registration tokens moved into a `tokens` directory the homeserver's unit mounts, so a machine admitted or dismissed while it runs is taken or refused at once; an earlier token file moves there on the next start |
