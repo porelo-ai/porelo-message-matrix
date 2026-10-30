@@ -2,6 +2,7 @@ package org.fuin.porelo.message.matrix;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
@@ -92,6 +93,9 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
             throw new Failure(Exit.CONFIG, HOMESERVER + " is not a URL: " + ex.getMessage(), ex);
         }
         final String scheme = uri.getScheme();
+        if ("unix".equals(scheme)) {
+            return socket(uri, HOMESERVER);
+        }
         if (!("http".equals(scheme) || "https".equals(scheme)) || uri.getHost() == null) {
             throw new Failure(
                     Exit.CONFIG,
@@ -109,6 +113,26 @@ record Config(URI homeserver, String accessToken, @Nullable Path caFile, boolean
                             + homeserver
                             + " is plain http on another host, where the token"
                             + " would travel readable; use https, or http only on this machine's loopback");
+        }
+        return uri;
+    }
+
+    /**
+     * A socket path has no URL authority, query, or fragment and never depends on the caller's
+     * directory.
+     */
+    static URI socket(final URI uri, final String setting) throws Failure {
+        final String path = uri.getPath();
+        if (path == null
+                || !path.startsWith("/")
+                || uri.getRawAuthority() != null
+                || uri.getRawQuery() != null
+                || uri.getRawFragment() != null
+                || path.indexOf('\0') >= 0
+                // The kernel keeps a socket's address in 108 bytes, its last one a zero.
+                || path.getBytes(StandardCharsets.UTF_8).length > 107) {
+            throw new Failure(
+                    Exit.CONFIG, setting + " must name a Unix socket as unix:<absolute path>");
         }
         return uri;
     }

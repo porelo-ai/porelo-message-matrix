@@ -55,7 +55,8 @@ class SettingsTest {
             strings = {
                 "http://matrix.example.org",
                 "http://192.168.1.10:8008",
-                "http://localhost.example.org"
+                "http://localhost.example.org",
+                "http://foo.localhost.example.org"
             })
     @DisplayName(
             "Plain http to another host is refused with 78: tokens and passwords would travel readable")
@@ -76,6 +77,8 @@ class SettingsTest {
             strings = {
                 "http://127.0.0.1:8008",
                 "http://localhost:8008",
+                "http://a.localhost:8008",
+                "unix:/run/matrix.sock",
                 "http://[::1]:8008",
                 "https://matrix.example.org"
             })
@@ -91,6 +94,29 @@ class SettingsTest {
                                 .homeserver())
                 .as(url)
                 .hasToString(url);
+    }
+
+    /**
+     * Harm guarded: a socket resolved against a caller's working directory reaches the wrong
+     * server.
+     */
+    @Test
+    void relativeSocketIsRefused() {
+        assertThatThrownBy(
+                        () ->
+                                settings(
+                                        "{\"homeserver\":\"unix:relative/path\",\"room\":\"#p:example.org\"}"))
+                .as("settings require an absolute socket path")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("configuration failure")
+                                    .isEqualTo(Exit.CONFIG);
+                            assertThat(failure)
+                                    .as("the path constraint is explained")
+                                    .hasMessageContaining("absolute");
+                        });
     }
 
     /**

@@ -32,6 +32,46 @@ class MatrixClientOwnerTest {
     }
 
     @Test
+    void localhostSuffixConnectsToIpv4WithoutDns() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, "{\"ok\":true}");
+            final URI url = URI.create(homeserver.url().replace("127.0.0.1", "forward.localhost"));
+            final MatrixClient client = new MatrixClient(new Config(url, "syt_token", null, true));
+
+            assertThat(client.get("/_matrix/test").path("ok").asBoolean())
+                    .as("the IPv4 loopback listener answers a localhost subdomain without DNS")
+                    .isTrue();
+            assertThat(homeserver.requests())
+                    .as("one request reached the loopback server")
+                    .hasSize(1);
+        }
+    }
+
+    @Test
+    void localhostSuffixRefusesAnotherOwnersPortBeforeSending() throws Exception {
+        final long own = Listener.ownUid(Path.of("/proc/self/status"));
+        final Path tcp = dir.resolve("tcp");
+        Files.write(tcp, List.of(HEAD, listening(8008, own + 1)), StandardCharsets.US_ASCII);
+        final MatrixClient client =
+                new MatrixClient(
+                        new Config(URI.create("http://a.localhost:8008"), "syt_token", null, true),
+                        List.of(tcp));
+
+        assertThatThrownBy(() -> client.get("/_matrix/client/v3/account/whoami"))
+                .as("another account must receive no token on a localhost subdomain")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("the listener's owner is refused before connecting")
+                                    .isEqualTo(Exit.CONFIG);
+                            assertThat(failure)
+                                    .as("the token was withheld")
+                                    .hasMessageContaining("no token goes to it");
+                        });
+    }
+
+    @Test
     @DisplayName(
             "Every request asks again whose the port is: another uid there by then gets nothing")
     void everyRequestAsksAgain() throws Exception {

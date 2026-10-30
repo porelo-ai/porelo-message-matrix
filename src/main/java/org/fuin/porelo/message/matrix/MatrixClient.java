@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import org.jspecify.annotations.Nullable;
@@ -36,7 +37,7 @@ final class MatrixClient {
 
     private final Config config;
 
-    private final HttpClient http;
+    private final Wire wire;
 
     private final List<Path> tables;
 
@@ -48,6 +49,10 @@ final class MatrixClient {
     MatrixClient(final Config config, final List<Path> tables) throws Failure {
         this.config = config;
         this.tables = tables;
+        if ("unix".equals(config.homeserver().getScheme())) {
+            this.wire = new SocketWire(Path.of(config.homeserver().getPath()), CONNECT_TIMEOUT);
+            return;
+        }
         // A redirect would carry the token to wherever the homeserver points, so none is followed.
         final HttpClient.Builder builder =
                 HttpClient.newBuilder()
@@ -57,7 +62,13 @@ final class MatrixClient {
         if (tls != null) {
             builder.sslContext(tls);
         }
-        this.http = builder.build();
+        final HttpClient http = builder.build();
+        this.wire =
+                request -> {
+                    final HttpResponse<byte[]> response =
+                            http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                    return new Wire.Reply(response.statusCode(), response.body());
+                };
     }
 
     /**
@@ -101,7 +112,7 @@ final class MatrixClient {
             builder.header("Content-Type", "application/json");
         }
         final HttpRequest request = builder.build();
-        final HttpResponse<byte[]> response = send(request);
+        final Wire.Reply response = send(request);
         JsonNode node;
         try {
             node = JSON.readTree(response.body());
@@ -157,8 +168,7 @@ final class MatrixClient {
 
     private HttpRequest.Builder request(final String path) {
         final HttpRequest.Builder builder =
-                HttpRequest.newBuilder(URI.create(config.homeserver() + path))
-                        .timeout(REQUEST_TIMEOUT);
+                HttpRequest.newBuilder(URI.create(endpoint() + path)).timeout(REQUEST_TIMEOUT);
         // Registration and login are made by nobody yet; every other call as the account.
         if (!config.accessToken().isEmpty()) {
             builder.header("Authorization", "Bearer " + config.accessToken());
@@ -166,12 +176,30 @@ final class MatrixClient {
         return builder;
     }
 
-    private HttpResponse<byte[]> send(final HttpRequest request) throws Failure {
+    private URI endpoint() {
+        final URI url = config.homeserver();
+        if ("unix".equals(url.getScheme())) {
+            return URI.create("http://localhost");
+        }
+        final String host = url.getHost();
+        if (host != null && host.toLowerCase(Locale.ROOT).endsWith(".localhost")) {
+            return URI.create(
+                    url.getScheme()
+                            + "://127.0.0.1"
+                            + (url.getPort() < 0 ? "" : ":" + url.getPort())
+                            + url.getRawPath());
+        }
+        return url;
+    }
+
+    private Wire.Reply send(final HttpRequest request) throws Failure {
         // Asked at every request: a homeserver that restarted since the last one may have left its
         // port to another account.
-        Listener.ensureOwn(config.homeserver(), tables);
+        if (!"unix".equals(config.homeserver().getScheme())) {
+            Listener.ensureOwn(config.homeserver(), tables);
+        }
         try {
-            return http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            return wire.send(request);
         } catch (final SSLHandshakeException ex) {
             // Not a moment's trouble: a certificate this machine does not trust stays untrusted,
             // and whoever
@@ -193,7 +221,7 @@ final class MatrixClient {
 
     private JsonNode call(final HttpRequest.Builder builder) throws Failure {
         final HttpRequest request = builder.build();
-        final HttpResponse<byte[]> response = send(request);
+        final Wire.Reply response = send(request);
         final int status = response.statusCode();
         if (status >= 200 && status < 300) {
             return parse(response.body(), request);
@@ -262,7 +290,7 @@ final class MatrixClient {
             }
             final String message = t.getMessage();
             if (message != null
-                    && message.toLowerCase(java.util.Locale.ROOT).contains("connection refused")) {
+                    && message.toLowerCase(Locale.ROOT).contains("connection refused")) {
                 return "connection refused";
             }
             if (message != null && !message.isBlank()) {

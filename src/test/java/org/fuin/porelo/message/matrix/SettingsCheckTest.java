@@ -78,6 +78,19 @@ class SettingsCheckTest {
                 .noneMatch(text -> text.contains("only this machine's loopback"));
     }
 
+    /** Harm guarded: an offline project accepts a central homeserver through its socket. */
+    @Test
+    void offlineRefusesASocket() throws IOException {
+        final String settings =
+                "{\"homeserver\":\"unix:/run/matrix.sock\",\"room\":\"#p:example.org\"}";
+        assertThat(texts(check(settings).path("refused")))
+                .as("a central project's socket is valid")
+                .isEmpty();
+        assertThat(texts(offline(settings).path("refused")))
+                .as("a socket is not an offline project's own loopback homeserver")
+                .anyMatch(text -> text.contains("only this machine's loopback"));
+    }
+
     private static List<String> texts(final JsonNode array) {
         return array.valueStream().map(JsonNode::asText).toList();
     }

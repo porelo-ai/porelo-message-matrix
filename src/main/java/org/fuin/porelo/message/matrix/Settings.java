@@ -153,6 +153,9 @@ record Settings(
         try {
             final URI uri =
                     new URI(text.endsWith("/") ? text.substring(0, text.length() - 1) : text);
+            if ("unix".equals(uri.getScheme())) {
+                return Config.socket(uri, "the project's homeserver");
+            }
             if (!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))
                     || uri.getHost() == null) {
                 throw new Failure(

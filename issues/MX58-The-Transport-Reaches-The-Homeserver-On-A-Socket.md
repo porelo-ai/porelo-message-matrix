@@ -1,6 +1,6 @@
 # MX58 — The Transport Reaches The Homeserver On A Socket
 
-**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review since 2026-10-30.
 **Size:** S - `MatrixClient`, `Config`, `Settings` and `Lifecycle.loopback`, with unit tests and the central integration
 tests run once over a socket; no verb changes.
 
@@ -16,9 +16,8 @@ The contract, in words:
   the verbs that read it, names the socket: a central homeserver like any other, never an offline project's. The server's name is what the homeserver answers for its accounts, as today. The transport speaks HTTP/1.1
   over the socket for every request it makes over TCP today; `setup` answers the socket's path where it answers the
   address it reached.
-- **A `*.localhost` name** (`http://<host>.localhost:<port>`) is loopback: the transport connects to the loopback
-  address the forward listens on without asking DNS, sends the name as the request's host, and checks the listener's
-  owner as it does for `127.0.0.1` today.
+- **A `*.localhost` name** (`http://<host>.localhost:<port>`) is loopback: the transport connects to `127.0.0.1` on
+  the same port without asking DNS, and checks the listener's owner as it does for `127.0.0.1` today.
 - `settings` accepts both forms and refuses a relative socket path.
 
 ## Plan

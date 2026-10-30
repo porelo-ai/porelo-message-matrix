@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -403,8 +404,11 @@ final class Lifecycle {
         return answer;
     }
 
-    /** Host and port, as the contract says, the scheme's own port where the URL names none. */
+    /** The socket's path, or host and port with the scheme's own port where the URL names none. */
     private static String reaches(final URI url) {
+        if ("unix".equals(url.getScheme())) {
+            return url.getPath();
+        }
         return url.getHost()
                 + ":"
                 + (url.getPort() >= 0 ? url.getPort() : "https".equals(url.getScheme()) ? 443 : 80);
@@ -1964,6 +1968,7 @@ final class Lifecycle {
         final String host = url.getHost();
         return "127.0.0.1".equals(host)
                 || "localhost".equals(host)
+                || (host != null && host.toLowerCase(Locale.ROOT).endsWith(".localhost"))
                 || "[::1]".equals(host)
                 || "::1".equals(host);
     }

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Central homeservers accept `unix:<absolute path>` for HTTP over a Unix socket; `*.localhost` names reach loopback without DNS and retain the listener ownership check.
+
 - On a central homeserver, `setup --project P --machine M --create-room` makes the project's room
   `#porelo-<P>:<server>` as `@porelo.<M>`, invite-only, closed to guests and unlisted, or takes the room under that
   alias only if `@porelo.<M>` made it, and answers `"created_room": true`. `members --project P --machines M1,M2,…`,

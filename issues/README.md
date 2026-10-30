@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx58"></a>[MX58](MX58-The-Transport-Reaches-The-Homeserver-On-A-Socket.md) | S | - | The transport reaches a homeserver on a Unix socket (`homeserver: unix:…`) and takes a `*.localhost` name as loopback, so neither needs a VPN or a certificate |
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
@@ -16,7 +17,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx58"></a>[MX58](MX58-The-Transport-Reaches-The-Homeserver-On-A-Socket.md) | S | - | The transport reaches a homeserver on a Unix socket (`homeserver: unix:…`) and takes a `*.localhost` name as loopback, so neither needs a VPN or a certificate |
 | <a id="mx56"></a>[MX56](MX56-The-Homeserver-Knows-The-Person-At-Its-Gate.md) | L | - | On a host, every Matrix client reaches the homeserver through one Unix socket whose gate takes the caller's host login as who they are, binds every request to that login's accounts, and alone registers accounts under it; nothing else reaches the homeserver |
 | <a id="mx57"></a>[MX57](MX57-A-Persons-Accounts-Are-Named-By-Their-Login.md) | M | [MX56](README.md#mx56), [MX30](README.md#mx30) | A person's accounts are named by their login, not a machine: `@<login>` for their own client, `members --persons` keeps the room to the access file, and `expel <login>` takes every account of a purged login |
 | <a id="mx59"></a>[MX59](MX59-The-VPN-Path-Goes.md) | M | [MX56](README.md#mx56), [MX57](README.md#mx57), [MX58](README.md#mx58) | `publish`, the account's own CA and certificates, `ca_certificate`, the machine tokens and `admit`/`dismiss` go, with their tests and docs |

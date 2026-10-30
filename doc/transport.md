@@ -32,12 +32,18 @@ The keys, on stdin or in the old way's environment:
 
 | Variable | What |
 |---|---|
-| `PORELO_MATRIX_HOMESERVER` | The homeserver's URL: `https`, or `http` only on this machine's loopback (78 otherwise) |
+| `PORELO_MATRIX_HOMESERVER` | The homeserver's URL: `https`, `http` only on this machine's loopback (78 otherwise), or `unix:<absolute path>` for a Unix socket |
 | `PORELO_MATRIX_ACCESS_TOKEN` | The account the transport acts as: a task's, or for `poll` the project's relay |
 | `PORELO_MATRIX_CA_FILE` | PEM certificates trusted besides the built-in authorities |
 | `PORELO_MATRIX_TLS_VERIFY` | `on` (default) or `off`, for development only; `off` warns on stderr at every start |
 | `XDG_STATE_HOME`, else `HOME` | From the environment, in either way: where `poll` keeps its position: `…/porelo/transports/matrix/`; people's room positions are under `room/` |
 
+- **Unix sockets speak HTTP/1.1**, with `Host: localhost`; socket file permissions guard access, and
+  TCP listener ownership is not checked. An unreachable socket is temporary (75), as an unreachable TCP
+  homeserver is. `setup` answers the socket's path in `reaches`.
+- **Names ending in `.localhost` are loopback**, as are `localhost`, `127.0.0.1`, and `::1`.
+  A `*.localhost` URL connects to `127.0.0.1` on the same port without DNS; plain HTTP checks that
+  listener's owner before sending a token. A name such as `foo.localhost.example.org` is remote.
 - **No redirect is followed** (76), so the token reaches no other server.
 - **A plain-`http` loopback port another uid listens on is 78**, before any request, so no other account of the
   machine receives a token while the account's own homeserver is down.
@@ -66,7 +72,8 @@ takes the project's settings (`mail.transports.matrix`) and the secrets Porelo k
 | `clear [--machine M]` | The account's own homeserver once no project uses it: stops and disables it, removes its container and database, its port and registration token, and every poll position. The machine's name is taken and changes nothing. Reads no settings | the same |
 | `settings [--loopback-only]` | Checks the settings as a draft, with no network and no environment; with `--loopback-only`, for an offline project, a `homeserver` that is not loopback is one of the findings | `{"refused": […], "warnings": […]}` |
 
-- **Settings:** `homeserver` (a central homeserver; requires `room`), `room` (an alias `#local:server` or a room id,
+- **Settings:** `homeserver` (a central homeserver; requires `room`; `https`, loopback `http`, or
+  `unix:<absolute path>`; a relative socket path is refused with 78), `room` (an alias `#local:server` or a room id,
   required with `homeserver` and refused without it), `ca_file` (absolute), `ca_certificate` (a CA's certificate as
   PEM text, as `admit` answers it; the transport keeps it as a file of its own, and names that file as
   `PORELO_MATRIX_CA_FILE` in the `secrets` it prints; refused with `ca_file` or with `tls_verify` off), `tls_verify` (`on`/`off`),
@@ -77,8 +84,8 @@ takes the project's settings (`mail.transports.matrix`) and the secrets Porelo k
   is harmless, and so is `clear`: it says what it removed and what it could not, with why, exits 0,
   and the second time finds nothing. Porelo removes its own entries for the transport beside it.
   A project cleared can be set up again.
-- **`--loopback-only`**, for an offline project: a `homeserver` that is not loopback is refused (78)
-  before any request.
+- **`--loopback-only`**, for an offline project: a `homeserver` that is not loopback, including a
+  `unix:` socket, is refused (78) before any request.
 - **The account's own homeserver by its published name:** a `homeserver` of `https://<name>:<port>` whose name is the
   one `publish --name` gave this account's homeserver is this machine's own, so the signed settings can name one
   homeserver for every machine. This machine then keeps its own homeserver's path, its administrator and its room, as
