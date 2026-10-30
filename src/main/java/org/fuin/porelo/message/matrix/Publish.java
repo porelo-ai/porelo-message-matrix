@@ -415,7 +415,16 @@ final class Publish {
                     "cannot make the homeserver's TLS directory in " + dir + ": " + ex.getMessage(),
                     ex);
         }
-        write(dir.resolve(TLS_ENV), settings);
+        try {
+            write(
+                    dir.resolve(TLS_ENV),
+                    settings
+                            + (GateFiles.enabled(env)
+                                    ? "TUWUNEL_UNIX_SOCKET_PATH=/gate/homeserver.sock\nTUWUNEL_UNIX_SOCKET_PERMS=600\n"
+                                    : ""));
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read the homeserver's gate mode", ex);
+        }
         return notice;
     }
 }

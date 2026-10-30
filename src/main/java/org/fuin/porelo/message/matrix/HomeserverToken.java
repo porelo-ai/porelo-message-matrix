@@ -46,6 +46,7 @@ final class HomeserverToken {
         }
         backups(env);
         token(env);
+        gateDirectory(env);
         final @Nullable String notice = Publish.prepare(env);
         if (notice != null) {
             err.println(Main.NAME + ": " + notice);
@@ -98,6 +99,18 @@ final class HomeserverToken {
                     Exit.CONFIG,
                     "cannot make the registration token " + file + ": " + ex.getMessage(),
                     ex);
+        }
+    }
+
+    /** The unit mounts this directory even when its homeserver serves only TCP. */
+    private static void gateDirectory(final Map<String, String> env) throws Failure {
+        try {
+            if (env.containsKey("XDG_RUNTIME_DIR") || GateFiles.enabled(env)) {
+                GateFiles.privateDirectory(GateFiles.runtime(env));
+            }
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG, "cannot prepare the homeserver's private socket directory", ex);
         }
     }
 

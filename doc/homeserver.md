@@ -204,3 +204,56 @@ A project whose settings named `homeserver` without `room` is refused (78) by `s
 `room` is set. Once `room` is set and a person invites `@porelo.<login>` into it, Porelo makes the login's new
 accounts (`@porelo.<login>`, `@porelo-relay-<project>.<login>`, `@<task>.<login>`); the old accounts stay
 on the homeserver until a person removes them.
+
+## The host's homeserver behind its gate
+
+A host shared by several people runs the homeserver as an account of its own. The host installs
+`/run/porelo-matrix/client.sock`, owned by the homeserver account and group `porelo-people`, mode 0660,
+in a directory of the same owner and group, mode 0750. The host keeps that group equal to the admitted,
+unlocked logins and leaves the homeserver account out. A system socket unit with `Accept=yes` starts
+`porelo-message-transport-matrix gate` as the homeserver account for each connection, with
+`StandardInput=socket`. The gate requires that inherited connection to be a connected Unix socket;
+starting it on ordinary stdin exits 78.
+
+Run `porelo-message-transport-matrix gate --prepare` as the homeserver account before the homeserver's
+first start. It preserves other settings in `$XDG_CONFIG_HOME/porelo/matrix/homeserver.conf`, sets
+`PORELO_MATRIX_GATE=1` and `PORELO_MATRIX_INNER_PORT=8009`, and prepares private directories. Its stdout
+is `{"gate":true,"administrator":false}` until the homeserver answers. Start the user unit, then run
+`gate --prepare` again before admitting clients. It registers the first account, `@porelo`, with the
+local registration token and keeps its administrator token in `gate/admin-token`, mode 0600. Its
+answer then has `"administrator":true`; repeating preparation retains the account and token. If
+`@porelo` already exists without an accepted token, preparation exits 78: restore the original token
+to `gate/admin-token` with mode 0600 and repeat preparation. It never resets that account's password.
+The system service needs this account's `HOME`, `XDG_CONFIG_HOME` and `XDG_RUNTIME_DIR`, pointing to
+the same directories as its user homeserver unit.
+
+Before every start, `homeserver-token` creates `$XDG_RUNTIME_DIR/porelo-matrix-gate` with mode 0700.
+The unit mounts it at `/gate`; in gate mode `tls.env` sets
+`TUWUNEL_UNIX_SOCKET_PATH=/gate/homeserver.sock` and `TUWUNEL_UNIX_SOCKET_PERMS=600`. The container's
+TCP listener stays on 8008, while the host port forwards to unused container port 8009. No host TCP
+port reaches that homeserver. The gate verifies the private directory and socket's ownership before
+sending credentials to it. Its own homeserver calls use the transport's Unix-socket HTTP client.
+
+A person forwards a local port to the host's client socket over SSH and points their Matrix client
+at that port. SSH connects as that person's host login. The gate reads that user from `SO_PEERCRED`
+and reads `/etc/group` at every request, including requests on an existing connection. A login starts
+with a lower-case letter, contains only lower-case letters, digits and hyphens, has at most 32
+characters, and is neither `porelo` nor a name starting `porelo-`. A login recorded under
+`expelled-logins/<login>` beside `homeserver.conf` is refused too. A lock holds at the next request;
+a sync already held open completes at its own timeout.
+
+Clients see SSO named “Your login on this host”, token login, and password login. SSO creates the
+person's `@<login>` account if missing and redirects to the client with a gate token valid for two
+minutes, usable once by that host login alone. Only its SHA-256, login and expiry are kept, under
+`gate/login-tokens/` with mode 0600. Registration offers the `m.login.dummy` authentication stage;
+the gate creates an available account and signs it in with the supplied password. The caller may
+register or use only `@<login>` or `@<name>.<login>`, where `<name>` starts with a lower-case letter
+or digit and then contains lower-case letters, digits, underscores or hyphens. `@porelo` belongs to
+no caller. Access tokens, in the header or query, are bound with `whoami`; each connection caches at
+most 64 identities by token hash.
+
+Only the client and media APIs pass. The gate answers discovery and sign-in flows, and hides admin,
+federation and key APIs with 404. Reserved room aliases `porelo-<project>` require the token of
+`@porelo.<login>` and that login on a line of `/etc/porelo-host/matrix/<project>.admins`; a missing
+or empty file grants nothing. Refusal logs contain only the login, method, path without its query,
+and status. The administrator token is read only for gate operations and is never returned to clients.

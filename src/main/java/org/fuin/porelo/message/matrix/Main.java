@@ -111,6 +111,7 @@ public final class Main {
                 case "rename" -> Rename.run(rest, Config.from(env));
                 case "room" -> Room.start(rest, env, out, err);
                 case "homeserver-token" -> HomeserverToken.run(rest, env, err);
+                case "gate" -> Gate.run(rest, env, out, err);
                 case "publish" -> Publish.run(rest, env, out, err, new Publish.Systemd());
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup",

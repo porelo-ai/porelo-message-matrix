@@ -4,6 +4,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 
 | Subject | What holds |
 |---|---|
+| [Identity by the host's login, registration by the gate](#identity-by-the-hosts-login-registration-by-the-gate) | A Unix-socket gate binds every client request to an admitted host login; only the gate provisions accounts. |
 | [The homeserver is Tuwunel](#the-homeserver-is-tuwunel) | Built and tested against Tuwunel, pinned by digest; Conduit is the measured alternative. |
 | [A message is a text event: a line for a person, the message and its signature beside it](#a-message-is-a-text-event-a-line-for-a-person-the-message-and-its-signature-beside-it) | One `m.text` event: the line for a person as its body, the message and its signature in fields of their own. |
 | [A person's words reach the tasks; whom they are meant for is what Matrix states](#a-persons-words-reach-the-tasks-whom-they-are-meant-for-is-what-matrix-states) | A person's text in the room and in a direct chat reaches the tasks; mentions and replies say whom it is meant for. |
@@ -392,3 +393,26 @@ the token is removed, which happens when the machine is dropped. A rented host h
 **What would change the answer:** Tuwunel serving TLS on one listener and plain `http` on another, which would drop
 `dual_protocol`; a registration token whose uses can be bounded, which would narrow the second risk; a machine
 admitted for longer than a rental.
+
+## Identity by the host's login, registration by the gate
+
+**Decided:** on a shared host, every Matrix client reaches a Unix socket whose gate binds requests
+to the host login obtained from `SO_PEERCRED`. The homeserver's socket and administrator token are
+private to its own account. The gate registers only that login's available names, creates the
+administrator before client registration, binds access tokens with `whoami`, and permits reserved
+project aliases only for a project admin named by the host. Password sign-in remains available;
+SSO trades the host login for a short-lived gate token and an administrator-issued session.
+
+**Why:** a shared TCP loopback port cannot identify the caller and can be taken by another account
+while the homeserver is down. A private homeserver socket and a separately admitted client socket
+bind both ends to the accounts that own them. The gate reads the admitted group for every request
+so locking a login also locks an existing client connection.
+
+**Accepted risks:** another user of a person's own machine can use that person's SSH forward. The
+forward is authenticated as the host login that established it; separate machine sessions would
+need a further authentication factor to change this exposure. A sync already held open completes
+at its own timeout after a group change, because the admission check happens at request time;
+immediate cancellation would require tracking and interrupting outstanding syncs. A gate login
+token lives up to two minutes in a file only the homeserver account reads, as a hash with its login
+and expiry, and is consumed under a shared lock. Processes of that trusted account can read or
+alter these records; a separate credential service would be needed to narrow that trust boundary.

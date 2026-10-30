@@ -1,10 +1,11 @@
-# The local homeserver of one account that runs Porelo, on loopback. Shipped disabled, like porelod: the
+# The homeserver of one account on loopback, or the host's behind its private gate. Shipped disabled: the
 # account enables it with `systemctl --user enable --now porelo-matrix-homeserver`. Its port and server
 # name come from porelo/matrix/homeserver.conf under $XDG_CONFIG_HOME (%E, ~/.config by default) when
 # set there, where the transport writes them. The image is filled in at build time from the FROM line of
 # homeserver/Dockerfile, the one place it is pinned. Published for another machine (PORELO_MATRIX_PUBLISH),
 # it also serves TLS on the same port, with the settings homeserver-token writes into tls.env before each
-# start; porelo-matrix-homeserver-vpn.socket forwards the published address to it.
+# start; porelo-matrix-homeserver-vpn.socket forwards the published address to it. In gate mode its Unix
+# socket is private to this account; inner port 8009 has no listener, so no host TCP port reaches it.
 [Unit]
 Description=The Matrix homeserver Porelo's transport talks to, on loopback
 Wants=podman-user-wait-network-online.service
@@ -13,6 +14,7 @@ RequiresMountsFor=%t/containers
 
 [Service]
 Environment=PORELO_MATRIX_PORT=8008
+Environment=PORELO_MATRIX_INNER_PORT=8008
 Environment=PORELO_MATRIX_SERVER_NAME=localhost
 EnvironmentFile=-%E/porelo/matrix/homeserver.conf
 Environment=PODMAN_SYSTEMD_UNIT=%n
@@ -46,7 +48,8 @@ ExecStart=/usr/bin/podman run --rm -d --cidfile=%t/%N.cid --name matrix-homeserv
     -v %E/porelo/matrix/tls:/tls:ro,Z \
     -v porelo-matrix-homeserver:/data \
     -v %S/porelo/matrix/backups:/backup:Z \
-    -p 127.0.0.1:${PORELO_MATRIX_PORT}:8008 \
+    -v %t/porelo-matrix-gate:/gate:Z \
+    -p 127.0.0.1:${PORELO_MATRIX_PORT}:${PORELO_MATRIX_INNER_PORT} \
     @IMAGE@
 ExecStop=/usr/bin/podman rm -v -f -i --cidfile=%t/%N.cid
 ExecStopPost=-/usr/bin/podman rm -v -f -i --cidfile=%t/%N.cid

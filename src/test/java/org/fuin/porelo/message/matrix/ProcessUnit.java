@@ -240,8 +240,11 @@ final class ProcessUnit implements Unit, AutoCloseable {
                             line.substring(0, equals),
                             line.substring(equals + 1)
                                     .replace(
-                                            Publish.MOUNT + "/",
-                                            dir.resolve(Certificate.TLS) + "/"));
+                                            Publish.MOUNT + "/", dir.resolve(Certificate.TLS) + "/")
+                                    .replace(
+                                            "/gate/",
+                                            env.getOrDefault("XDG_RUNTIME_DIR", "")
+                                                    + "/porelo-matrix-gate/"));
                 }
             }
         } catch (final IOException ex) {

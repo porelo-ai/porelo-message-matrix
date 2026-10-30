@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A host homeserver can run behind a Unix-socket gate that admits host logins, binds their Matrix accounts, handles registration and SSO, and protects project room aliases. `gate --prepare` keeps the administrator token private and configures the container without a reachable host TCP listener.
+
 - Central homeservers accept `unix:<absolute path>` for HTTP over a Unix socket; `*.localhost` names reach loopback without DNS and retain the listener ownership check.
 - `expel <login>` deactivates a person's bare account and every account with that final login suffix,
   provisioning first, and records the login under `expelled-logins` for the host's gate. Unknown logins stay

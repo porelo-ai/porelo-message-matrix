@@ -43,11 +43,11 @@ The contract, in words:
   token's account is the caller's login's, asked of the homeserver and kept, by the token's hash, in a bounded cache;
   a sign-in or registration only for an account of the caller's login; and without a token only the few requests a
   client needs before it signs in. The homeserver's administrator is reached by no caller; the gate alone acts as it.
-- **A login** begins with a lower-case letter, holds lower-case letters, digits, `-` and `_` only, has no dot, is at
+- **A login** begins with a lower-case letter, holds lower-case letters, digits and `-` only (the rule Core, Machines and this transport agreed on 2026-10-30), has no dot, is at
   most 32 characters, and is none of the names the transport keeps for itself (`porelo` and every `porelo-…`), so no
   account of one login ends as another's. A user of the host whose name is no login is refused.
 - **Room aliases** beginning `#porelo-` are made only by the gate's own rule: `#porelo-<project>` only for
-  `@porelo.<login>` of a login the host names as that project's admin, in a file the host keeps beside the socket.
+  `@porelo.<login>` of a login the host names as that project's admin, in a file the host keeps, `/etc/porelo-host/matrix/<project>.admins`.
   Every other caller is refused, so nobody takes a project's room name before its admin.
 - **Registration.** The homeserver takes registrations only with a registration token the gate alone can read. A
   client registers as Matrix clients do: for a username of the caller's login, the gate answers the token stage
@@ -80,7 +80,7 @@ the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `us
   `GateRules` decides each: refused, answered by the gate, or passed on to `homeserver.sock` byte for byte with the
   answer copied back. A request with a token is bound by `whoami`, cached by the token's SHA-256 in a bounded map.
   `/register` is answered by the gate (admin `v2/users` with the client's password, then a login whose answer it
-  returns). `/login` shows `m.login.sso` and `m.login.token`; the SSO redirect makes `@<login>` if it is missing and
+  returns). `/login` shows `m.login.sso`, `m.login.token` and `m.login.password` (a person who registered with a password signs in with it); the SSO redirect makes `@<login>` if it is missing and
   answers a login token for it (admin `users/{id}/login`, then `login/get_token`). A password or token login passes
   only when the homeserver's answer names an account of the caller's login. Room aliases `porelo-*` pass only for a
   project's admin, read from the host's file. Expelled logins are refused.
@@ -107,11 +107,15 @@ the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `us
   registration by the gate", with its accepted risks: whoever else may use a person's own machine can use their
   forward, and the gate takes the group at the time of each request.
 
-## To be checked
+## Checked (2026-10-30)
 
-- Whether and how Tuwunel makes a login token for an account on the administrator's word, measured on Tuwunel.
-- Where the homeserver listens so only its account reaches it: a Unix socket of Tuwunel's own in a directory of mode
-  0700, or a network namespace with no port on the host; measured on Tuwunel.
-- How long a sync held open passes through the gate, and how many open connections the gate's unit allows.
-- The file naming each project's admins, its path and form, agreed with the host's agent.
-- How the gate's system service reaches the homeserver's account's files (its listener and registration token).
+- Tuwunel 1.9.4 makes a session for an account on the administrator's word (`users/{id}/login`), but its own
+  login token asks for a password stage, so the gate issues login tokens of its own: single use, two minutes.
+- The homeserver listens on a Unix socket of Tuwunel's own in `$XDG_RUNTIME_DIR/porelo-matrix-gate` (0700, the
+  socket 0600); the unit's port maps to the container's 8009, where nothing listens.
+- A sync held open passes for as long as the client asks; the gate ends a connection after each passed request and
+  closes one on which no request arrives whole in two minutes. How many connections the unit allows is the host's
+  socket unit's (Machines).
+- The admins file is `/etc/porelo-host/matrix/<project>.admins`, `root:porelo-matrix` 0640, one login per line,
+  agreed with Agent Machines.
+- The gate runs as the homeserver's account, `porelo-matrix`, and reads its files there.

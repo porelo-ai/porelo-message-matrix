@@ -1,4 +1,14 @@
 {
+    "reflection": [
+        {
+            "type": "java.io.FileDescriptor",
+            "methods": [{"name": "<init>", "parameterTypes": ["int"]}]
+        },
+        {
+            "type": "jdk.net.LinuxSocketOptions",
+            "methods": [{"name": "<init>", "parameterTypes": []}]
+        }
+    ],
     "foreign": {
         "downcalls": [
             {

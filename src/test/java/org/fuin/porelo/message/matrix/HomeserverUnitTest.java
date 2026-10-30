@@ -148,7 +148,9 @@ class HomeserverUnitTest {
         assertThat(template)
                 .contains(
                         "ExecStartPre=/usr/libexec/porelo/transports/porelo-message-transport-matrix homeserver-token")
-                .contains("-p 127.0.0.1:${PORELO_MATRIX_PORT}:8008")
+                .contains("-p 127.0.0.1:${PORELO_MATRIX_PORT}:${PORELO_MATRIX_INNER_PORT}")
+                .contains("Environment=PORELO_MATRIX_INNER_PORT=8008")
+                .contains("-v %t/porelo-matrix-gate:/gate:Z")
                 .contains("TUWUNEL_ALLOW_FEDERATION=false");
     }
 

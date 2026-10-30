@@ -16,12 +16,15 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
+import jdk.net.ExtendedSocketOptions;
+import org.jspecify.annotations.Nullable;
 
 /** A single HTTP/1.1 exchange on a Unix socket, bounded by connect and whole-request deadlines. */
 final class SocketWire implements Wire {
@@ -31,10 +34,17 @@ final class SocketWire implements Wire {
 
     private final Path path;
     private final Duration connectTimeout;
+    private final @Nullable UserPrincipal owner;
 
     SocketWire(final Path path, final Duration connectTimeout) {
+        this(path, connectTimeout, null);
+    }
+
+    SocketWire(
+            final Path path, final Duration connectTimeout, final @Nullable UserPrincipal owner) {
         this.path = path;
         this.connectTimeout = connectTimeout;
+        this.owner = owner;
     }
 
     @Override
@@ -53,6 +63,10 @@ final class SocketWire implements Wire {
                 while (!socket.finishConnect()) {
                     await(key, SelectionKey.OP_CONNECT, connectDeadline);
                 }
+            }
+            if (owner != null
+                    && !socket.getOption(ExtendedSocketOptions.SO_PEERCRED).user().equals(owner)) {
+                throw new IOException("Unix listener is not owned by the homeserver account");
             }
             write(socket, key, ByteBuffer.wrap(head(request, body.length)), deadline);
             write(socket, key, ByteBuffer.wrap(body), deadline);
@@ -198,6 +212,33 @@ final class SocketWire implements Wire {
     }
 
     static Reply read(final InputStream in, final String method) throws IOException {
+        final ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        final InputStream recording =
+                new java.io.FilterInputStream(in) {
+                    @Override
+                    public int read() throws IOException {
+                        final int value = in.read();
+                        if (value >= 0) {
+                            raw.write(value);
+                        }
+                        return value;
+                    }
+
+                    @Override
+                    public int read(final byte[] bytes, final int offset, final int length)
+                            throws IOException {
+                        final int count = in.read(bytes, offset, length);
+                        if (count > 0) {
+                            raw.write(bytes, offset, count);
+                        }
+                        return count;
+                    }
+                };
+        final Reply parsed = readParsed(recording, method);
+        return new Reply(parsed.statusCode(), parsed.body(), raw.toByteArray());
+    }
+
+    private static Reply readParsed(final InputStream in, final String method) throws IOException {
         int status;
         Map<String, String> headers;
         do {

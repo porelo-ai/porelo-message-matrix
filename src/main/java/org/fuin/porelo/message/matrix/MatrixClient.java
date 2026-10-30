@@ -16,6 +16,7 @@ import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +41,7 @@ final class MatrixClient {
     private final Wire wire;
 
     private final List<Path> tables;
+    private final @Nullable UserPrincipal socketOwner;
 
     MatrixClient(final Config config) throws Failure {
         this(config, Listener.TABLES);
@@ -47,10 +49,19 @@ final class MatrixClient {
 
     /** With the kernel's socket tables read from {@code tables}, so a test can give its own. */
     MatrixClient(final Config config, final List<Path> tables) throws Failure {
+        this(config, tables, null);
+    }
+
+    MatrixClient(
+            final Config config, final List<Path> tables, final @Nullable UserPrincipal socketOwner)
+            throws Failure {
         this.config = config;
         this.tables = tables;
+        this.socketOwner = socketOwner;
         if ("unix".equals(config.homeserver().getScheme())) {
-            this.wire = new SocketWire(Path.of(config.homeserver().getPath()), CONNECT_TIMEOUT);
+            this.wire =
+                    new SocketWire(
+                            Path.of(config.homeserver().getPath()), CONNECT_TIMEOUT, socketOwner);
             return;
         }
         // A redirect would carry the token to wherever the homeserver points, so none is followed.
@@ -92,7 +103,8 @@ final class MatrixClient {
     MatrixClient as(final String accessToken) throws Failure {
         return new MatrixClient(
                 new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()),
-                tables);
+                tables,
+                socketOwner);
     }
 
     /**
@@ -124,6 +136,22 @@ final class MatrixClient {
 
     static String segment(final String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    /** An internal gate call whose refusal must retain the homeserver's complete HTTP answer. */
+    Wire.Reply rawExchange(final String method, final String path, final @Nullable JsonNode body)
+            throws Failure {
+        final HttpRequest.Builder builder =
+                request(path)
+                        .method(
+                                method,
+                                body == null
+                                        ? HttpRequest.BodyPublishers.noBody()
+                                        : HttpRequest.BodyPublishers.ofByteArray(bytes(body)));
+        if (body != null) {
+            builder.header("Content-Type", "application/json");
+        }
+        return send(builder.build());
     }
 
     JsonNode put(final String path, final JsonNode body) throws Failure {
