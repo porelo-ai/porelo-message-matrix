@@ -31,6 +31,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx55"></a>[MX55](MX55-A-Person-Has-Their-Own-Account-In-The-Room.md) | - | - | A person of the access file has their own account in the project's room on a host's homeserver, reached over an ssh forward, invited and taken out by the room's maker, and kept in step by `members` beside the machines |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
