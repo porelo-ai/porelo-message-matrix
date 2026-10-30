@@ -33,7 +33,6 @@ sequence.
 | <a id="mx57"></a>[MX57](MX57-A-Persons-Accounts-Are-Named-By-Their-Login.md) | M | [MX56](README.md#mx56), [MX30](README.md#mx30) | A person's accounts are named by their login, not a machine: `@<login>` for their own client, `members --persons` keeps the room to the access file, and `expel <login>` takes every account of a purged login |
 | <a id="mx58"></a>[MX58](MX58-The-Transport-Reaches-The-Homeserver-On-A-Socket.md) | S | - | The transport reaches a homeserver on a Unix socket (`homeserver: unix:…`) and takes a `*.localhost` name as loopback, so neither needs a VPN or a certificate |
 | <a id="mx59"></a>[MX59](MX59-The-VPN-Path-Goes.md) | M | [MX56](README.md#mx56), [MX57](README.md#mx57), [MX58](README.md#mx58) | `publish`, the account's own CA and certificates, `ca_certificate`, the machine tokens and `admit`/`dismiss` go, with their tests and docs |
-| <a id="mx55"></a>[MX55](MX55-A-Person-Has-Their-Own-Account-In-The-Room.md) | - | - | A person of the access file has their own account in the project's room on a host's homeserver, reached over an ssh forward, invited and taken out by the room's maker, and kept in step by `members` beside the machines |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | M | - | On a central homeserver a task takes words as a person's only from the people the project names, so the operator's direct chat with a task is the operator's own channel and no other machine's account speaks in it |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
@@ -41,7 +40,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx53"></a>[MX53](MX53-A-Person-Added-Again-Keeps-Their-Name.md) | - | - | A person removed from a host and added again under the same user name gets their Matrix accounts back: `expel` locks instead of deactivating, and `issue` answers one-time passwords their Porelo takes the accounts back with |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | - | - | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name |
 
 ## Estimated
@@ -82,3 +80,10 @@ sequence.
 | <a id="mx18"></a>[MX18](README.md#mx18) | Reformatted To The Shared Style | The shared `.editorconfig` and `spotless:check` in `validate`, the Java reformatted once in `2e795eb`, which `git blame` skips through `.git-blame-ignore-revs` |
 | <a id="mx16"></a>[MX16](README.md#mx16) | The Code Read Against Its Skills | All of the code read against seven skills, its findings fixed in `433cebe`, each with its test or why it has none |
 | <a id="mx17"></a>[MX17](README.md#mx17) | The Transport Is Renamed Porelo | The transport, its packages, program, settings, directories and accounts say Porelo, installed afresh; a documents test keeps the old name out of every tracked file |
+
+## Rejected
+
+| # | Title | Why |
+|---|---|---|
+| <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Rejected (operator, 2026-10-30): replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
+| <a id="mx53"></a>[MX53](README.md#mx53) | A Person Added Again Keeps Their Name | Rejected (operator, 2026-10-30): replaced by the one-key design; a purged login is never made again on a host, so a person comes back under a new login ([MX57](README.md#mx57)) |
