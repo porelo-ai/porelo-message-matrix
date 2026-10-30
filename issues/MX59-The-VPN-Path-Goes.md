@@ -1,7 +1,6 @@
 # MX59 — The VPN Path Goes
 
-**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m);
-blocked by [MX56](README.md#mx56), [MX57](README.md#mx57) and [MX58](README.md#mx58).
+**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
 **Size:** M - deletions across `Publish`, `Certificate`, `MachineTokens`, `MachineTokenVerb`, `Lifecycle` (`admit`,
 `dismiss`, the published name), `Keep`, `HomeserverToken`, the VPN units, `pom.xml` and the packages'
 descriptions, with their tests and docs.

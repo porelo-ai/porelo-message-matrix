@@ -1,6 +1,6 @@
 # MX56 — The Homeserver Knows The Person At Its Gate
 
-**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
 **Size:** L - grew from M: a new verb with its own HTTP handling and sign-in rules, a mode of the homeserver's unit,
 a verb that prepares the host's homeserver, docs, a decision and an integration test.
 
