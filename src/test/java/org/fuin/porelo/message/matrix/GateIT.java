@@ -218,6 +218,139 @@ class GateIT {
     }
 
     /**
+     * Harm guarded: the transport's own verbs need a registration token or a TCP port that a host's
+     * homeserver behind its gate no longer offers, so a person's Porelo cannot work there at all.
+     */
+    @Test
+    @Timeout(240)
+    void thePersonsPoreloMakesItsRoomAndCarriesAMessageThroughTheGate() throws Exception {
+        final String login = System.getProperty("user.name");
+        final Map<String, String> env = new HashMap<>();
+        env.put("HOME", dir.resolve("home").toString());
+        env.put("XDG_CONFIG_HOME", dir.resolve("config").toString());
+        env.put("XDG_STATE_HOME", dir.resolve("state").toString());
+        env.put("XDG_RUNTIME_DIR", dir.resolve("runtime").toString());
+        env.put(
+                "PORELO_MATRIX_GATE_GROUP_FILE",
+                Files.writeString(dir.resolve("group"), "porelo-people:x:101:" + login + "\n")
+                        .toString());
+        final Path admins = Files.createDirectories(dir.resolve("admins"));
+        Files.writeString(admins.resolve("demo.admins"), login + "\n");
+        env.put("PORELO_MATRIX_GATE_ADMINS_DIR", admins.toString());
+        final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
+        Files.createDirectories(conf.getParent());
+        try (var port =
+                new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+            Files.writeString(conf, "PORELO_MATRIX_PORT=" + port.getLocalPort() + "\n");
+        }
+        assertThat(Transport.run(env, "gate", "--prepare").exit()).as("gate mode").isZero();
+        final Path binary = ProcessUnit.binary(Files.createDirectories(dir.resolve("bin")));
+        try (ProcessUnit homeserver = new ProcessUnit(env, binary, dir.resolve("unit"))) {
+            homeserver.start();
+            awaitHomeserver(env, homeserver);
+            assertThat(Transport.run(env, "gate", "--prepare").exit())
+                    .as("administrator registered")
+                    .isZero();
+            final Path listener = dir.resolve("client.sock");
+            final Process gate = startGate(env, listener);
+            try {
+                awaitSocket(listener, gate);
+                // The person's Porelo: its own state, and nothing of the homeserver's account.
+                final Map<String, String> porelo =
+                        Map.of("XDG_STATE_HOME", dir.resolve("porelo").toString());
+                final String settings =
+                        "{\"homeserver\":\"unix:"
+                                + listener.toUri().getRawPath()
+                                + "\",\"room\":\"#porelo-demo:localhost\"}";
+                final Transport.Result setup =
+                        Transport.runWithInput(
+                                porelo,
+                                settings,
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                login,
+                                "--create-room");
+                assertThat(setup.exit()).as("setup: %s", setup.err()).isZero();
+                final JsonNode made = MatrixClient.JSON.readTree(setup.out());
+                assertThat(made.path("secrets").path(Config.LOGIN).asText())
+                        .as("the relay's secrets mark a central account")
+                        .isEqualTo(login);
+                final Map<String, String> lifecycle = new HashMap<>(porelo);
+                made.path("account")
+                        .properties()
+                        .forEach(e -> lifecycle.put(e.getKey(), e.getValue().asText()));
+                made.path("secrets")
+                        .properties()
+                        .forEach(e -> lifecycle.put(e.getKey(), e.getValue().asText()));
+                final Transport.Result enroll =
+                        Transport.runWithInput(
+                                lifecycle,
+                                settings,
+                                "enroll",
+                                "--project",
+                                "demo",
+                                "--task",
+                                "worker",
+                                "--login",
+                                login);
+                assertThat(enroll.exit()).as("enroll: %s", enroll.err()).isZero();
+                final JsonNode enrolled = MatrixClient.JSON.readTree(enroll.out());
+                assertThat(enrolled.path("address").asText())
+                        .as("the task's account under the person's login")
+                        .isEqualTo("@worker." + login + ":localhost");
+                assertThat(enrolled.path("secrets").path(Config.LOGIN).asText())
+                        .as("the task's secrets mark a central account")
+                        .isEqualTo(login);
+                final Map<String, String> task = new HashMap<>();
+                enrolled.path("secrets")
+                        .properties()
+                        .forEach(e -> task.put(e.getKey(), e.getValue().asText()));
+                final Path message = Files.writeString(dir.resolve("m.json"), "{\"to\":\"relay\"}");
+                final Path sig = Files.write(dir.resolve("m.json.sig"), new byte[] {1, 2, 3});
+                final Transport.Result sent =
+                        Transport.run(
+                                task,
+                                "send",
+                                message.toString(),
+                                sig.toString(),
+                                "--to",
+                                made.path("conversation").asText());
+                assertThat(sent.exit()).as("send: %s", sent.err()).isZero();
+                final Map<String, String> relay = new HashMap<>(porelo);
+                made.path("secrets")
+                        .properties()
+                        .forEach(e -> relay.put(e.getKey(), e.getValue().asText()));
+                final Path inbound = Files.createDirectories(dir.resolve("in"));
+                final Transport.Result polled =
+                        Transport.run(relay, "poll", "--into", inbound.toString());
+                assertThat(polled.exit()).as("poll: %s", polled.err()).isZero();
+                try (var files = Files.list(inbound)) {
+                    assertThat(
+                                    files.filter(f -> f.toString().endsWith(".json"))
+                                            .map(
+                                                    f -> {
+                                                        try {
+                                                            return Files.readString(f);
+                                                        } catch (final IOException ex) {
+                                                            throw new IllegalStateException(ex);
+                                                        }
+                                                    })
+                                            .toList())
+                            .as("the task's message reaches the relay through the gate")
+                            .containsExactly("{\"to\":\"relay\"}");
+                }
+            } finally {
+                gate.destroy();
+                if (!gate.waitFor(5, TimeUnit.SECONDS)) {
+                    gate.destroyForcibly().waitFor();
+                }
+            }
+        }
+    }
+
+    /**
      * Harm guarded: concurrent registration uses the admin PUT as a reset of an existing password.
      */
     private static void concurrentRegistrationKeepsTheWinningPassword(
