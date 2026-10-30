@@ -127,6 +127,12 @@ final class Person {
         }
         final long ts = event.path("origin_server_ts").asLong(0);
         final ObjectNode file = MatrixClient.JSON.createObjectNode().put("sender", sender);
+        // Only a login's own account names a person Porelo can find in the access file; any other
+        // account names nobody, and the field is left out rather than guessed.
+        final String server = central != null ? central : AdminRoom.server(self);
+        if (Login.person(sender, server)) {
+            file.put("account", sender.substring(1, sender.length() - server.length() - 1));
+        }
         to.forEach(file.putArray("to")::add);
         file.put("body", content.path("body").asText());
         if (directTo != null) {

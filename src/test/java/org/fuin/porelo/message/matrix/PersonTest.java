@@ -70,12 +70,36 @@ class PersonTest {
         assertThat(written.has("helpers")).as("an unaddressed line is for the tasks").isFalse();
     }
 
+    /** Harm guarded: Porelo cannot tell which developer of the access file wrote a line. */
+    @Test
+    void aLoginsOwnAccountNamesItsLogin() throws Exception {
+        final JsonNode written = deliverFrom("@ann:x");
+
+        assertThat(written.path("account").asText())
+                .as("the login the person's own account is named after")
+                .isEqualTo("ann");
+    }
+
+    /** Harm guarded: a task's, a helper's or another server's account passes as a developer. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {"@t.ann:x", "@porelo.ann:x", "@porelo:x", "@porelo-relay-demo:x", "@ann:y"})
+    void anyOtherAccountNamesNoLogin(final String sender) throws Exception {
+        final JsonNode written = deliverFrom(sender);
+
+        assertThat(written.has("account")).as("absent means no known person").isFalse();
+    }
+
     private JsonNode deliverMentions(final String... mentions) throws Exception {
+        return deliverFrom("@ann:x", mentions);
+    }
+
+    private JsonNode deliverFrom(final String sender, final String... mentions) throws Exception {
         final var event =
                 MatrixClient.JSON
                         .createObjectNode()
                         .put("event_id", "$helper")
-                        .put("sender", "@ann:x")
+                        .put("sender", sender)
                         .put("origin_server_ts", 1790000000000L);
         final var content =
                 event.putObject("content").put("msgtype", "m.text").put("body", "hello");
