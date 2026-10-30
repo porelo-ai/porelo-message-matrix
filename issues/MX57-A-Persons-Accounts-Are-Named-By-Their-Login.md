@@ -40,6 +40,9 @@ The contract, in words:
   known is left as it is.
 - **A lock** deactivates nothing: the host drops the login from the gate's group, which refuses its next request.
   The project admins take the person out of the access file if they are to leave the room; then `members` does.
+- **A lock for one project** is the access file's: Porelo leaves a person the access file locks for that project out of
+  `--persons`, so `members` takes their accounts out of that project's rooms and leaves their other projects' rooms
+  and their accounts as they are; let back in, the next `members` invites them again.
 
 ## Acceptance
 
