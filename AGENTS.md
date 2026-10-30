@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `bb8fd36857a3b8c4` · changed 2026-10-30T07:31Z
+> **BEGIN Shared Area** · sha256 `f6e677e5a98f4d56` · changed 2026-10-30T13:48Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -201,6 +201,8 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **After a failed run, rerun the failed step and the tests of the area the fix changes; the unit
   suite still runs whole.** The handover names the final commit, what was rerun and why that covers
   the fix, and keeps checks passed earlier apart from those rerun on it.
+- **A small change is tried on a local VM only as far as the change needs, not by a full run of
+  the whole flow.** The complete run is the workflow's on GitHub afterwards.
 - **A workflow step replayed locally runs on a clean build (`clean`, or a fresh clone), as the
   runner's checkout does.** What an earlier build left in `target/` is read too and fails, or passes,
   what the runner would not.
@@ -280,6 +282,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Before a walk starts, have the responsible repositories prepare the operator’s test environment
   with the newest intended snapshots and verify installed versions and adapter commits.** Keep an
   ongoing walk stable.
+- **A bug fix made during a running walk gets only its short unit tests, not the full suite, so the
+  walk is held up as little as possible.** The walk’s live rerun is the fix’s test; the reading by
+  another model follows after the walk.
 - **Budget each lease using its provider’s billing units at the current price.** Include every new
   lease required for a rerun.
 - **An assigned isolated test environment’s test-only vault may be unlocked, reset, or recreated
@@ -463,7 +468,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   with `+`: estimates summed, the earliest start and the stack's readiness, VM time and tokens counted
   once.
 
-> **END Shared Area** · sha256 `bb8fd36857a3b8c4`
+> **END Shared Area** · sha256 `f6e677e5a98f4d56`
 
 ## What this repository is
 
