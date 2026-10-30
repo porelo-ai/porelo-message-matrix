@@ -51,11 +51,17 @@ The contract, in words:
   client registers as Matrix clients do: for a username of the caller's login, the gate answers the token stage
   itself, so the password goes nowhere but the homeserver's password store; a taken name, a name of another login,
   an expelled login's name and anything that is no localpart are refused.
+- **A person's own client signs in by their host login alone**, with no password: for a sign-in to `@<login>`, the gate
+  has the homeserver make a login token for that account and signs the client in with it, so the login on the host is
+  the only proof. Only if the homeserver can make no login token, the person's Porelo makes a random password at
+  registration and keeps it in the person's vault.
 - **A lock** holds at the locked login's next request; a sync it held open before ends at its own timeout and is
   not renewed.
 
 ## Acceptance
 
+- Over a real `ssh -L` to the socket, a Matrix client signs in as `@<login>` with no password, where Tuwunel makes
+  login tokens. Seen to fail: a caller of another login is signed in as `@<login>` that way.
 - Over a real `ssh -L` to the socket on a test machine, a person's Matrix client registers `@<login>`, signs in,
   syncs (a sync held open for its whole timeout included) and sends in a room.
 - A uid outside `porelo-people` is refused at its first request; a login dropped from the group is refused at its
@@ -71,13 +77,9 @@ The contract, in words:
   registration by the gate", with its accepted risks: whoever else may use a person's own machine can use their
   forward, and the gate takes the group at the time of each request.
 
-## Open questions
-
-- Whether a person's own client may sign in by their host login alone, with no password, if the homeserver can make
-  a login token for the gate: one secret less, and the login on the host as the only proof.
-
 ## To be checked
 
+- Whether and how Tuwunel makes a login token for an account on the administrator's word, measured on Tuwunel.
 - Where the homeserver listens so only its account reaches it: a Unix socket of Tuwunel's own in a directory of mode
   0700, or a network namespace with no port on the host; measured on Tuwunel.
 - How long a sync held open passes through the gate, and how many open connections the gate's unit allows.
