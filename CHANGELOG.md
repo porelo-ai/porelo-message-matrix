@@ -121,7 +121,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   until a person removes them.
 - The code follows the shared style of every Porelo repository: one `.editorconfig`, and `google-java-format`
   in its AOSP style checked by the build, which refuses code that does not match it. The build takes
-  `porelo-parent` 0.2.1 and the shared tools 0.5.1, and its checkouts keep no token for later steps.
+  `porelo-parent` 0.2.2 and the shared tools 0.5.2, and its checkouts keep no token for later steps.
 - `setup` names the scheme's port in `reaches` when the homeserver's URL names none, as the contract says.
 - The homeserver package runs Tuwunel 1.9.4, pinned by its digest.
 - The homeserver's unit reads its port and registration token under `$XDG_CONFIG_HOME` when it is set, where
