@@ -1,6 +1,8 @@
 # MX58 — The Transport Reaches The Homeserver On A Socket
 
-**Status:** Accepted.
+**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Size:** S - `MatrixClient`, `Config`, `Settings` and `Lifecycle.loopback`, with unit tests and the central integration
+tests run once over a socket; no verb changes.
 
 **What must be true.** The transport running in a person's account on a host reaches the host's homeserver through
 its Unix socket, and a homeserver forwarded to a person's machine is reached under a `*.localhost` name as loopback,
@@ -18,6 +20,22 @@ The contract, in words:
   address the forward listens on without asking DNS, sends the name as the request's host, and checks the listener's
   owner as it does for `127.0.0.1` today.
 - `settings` accepts both forms and refuses a relative socket path.
+
+## Plan
+
+Read in `e8aadf8`.
+
+- `MatrixClient` sends through a small `Wire` of two kinds: today's `HttpClient` for `http` and `https`, and a new
+  `SocketWire` that writes one HTTP/1.1 request (`Host`, `Authorization`, `Content-Type`, `Content-Length`,
+  `Connection: close`) to a `SocketChannel` on a `UnixDomainSocketAddress` and reads status, headers and a body by
+  `Content-Length` or chunked. Both give back status and bytes; `exchange`, `call` and `parse` stay as they are.
+- `Config.homeserver` and `Settings` take `unix:<absolute path>`; `Listener.ensureOwn` is not asked for a socket,
+  whose file modes guard it. `SettingsCheck --loopback-only` refuses `unix:`, an offline project's homeserver being
+  this machine's own.
+- `Lifecycle.loopback` takes a host ending in `.localhost`; `MatrixClient` sends a `*.localhost` request to
+  `127.0.0.1` on the same port. `Lifecycle.reaches` answers the socket's path for `unix:`.
+- Red first: `MatrixClientSocketTest` against a `FakeHomeserver` served on a Unix socket, and `ConfigTest` and
+  `SettingsTest` cases for `unix:relative`, `foo.localhost.example.org` and `a.localhost`.
 
 ## Acceptance
 

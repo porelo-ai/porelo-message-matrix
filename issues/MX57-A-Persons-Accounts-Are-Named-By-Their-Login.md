@@ -1,6 +1,9 @@
 # MX57 — A Person's Accounts Are Named By Their Login
 
-**Status:** Accepted; blocked by [MX56](README.md#mx56) and [MX30](README.md#mx30).
+**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m);
+blocked by [MX56](README.md#mx56) and [MX30](README.md#mx30).
+**Size:** M - the machine's name replaced by the login through `Lifecycle`, `CentralRoom`, `Describe`, `Main` and their
+tests, `expel <login>` from `MachineTokens.expel`, docs.
 
 **What must be true.** On a host's homeserver every account belongs to a person, whatever machine they sit at: the
 person's own account is `@<login>:<server>`, and their Porelo's are `@porelo.<login>`, `@porelo-relay-<project>.<login>`
@@ -43,6 +46,21 @@ The contract, in words:
 - **A lock for one project** is the access file's: Porelo leaves a person the access file locks for that project out of
   `--persons`, so `members` takes their accounts out of that project's rooms and leaves their other projects' rooms
   and their accounts as they are; let back in, the next `members` invites them again.
+
+## Plan
+
+Read in `e8aadf8`.
+
+- `--machine` and `PORELO_MATRIX_MACHINE` become `--login` and `PORELO_MATRIX_LOGIN` through `Main`, `Config`,
+  `Lifecycle` (195 places), `CentralRoom`, `Describe` (`takes`), `Accounts` and `Settings`; the suffix, and the checks
+  that one machine's names never end as another's, stay, now per login, with a login's rule (no dot, not `porelo…`).
+- `members` takes `--persons` instead of `--machines`, and invites `@<login>` beside `@porelo.<login>`.
+- `expel <login>` comes from `MachineTokens.expel`, without the token: the record moves to `expelled-logins/`, which
+  the gate reads; `MachineTokens` keeps only what goes with the VPN path.
+- On a host's homeserver (`unix:` or `*.localhost`) `setup`, `enroll` and `join` register through the gate without a
+  registration token; elsewhere as today.
+- Red first: `CentralRoomTest` and `LifecycleTest` cases with `--login`, `members --persons` dropping one login, and
+  `expel` of a login beside a longer one.
 
 ## Acceptance
 

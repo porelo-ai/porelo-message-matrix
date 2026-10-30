@@ -1,11 +1,13 @@
 # MX56 — The Homeserver Knows The Person At Its Gate
 
-**Status:** Accepted.
+**Status:** Implementing; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Size:** L - grew from M: a new verb with its own HTTP handling and sign-in rules, a mode of the homeserver's unit,
+a verb that prepares the host's homeserver, docs, a decision and an integration test.
 
-**What must be true.** On a host's homeserver (not on a homeserver of one account's own on a person's machine), every Matrix client reaches the host's homeserver only through one Unix socket, and
-the homeserver knows who is calling from the caller's own login on the host: a person or task acts only as an
-account of their own login, anybody else is refused at the first request, and a locked login gets no further request
-through.
+**What must be true.** On a host's homeserver (not on a homeserver of one account's own on a person's machine),
+every Matrix client reaches the homeserver only through one Unix socket, and the homeserver knows who is calling from
+the caller's own login on the host: a person or task acts only as an account of their own login, anybody else is
+refused at the first request, and a locked login gets no further request through.
 
 ## Why
 
@@ -57,6 +59,34 @@ The contract, in words:
   registration and keeps it in the person's vault.
 - **A lock** holds at the locked login's next request; a sync it held open before ends at its own timeout and is
   not renewed.
+
+## Plan
+
+Read in `e8aadf8`, measured on Tuwunel 1.9.4 and GraalVM 25 (the JVM; the native image while building): Tuwunel
+serves the client API on `unix_socket_path`, with the mode from `unix_socket_perms`, beside its TCP listener, and has
+the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `username_available`) and
+`login/get_token`; a Java process started per connection by systemd (`Accept=yes`) takes the connection as
+`System.inheritedChannel()` and reads `SO_PEERCRED` from it.
+
+- **The host's homeserver, `PORELO_MATRIX_GATE=1` in `homeserver.conf`:** `homeserver-token` writes the start
+  environment with `TUWUNEL_UNIX_SOCKET_PATH=/gate/homeserver.sock` and perms 600, and the unit mounts
+  `%t/porelo-matrix-gate` (0700) there. In that mode no TCP port of the container reaches the host; measured while
+  building whether the unit drops the port or Tuwunel's TCP listener stays inside the container's namespace.
+- **`gate --prepare`**, run once by the host's preparation as the homeserver's account: sets the mode, registers
+  `@porelo` with the local registration token if it is not there, and keeps its token in
+  `%E/porelo/matrix/gate/admin-token` (0600). Run again, it changes nothing.
+- **`gate`** (new `Gate`, `GateRequest`, `GateRules`): one process per connection. It reads the caller's uid and user
+  name, and `porelo-people` from `/etc/group` at each request; it reads requests one after another (keep-alive), and
+  `GateRules` decides each: refused, answered by the gate, or passed on to `homeserver.sock` byte for byte with the
+  answer copied back. A request with a token is bound by `whoami`, cached by the token's SHA-256 in a bounded map.
+  `/register` is answered by the gate (admin `v2/users` with the client's password, then a login whose answer it
+  returns). `/login` shows `m.login.sso` and `m.login.token`; the SSO redirect makes `@<login>` if it is missing and
+  answers a login token for it (admin `users/{id}/login`, then `login/get_token`). A password or token login passes
+  only when the homeserver's answer names an account of the caller's login. Room aliases `porelo-*` pass only for a
+  project's admin, read from the host's file. Expelled logins are refused.
+- Red first: `GateRulesTest` (each rule of the shape, with the "seen to fail" cases), then `GateIT`, which starts
+  Tuwunel on a socket and the gate per connection under `systemd-socket-activate`, and signs a Matrix client in,
+  syncs and sends through it; the `ssh -L` run on a test machine.
 
 ## Acceptance
 
