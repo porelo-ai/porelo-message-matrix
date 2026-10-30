@@ -119,3 +119,18 @@ the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `us
 - The admins file is `/etc/porelo-host/matrix/<project>.admins`, `root:porelo-matrix` 0640, one login per line,
   agreed with Agent Machines.
 - The gate runs as the homeserver's account, `porelo-matrix`, and reads its files there.
+
+## Accepted in review (2026-10-30)
+
+Read by a second model twice, before and after the security rewrite; every finding is fixed but these, each accepted
+for the test and left for a later issue if it matters there:
+
+- The gate reads a request's body whole, up to 64 MiB, before it decides whether the caller may send it; one person
+  can make the homeserver's account hold that much per connection.
+- `GateFiles.read` checks a file and then reads it; between the two the file can change. Only the homeserver's
+  account writes those files.
+- When the session made for a login fails after it was made, the gate does not log that session out.
+- In gate mode the host's port 8008 stays published, mapped to the container's 8009, where nothing listens.
+- The SSO redirect sends the login token to any absolute `https` or custom-scheme URL the client names; the token
+  is the caller's own, single use and two minutes long.
+- SSO redirects under `/_matrix/client/r0/` are refused; clients use `v3`.
