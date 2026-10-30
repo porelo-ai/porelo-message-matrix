@@ -1,21 +1,12 @@
 package org.fuin.porelo.message.matrix;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -34,8 +25,7 @@ record Settings(
         @Nullable Path caFile,
         boolean verifyTls,
         @Nullable Path registrationTokenFile,
-        @Nullable String room,
-        @Nullable String caCertificate) {
+        @Nullable String room) {
 
     /** Said on stderr whenever the project's settings switch the certificate check off. */
     static final String VERIFY_OFF_WARNING =
@@ -44,16 +34,21 @@ record Settings(
                     + " development only.";
 
     static final Set<String> KEYS =
-            Set.of(
-                    "homeserver",
-                    "ca_file",
-                    "ca_certificate",
-                    "tls_verify",
-                    "registration_token_file",
-                    "room");
+            Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file", "room");
+
+    static final String CA_CERTIFICATE_WENT =
+            "the project's settings name 'ca_certificate', which went with the published"
+                    + " homeserver; use ca_file";
 
     /** A host's gate supplies the registration token itself. */
     boolean hosted() {
+        return hosted(homeserver);
+    }
+
+    /**
+     * A host's homeserver behind its gate: reached on a Unix socket or as a {@code *.localhost}.
+     */
+    static boolean hosted(final @Nullable URI homeserver) {
         return homeserver != null
                 && ("unix".equals(homeserver.getScheme())
                         || (homeserver.getHost() != null
@@ -66,12 +61,6 @@ record Settings(
     static final String TOKEN_FILE_ON_A_HOST =
             "the project's registration_token_file is for a homeserver elsewhere; a host's"
                     + " homeserver behind its gate takes no registration token";
-
-    static final String TEXT_CONTRADICTION =
-            "the project's ca_certificate and tls_verify off contradict each other; set one";
-
-    static final String TWO_CAS =
-            "the project's ca_file and ca_certificate both name a CA; give one";
 
     static final String TOKEN_FILE_WITHOUT_HOMESERVER =
             "the project's registration_token_file is for a homeserver elsewhere; this account's"
@@ -110,13 +99,16 @@ record Settings(
                     ex);
         }
         if (node == null || node.isNull()) {
-            return new Settings(null, null, true, null, null, null);
+            return new Settings(null, null, true, null, null);
         }
         if (!node.isObject()) {
             throw new Failure(Exit.CONFIG, "the project's settings on stdin are not a JSON object");
         }
         for (final Map.Entry<String, JsonNode> entry : node.properties()) {
             final String key = entry.getKey();
+            if ("ca_certificate".equals(key)) {
+                throw new Failure(Exit.CONFIG, CA_CERTIFICATE_WENT);
+            }
             if (!KEYS.contains(key)) {
                 throw new Failure(
                         Exit.CONFIG,
@@ -132,14 +124,7 @@ record Settings(
                         verify(node.path("tls_verify")),
                         absolutePath(
                                 node.path("registration_token_file"), "registration_token_file"),
-                        room(node.path("room")),
-                        caCertificate(node.path("ca_certificate")));
-        if (settings.caFile() != null && settings.caCertificate() != null) {
-            throw new Failure(Exit.CONFIG, TWO_CAS);
-        }
-        if (settings.caCertificate() != null && !settings.verifyTls()) {
-            throw new Failure(Exit.CONFIG, TEXT_CONTRADICTION);
-        }
+                        room(node.path("room")));
         // Refused here, not first by the verb that reads the printed secrets: which was meant
         // cannot be told.
         if (settings.caFile() != null && !settings.verifyTls()) {
@@ -150,12 +135,12 @@ record Settings(
         if (settings.registrationTokenFile() != null && settings.homeserver() == null) {
             throw new Failure(Exit.CONFIG, TOKEN_FILE_WITHOUT_HOMESERVER);
         }
-        // A central homeserver's room is made by a person there; without it, setup has none to
-        // join.
         // A host's gate registers without a token; one named here would silently do nothing.
         if (settings.registrationTokenFile() != null && settings.hosted()) {
             throw new Failure(Exit.CONFIG, TOKEN_FILE_ON_A_HOST);
         }
+        // A central homeserver's room is made by a person there; without it, setup has none to
+        // join.
         if (settings.homeserver() != null && settings.room() == null) {
             throw new Failure(Exit.CONFIG, HOMESERVER_WITHOUT_ROOM);
         }
@@ -200,76 +185,14 @@ record Settings(
         }
     }
 
-    /**
-     * The text of a CA's certificate, as another machine's {@code admit} answers it: refused unless
-     * it holds one, so a fault shows here rather than as every connection refused.
-     */
-    static @Nullable String caCertificate(final JsonNode value) throws Failure {
-        if (value.isMissingNode() || value.isNull()) {
-            return null;
-        }
-        final String text = value.isTextual() ? value.asText() : "";
-        try {
-            if (text.isBlank()
-                    || CertificateFactory.getInstance("X.509")
-                            .generateCertificates(
-                                    new ByteArrayInputStream(
-                                            text.getBytes(StandardCharsets.US_ASCII)))
-                            .isEmpty()) {
-                throw new Failure(Exit.CONFIG, "the project's ca_certificate holds no certificate");
-            }
-        } catch (final CertificateException ex) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the project's ca_certificate is not a certificate: " + ex.getMessage(),
-                    ex);
-        }
-        return text;
-    }
-
-    /**
-     * These settings with a {@code ca_certificate} written to a file of the transport's own, named
-     * after its content, which the verbs after {@code setup} are handed as their CA file.
-     */
+    /** These settings with any {@code ~/} paths resolved in the running account's home. */
     Settings materialized(final Map<String, String> env) throws Failure {
-        final @Nullable Path tokenFile = inHome(registrationTokenFile, env);
-        final @Nullable Path ca = inHome(caFile, env);
-        if (caCertificate == null) {
-            return new Settings(homeserver, ca, verifyTls, tokenFile, room, null);
-        }
-        try {
-            final MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            final String name =
-                    HexFormat.of()
-                                    .formatHex(
-                                            sha.digest(
-                                                    caCertificate
-                                                            .strip()
-                                                            .getBytes(
-                                                                    java.nio.charset
-                                                                            .StandardCharsets
-                                                                            .US_ASCII)))
-                                    .substring(0, 16)
-                            + ".crt";
-            final Path dir = Poll.stateDirectory(env).resolve("ca");
-            Files.createDirectories(dir);
-            final Path file = dir.resolve(name);
-            if (!Files.exists(file)) {
-                final Path draft = Files.createTempFile(dir, ".ca-", ".draft");
-                try {
-                    Files.writeString(draft, caCertificate.strip(), StandardCharsets.US_ASCII);
-                    Files.move(draft, file, StandardCopyOption.ATOMIC_MOVE);
-                } finally {
-                    Files.deleteIfExists(draft);
-                }
-            }
-            return new Settings(homeserver, file, verifyTls, tokenFile, room, null);
-        } catch (final IOException | NoSuchAlgorithmException ex) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "cannot keep the project's ca_certificate: " + ex.getMessage(),
-                    ex);
-        }
+        return new Settings(
+                homeserver,
+                inHome(caFile, env),
+                verifyTls,
+                inHome(registrationTokenFile, env),
+                room);
     }
 
     /** The first name of a path in the running account's home: {@code ~}. */

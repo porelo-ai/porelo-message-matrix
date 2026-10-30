@@ -7,13 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Central accounts are named by the person's login: `--login` and `PORELO_MATRIX_LOGIN` replace the machine
-  option and name, and `setup` answers `login`; `describe` lists `login` among `takes`. Logins have at most
+- A person's accounts on a central homeserver are named by their login (`--login`, `PORELO_MATRIX_LOGIN`), and
+  `setup` answers `login`; `describe` lists `login` among `takes`. Logins have at most
   32 lower-case letters, digits and `-`, start with a letter, and exclude `porelo` and `porelo-` names.
-- `members --persons` replaces `--machines`, invites each person's bare and provisioning accounts, and
+- `members --persons` invites each person's bare and provisioning accounts, and
   removes every account of a login no longer listed while keeping the room maker and other listed logins.
 - A host's gate handles registration without a client-held registration token; external homeservers keep
-  the token flow. The legacy machine-token, publish, admit and dismiss commands remain available.
+  the token flow.
 
 ### Added
 
@@ -31,38 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   run by that login, keeps the room to the list: it invites each listed person's own account and `@porelo` not yet in, and takes
   every account of a login ever in the room that the list drops out of that room alone, `@porelo` first, never
   one a listed login owns; a central task named `porelo.…` is refused; `describe` offers both.
-- `machine-token issue|revoke|expel <machine>` admits a person's machine to the account's own homeserver with no
-  project and no room, and takes it out again: `issue` registers the administrator `@porelo` first if there is none
-  and answers its token under `account`, then answers the machine's own registration token, the same on every call;
-  `revoke` refuses that token; `expel` revokes it too and deactivates every `@….<machine>`, which logs it out and
-  takes it out of every room, and records the machine, so a later `issue` for it is refused in words; a machine of
-  which nothing is known answers `"known": false`. The administrator's token comes on stdin among the secrets.
-- A published homeserver serves a server certificate its host's administrator made elsewhere: with `ca.crt`,
-  `tls/server.crt` and `tls/server.key` placed beside `homeserver.conf` and no `ca.key`, the transport makes, renews
-  and removes no certificate, not on `publish --off`, `clear` or `restore` either. Each start and `publish` refuse, as a
-  client would, one that is not signed by `ca.crt`, is not a server's, does not fit its key, does not name the
-  published address and name (a wildcard covers one label) or has ended, before `publish` writes a setting, and warn
-  on stderr in its last 30 days. A `ca.crt` that holds a private key is refused and never handed out. A CA of the
-  account's own whose key is gone keeps serving its server certificate until that ends.
 - Every verb that takes a token reads the secrets Porelo kept from stdin, as `{"settings": {...}, "secrets": {...}}`,
   and `describe` says so with `"secrets": "input"`. A token handed so is never in the transport's environment, which
   another process of the account could read in `/proc` in the moment before the transport makes itself unreadable.
   With secrets on stdin, no `PORELO_MATRIX_*` variable of the environment is read. A Porelo that still hands the
   bare settings on stdin and the secrets as the environment works as before.
-- `publish --address <address>:<port> [--name <host name>]` serves the account's own homeserver for another machine on one address of
-  this machine's VPN, over `https` with a CA of the account's own; `publish --off` takes it back. The answer names
-  the CA file the other machine trusts. The new socket `porelo-matrix-homeserver-vpn` listens on the address even
-  while the VPN is down and forwards to the loopback port, where Tuwunel serves TLS beside plain `http`; the server
-  certificate holds one year and is renewed within its last 30 days at the homeserver's start. A wildcard, a name,
-  loopback, multicast or a privileged port is refused. `backup` carries the CA and `restore` drops the published
-  address; `clear` removes all of it.
-- `admit --project P --machine M` gives another machine a registration token of its own for the published homeserver
-  and invites `@porelo.<M>` into the project's room; it answers the homeserver's address, the room, the CA's
-  certificate, and the token under `secrets`. `dismiss --project P --machine M` refuses that token at once and bans
-  the machine's accounts, `@porelo.<M>` and every `@<name>.<M>`, from the room; while a machine is admitted, no person,
-  task or other machine of this machine's may take a name ending so.
-- The settings take `ca_certificate`, a CA's certificate as PEM text, which the transport keeps as a file of its own;
-  `settings` takes `--loopback-only` for an offline project.
+- `settings` takes `--loopback-only` for an offline project.
 - A project that names `registration_token_file` while `PORELO_MATRIX_REGISTRATION_TOKEN` is set is refused, since
   which token was meant cannot be told.
 - `join --token [--display <name>]` returns a vault token with the user and room id, keeps the password
@@ -84,14 +58,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A person file carries `"helpers": true` with an empty `to` exactly when the line names only the room's
   helper accounts, so Porelo can answer through the relay without waking a task.
 - `describe` names what a start waits on as `"waitsOn": "the room's homeserver"`.
-- Several machines of one project share one conversation on a central homeserver (`homeserver` and `room` in the
-  project's settings): `describe` announces `"takes": ["machine"]`, every lifecycle verb takes `--machine <name>`
-  (without regard to case, as a host name), and each machine registers only its own accounts (`@porelo.<machine>`,
-  `@porelo-relay-<project>.<machine>`, `@<task>.<machine>`) with passwords derived from a secret of its own
-  (`PORELO_MATRIX_MACHINE_SECRET` in `account`), so no machine holds an administrator token or acts on another machine's accounts.
-- On a central homeserver, `setup` prints `"admitted": false` until a person in `room` invites `@porelo.<machine>`,
-  then joins the room (checking that it is invite-only and forbids guests) and admits the machine's relay; `retire`
-  and `clear --project` have only this machine's accounts leave the room and log out every session, as themselves,
+- Several persons of one project share one conversation on a central homeserver (`homeserver` and `room` in the
+  project's settings): `describe` announces `"takes": ["login"]`, every lifecycle verb takes `--login <login>`,
+  and each person's Porelo registers only its own accounts (`@porelo.<login>`,
+  `@porelo-relay-<project>.<login>`, `@<task>.<login>`) with passwords derived from a secret of its own
+  (`PORELO_MATRIX_MACHINE_SECRET` in `account`), so no person's Porelo holds an administrator token or acts on another login's accounts.
+- On a central homeserver, `setup` prints `"admitted": false` until a person in `room` invites `@porelo.<login>`,
+  then joins the room (checking that it is invite-only and forbids guests) and admits its relay; `retire`
+  and `clear --project` have only this login's accounts leave the room and log out every session, as themselves,
   so their names can be set up or enrolled again, and `join` answers 77 because people are managed at the
   homeserver itself.
 
@@ -135,8 +109,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   descendants after normal completion or timeout.
 - A `homeserver` in the project's settings is now always a central homeserver and needs `room` (a room alias or a
   room id; `room` without `homeserver` is refused too). A project on a homeserver elsewhere names its room as
-  `room`, invites each machine's `@porelo.<machine>` into it, and enrolls its tasks again; the earlier accounts stay
-  until a person removes them.
+  room id; `room` without `homeserver` is refused too). A project on a homeserver elsewhere names its room as
+  `room`, invites each person's `@porelo.<login>` into it, and enrolls its tasks again; the earlier accounts stay
 - The code follows the shared style of every Porelo repository: one `.editorconfig`, and `google-java-format`
   in its AOSP style checked by the build, which refuses code that does not match it. The build takes
   `porelo-parent` 0.2.2 and the shared tools 0.5.2, and its checkouts keep no token for later steps.
@@ -147,18 +121,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- A machine whose name was invited into the room before it registered, as `admit` does, joins at its first `setup`,
+- A person's provisioning account invited into the room before it registered joins at its first `setup`,
   not only at the second. A central `setup` not yet admitted answers `address` and `room`, so Porelo names the account
   a person lets in and the room.
 - `clear` on a central homeserver ends 75, saying the homeserver was not reached, where it cannot be reached; it
-  answered 78 "not valid" before. A token the homeserver no longer knows means it let the machine go already: `clear`
+  answered 78 "not valid" before. A token the homeserver no longer knows means it let the login go already: `clear`
   then ends 0 and says so.
 - A first `setup` beside a homeserver that already runs stops it before it chooses the port, so the homeserver keeps
   its port and comes back where the file says, instead of `setup` waiting three minutes on a port nothing listens on.
-- A machine admitted or dismissed while the homeserver runs is taken or refused at once. The registration tokens
+- A registration token changed while the homeserver runs is read at once. The registration token
   moved into `~/.config/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
-  file the container started with, so an admitted machine got `401 Invalid registration token` until a restart, and
-  a dismissed one kept registering. The unit's next start moves an existing token file there, and `setup` restarts
+  file the container started with, so a new token got `401 Invalid registration token` until a restart. The
+  unit's next start moves an existing token file there, and `setup` restarts
   a homeserver an earlier version started.
 - A backup stops trying to acquire its locks when their shared wait budget expires, even when a
   holder releases a lock just after the deadline.
@@ -170,7 +144,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the homeserver did not start.
 - A person in the conversation is shown by the name they joined with: the local homeserver no longer adds its
   default suffix, an emoji, to every new account's display name.
-- `clear` for the account takes `--machine`, as Porelo passes it, so `porelo vault clear` takes the account's
+- `clear` for the account takes `--login`, as Porelo passes it, so `porelo vault clear` takes the account's
   homeserver away instead of failing with 64.
 - `enroll` and `retire` refuse (78) a task account another project's room has, as two projects whose names run
   together give one task name; before, the second project's `enroll` took that task's account over and its token

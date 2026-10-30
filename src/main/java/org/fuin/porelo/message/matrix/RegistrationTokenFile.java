@@ -7,6 +7,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * The registration token of a homeserver elsewhere, read from the file the project's settings name.
@@ -16,7 +17,15 @@ import java.util.Set;
  */
 final class RegistrationTokenFile {
 
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
     private RegistrationTokenFile() {}
+
+    /** The first token on the first line of a registration-token file. */
+    static String firstToken(final String content) {
+        final String first = content.lines().findFirst().orElse("").strip();
+        return WHITESPACE.split(first, 2)[0];
+    }
 
     static String read(final Path file) throws Failure {
         try {
@@ -30,9 +39,7 @@ final class RegistrationTokenFile {
                                 + " is readable by other accounts; make it readable by this"
                                 + " account alone (chmod 600)");
             }
-            // A file the homeserver reads holds this machine's token first, others after it.
-            final String token =
-                    MachineTokens.local(Files.readString(file, StandardCharsets.UTF_8));
+            final String token = firstToken(Files.readString(file, StandardCharsets.UTF_8));
             if (token.isEmpty()) {
                 throw new Failure(
                         Exit.CONFIG, "the project's registration_token_file " + file + " is empty");

@@ -121,57 +121,6 @@ class LifecycleTest {
         return Map.of("HOME", dir.toString(), "XDG_CONFIG_HOME", dir.resolve("config").toString());
     }
 
-    /** Harm guarded: a machine is admitted to a homeserver this transport does not run. */
-    @Test
-    void admitIsRefusedOnACentralHomeserver() {
-        org.assertj.core.api.Assertions.assertThat(
-                        exit(
-                                "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#p:example.org\"}",
-                                account(),
-                                "admit",
-                                "--project",
-                                "demo",
-                                "--machine",
-                                "hostb"))
-                .as("a central homeserver admits machines itself")
-                .isEqualTo(Exit.NOT_PERMITTED);
-    }
-
-    /** Harm guarded: an offline project's room is opened to another machine. */
-    @Test
-    void admitIsRefusedForAnOfflineProject() throws Exception {
-        // Published, so only the offline project's rule can refuse it.
-        java.nio.file.Files.createDirectories(dir.resolve("config/porelo/matrix"));
-        java.nio.file.Files.writeString(
-                dir.resolve("config/porelo/matrix/homeserver.conf"),
-                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.2:8448\n");
-        org.assertj.core.api.Assertions.assertThat(
-                        reason(
-                                "{}",
-                                account(),
-                                "admit",
-                                "--project",
-                                "demo",
-                                "--machine",
-                                "hostb",
-                                "--loopback-only"))
-                .as("an offline project reaches loopback alone")
-                .startsWith(Exit.CONFIG + " an offline project admits no other machine");
-    }
-
-    /** Harm guarded: a machine gets a token for a homeserver it cannot reach. */
-    @Test
-    void admitIsRefusedWhileNothingIsPublished() throws Exception {
-        java.nio.file.Files.createDirectories(dir.resolve("config/porelo/matrix"));
-        java.nio.file.Files.writeString(
-                dir.resolve("config/porelo/matrix/homeserver.conf"), "PORELO_MATRIX_PORT=8008\n");
-
-        org.assertj.core.api.Assertions.assertThat(
-                        reason("{}", account(), "admit", "--project", "demo", "--machine", "hostb"))
-                .as("nothing is published for the machine to reach")
-                .startsWith(Exit.CONFIG + " the homeserver is published on no address");
-    }
-
     /** Harm guarded: the transport registers with a token other than the one meant. */
     @Test
     void twoRegistrationTokensAreRefused() throws Exception {
@@ -196,15 +145,6 @@ class LifecycleTest {
                                 "hosta"))
                 .as("which of the two was meant cannot be told")
                 .isEqualTo(Exit.CONFIG);
-    }
-
-    /** Harm guarded: a mistyped dismiss guesses which machine it puts out. */
-    @Test
-    void dismissNeedsTheMachine() {
-        org.assertj.core.api.Assertions.assertThat(
-                        exit("{}", account(), "dismiss", "--project", "demo"))
-                .as("no machine named, none dismissed")
-                .isEqualTo(Exit.USAGE);
     }
 
     /** Harm guarded: a list mistyped drops every developer from the project's room. */
@@ -247,8 +187,8 @@ class LifecycleTest {
     }
 
     /**
-     * Harm guarded: the account's own homeserver's room, which keeps its members by {@code admit}
-     * and {@code dismiss}, has machines put out by a list meant for a central one.
+     * Harm guarded: the account's own homeserver's room has accounts put out by a list meant for a
+     * central homeserver.
      */
     @Test
     @org.junit.jupiter.api.DisplayName(
@@ -389,7 +329,7 @@ class LifecycleTest {
     private Map<String, String> centralAccount() {
         final Map<String, String> env = new java.util.HashMap<>(account());
         env.put(Config.MACHINE_SECRET, "machine-secret");
-        env.put(Config.ADMIN_TOKEN, "machine-token");
+        env.put(Config.ADMIN_TOKEN, "admin-token");
         env.put("PORELO_MATRIX_LOGIN", "hosta");
         return env;
     }
@@ -399,7 +339,7 @@ class LifecycleTest {
     }
 
     /**
-     * Harm guarded: a host whose machine the homeserver let go (dismissed, or the homeserver reset)
+     * Harm guarded: a host whose machine the homeserver let go (expelled, or the homeserver reset)
      * can never clear, so its give-back stops on a refusal nobody can act on.
      */
     @Test

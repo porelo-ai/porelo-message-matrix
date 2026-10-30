@@ -141,13 +141,15 @@ class HomeserverUnitTest {
 
     @Test
     @DisplayName(
-            "The unit makes its token with the transport's own verb, and publishes on loopback only")
+            "The unit makes its token with the transport's own verb, and serves on loopback only")
     void tokenAndLoopback() throws IOException {
         final String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
 
         assertThat(template)
                 .contains(
                         "ExecStartPre=/usr/libexec/porelo/transports/porelo-message-transport-matrix homeserver-token")
+                .contains("--env-file=%E/porelo/matrix/tls.env")
+                .doesNotContain(":/tls")
                 .contains("-p 127.0.0.1:${PORELO_MATRIX_PORT}:${PORELO_MATRIX_INNER_PORT}")
                 .contains("Environment=PORELO_MATRIX_INNER_PORT=8008")
                 .contains("-v %t/porelo-matrix-gate:/gate:Z")
@@ -174,9 +176,8 @@ class HomeserverUnitTest {
     }
 
     /**
-     * Harm guarded: a mounted file keeps the file the container started with, and the transport
-     * writes the tokens by a rename; a machine admitted while the homeserver runs is then refused
-     * with 401 until a restart, and a dismissed one goes on registering.
+     * Harm guarded: mounting the token's own directory rather than the account's configuration
+     * directory keeps other files under {@code porelo/matrix} out of the container.
      */
     @Test
     @DisplayName("The unit mounts the tokens' directory, never the token file itself")

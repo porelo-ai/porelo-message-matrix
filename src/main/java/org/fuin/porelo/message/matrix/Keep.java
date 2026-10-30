@@ -27,10 +27,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * {@code backup <dir>} and {@code restore <dir>}: the local homeserver's conversation copied into a
  * directory and put back on another machine, for the host's playbook, not for Porelo. A copy holds
- * the homeserver's online backups, its {@code homeserver.conf}, the account's CA when it has one,
- * and the poll positions taken just before the backup, so a restored relay hands over exactly what
- * came after its last poll, and a machine that trusts the CA still trusts the restored homeserver.
- * The published address and the server certificate name the machine copied from, and stay behind.
+ * the homeserver's online backups, its {@code homeserver.conf}, and the poll positions taken just
+ * before the backup, so a restored relay hands over exactly what came after its last poll.
  */
 final class Keep {
 
@@ -52,9 +50,6 @@ final class Keep {
     private static final String POSITIONS = "positions";
 
     private static final String CONF = "homeserver.conf";
-
-    /** The CA's certificate and key, as {@link Certificate} keeps them beside the configuration. */
-    private static final List<String> CA = List.of(Certificate.CA_CERTIFICATE, Certificate.CA_KEY);
 
     /** For a backup of a busy room, measured at about one second: a wide margin. */
     static final Duration BACKUP_WAIT = Duration.ofSeconds(60);
@@ -167,16 +162,6 @@ final class Keep {
                 if (Files.isRegularFile(conf)) {
                     Files.copy(conf, dir.resolve(CONF));
                 }
-                // A placed CA is the host administrator's, placed again wherever the copy goes.
-                for (final String name :
-                        Certificate.placed(LocalHomeserver.directory(env))
-                                ? List.<String>of()
-                                : CA) {
-                    final Path file = LocalHomeserver.directory(env).resolve(name);
-                    if (Files.isRegularFile(file)) {
-                        ownerOnlyCopy(file, dir.resolve(name));
-                    }
-                }
             }
             done = true;
         } catch (final IOException ex) {
@@ -247,8 +232,6 @@ final class Keep {
         final Path database = dir.resolve(DATABASE);
         final long id;
         final Path confHere = LocalHomeserver.directory(env).resolve(CONF);
-        final @Nullable Path confDir = confHere.getParent();
-        final boolean placedHere = confDir != null && Certificate.placed(confDir);
         final Path backups = backups(env);
         final Path state = Poll.stateDirectory(env);
         try {
@@ -273,22 +256,6 @@ final class Keep {
                 same(confHere, confThere, LocalHomeserver.PORT, "port");
                 same(confHere, confThere, LocalHomeserver.SERVER_NAME, "server name");
             }
-            whole(dir, "the copy");
-            if (!placedHere) {
-                whole(confHere.getParent(), "this account");
-            }
-            final Path caHere = confHere.resolveSibling(Certificate.CA_CERTIFICATE);
-            final Path caThere = dir.resolve(Certificate.CA_CERTIFICATE);
-            if (Files.exists(caHere)
-                    && Files.isRegularFile(caThere)
-                    && Files.mismatch(caHere, caThere) != -1) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        "this account has a CA of its own, and the copy another: a restore keeps"
-                                + " the copy's, so remove "
-                                + caHere
-                                + " and its key, or restore elsewhere");
-            }
             if (Files.exists(backups) && !empty(backups)) {
                 throw new Failure(
                         Exit.CONFIG, backups + " holds backups of another database already");
@@ -308,17 +275,8 @@ final class Keep {
                         confHere.getParent(),
                         PosixFilePermissions.asFileAttribute(
                                 PosixFilePermissions.fromString("rwx------")));
-                Files.write(confHere, unpublished(dir.resolve(CONF)), StandardCharsets.UTF_8);
+                Files.write(confHere, withoutPublishing(dir.resolve(CONF)), StandardCharsets.UTF_8);
                 made.add(confHere);
-            }
-            // Beside a placed certificate a CA key would be taken for the account's own CA.
-            for (final String name : placedHere ? List.<String>of() : CA) {
-                final Path there = dir.resolve(name);
-                final Path here = confHere.resolveSibling(name);
-                if (Files.isRegularFile(there) && !Files.exists(here)) {
-                    ownerOnlyCopy(there, here);
-                    made.add(here);
-                }
             }
             made.add(backups);
             copyTree(database, backups);
@@ -368,47 +326,6 @@ final class Keep {
             throw new Failure(
                     Exit.CONFIG, "the restore failed and left " + String.join(", ", left));
         }
-    }
-
-    /**
-     * A CA is its certificate and its key together, or neither; half of one is refused. The
-     * account's own placed certificate is not checked so: its CA's key is elsewhere.
-     */
-    private static void whole(final @Nullable Path dir, final String whose) throws Failure {
-        if (dir == null) {
-            return;
-        }
-        final long present = CA.stream().filter(name -> Files.exists(dir.resolve(name))).count();
-        if (present == 1) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    whose
-                            + " holds half a CA in "
-                            + dir
-                            + ", its certificate or its key alone: a restore pairs neither with"
-                            + " the other half");
-        }
-    }
-
-    /**
-     * The copy's settings without the address it was published on, which was the other machine's.
-     */
-    private static List<String> unpublished(final Path conf) throws IOException {
-        return Files.readAllLines(conf, StandardCharsets.UTF_8).stream()
-                .filter(
-                        line ->
-                                !line.strip().startsWith(LocalHomeserver.PUBLISH + "=")
-                                        && !line.strip()
-                                                .startsWith(LocalHomeserver.PUBLISH_NAME + "="))
-                .toList();
-    }
-
-    /** Copied readable by its owner alone from the first byte, as a key must be. */
-    private static void ownerOnlyCopy(final Path from, final Path to) throws IOException {
-        Files.createFile(
-                to,
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
-        Files.write(to, Files.readAllBytes(from));
     }
 
     private static void same(final Path here, final Path there, final String key, final String what)
@@ -707,5 +624,21 @@ final class Keep {
             Thread.currentThread().interrupt();
             throw new Failure(Exit.TEMPORARY, "interrupted while waiting", ex);
         }
+    }
+
+    /**
+     * A backup's settings without the published address of an earlier version, which no unit serves
+     * any more: kept, it would read as a homeserver reachable from elsewhere.
+     */
+    private static List<String> withoutPublishing(final Path conf) throws IOException {
+        if (Files.isSymbolicLink(conf)) {
+            throw new IOException(conf + " is a link");
+        }
+        return Files.readAllLines(conf, StandardCharsets.UTF_8).stream()
+                .filter(
+                        line ->
+                                !line.strip().startsWith("PORELO_MATRIX_PUBLISH=")
+                                        && !line.strip().startsWith("PORELO_MATRIX_PUBLISH_NAME="))
+                .toList();
     }
 }

@@ -69,15 +69,6 @@ final class SettingsCheck {
         }
     }
 
-    /** Whether tls_verify is off; a value that is neither is said once, by its own check. */
-    private static boolean off(final JsonNode node) {
-        try {
-            return !Settings.verify(node.path("tls_verify"));
-        } catch (final Failure failure) {
-            return false;
-        }
-    }
-
     /** An offline project reaches this machine's loopback alone, as setup holds it to. */
     private static void offline(final JsonNode node, final List<String> refused) {
         try {
@@ -124,7 +115,9 @@ final class SettingsCheck {
         final Map<String, JsonNode> keys = new TreeMap<>();
         node.properties().forEach(entry -> keys.put(entry.getKey(), entry.getValue()));
         for (final String key : keys.keySet()) {
-            if (!Settings.KEYS.contains(key)) {
+            if ("ca_certificate".equals(key)) {
+                refused.add(Settings.CA_CERTIFICATE_WENT);
+            } else if (!Settings.KEYS.contains(key)) {
                 refused.add("'" + key + "' is not a setting this transport knows");
             }
         }
@@ -162,21 +155,11 @@ final class SettingsCheck {
             if (tokenFile != null) {
                 if (node.path("homeserver").isMissingNode() || node.path("homeserver").isNull()) {
                     refused.add(Settings.TOKEN_FILE_WITHOUT_HOMESERVER);
+                } else if (hosted(node.path("homeserver"))) {
+                    refused.add(Settings.TOKEN_FILE_ON_A_HOST);
                 } else if (tokenFile.isAbsolute()) {
                     // A path in the home is each account's own: this check reads no environment.
                     tokenFileOnThisMachine(tokenFile, warnings);
-                }
-            }
-        } catch (final Failure failure) {
-            refused.add(failure.getMessage());
-        }
-        try {
-            if (Settings.caCertificate(node.path("ca_certificate")) != null) {
-                if (!node.path("ca_file").isMissingNode() && !node.path("ca_file").isNull()) {
-                    refused.add(Settings.TWO_CAS);
-                }
-                if (off(node)) {
-                    refused.add(Settings.TEXT_CONTRADICTION);
                 }
             }
         } catch (final Failure failure) {
@@ -192,6 +175,15 @@ final class SettingsCheck {
             }
         } catch (final Failure failure) {
             refused.add(failure.getMessage());
+        }
+    }
+
+    /** A homeserver this check refuses for itself counts as no host's: it is named once. */
+    private static boolean hosted(final JsonNode homeserver) {
+        try {
+            return Settings.hosted(Settings.homeserver(homeserver));
+        } catch (final Failure failure) {
+            return false;
         }
     }
 }

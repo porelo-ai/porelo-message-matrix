@@ -762,7 +762,16 @@ class LocalHomeserverTest {
                 "config/porelo/matrix/tokens/registration-token",
                 "state/porelo/transports/matrix/abc.since",
                 "state/porelo/transports/matrix/room/abc.since",
-                "state/porelo/matrix/backups/database/meta/3");
+                "state/porelo/matrix/backups/database/meta/3",
+                "config/porelo/matrix/tls.env",
+                "config/porelo/matrix/expelled-logins/bob",
+                "config/porelo/matrix/gate/admin-token",
+                "config/porelo/matrix/gate/login-tokens/abc",
+                "runtime/porelo-matrix-gate/homeserver.sock",
+                "config/porelo/matrix/ca.key",
+                "config/porelo/matrix/tls/server.key",
+                "config/porelo/matrix/machine-tokens/node-1",
+                "config/systemd/user/porelo-matrix-homeserver-vpn.socket.d/publish.conf");
     }
 
     private void prepareAccountClear() throws IOException {
@@ -837,7 +846,9 @@ class LocalHomeserverTest {
                                 "XDG_CONFIG_HOME",
                                 dir.resolve("config").toString(),
                                 "XDG_STATE_HOME",
-                                dir.resolve("state").toString()));
+                                dir.resolve("state").toString(),
+                                "XDG_RUNTIME_DIR",
+                                dir.resolve("runtime").toString()));
         final Process process = builder.start();
         // A project's clear reads its settings from standard input; an open one would hold it.
         process.getOutputStream().close();

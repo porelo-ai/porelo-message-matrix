@@ -30,12 +30,9 @@ public final class Main {
                     "retire",
                     "join",
                     "part",
-                    "admit",
-                    "dismiss",
                     "members",
                     "clear",
-                    "expel",
-                    "machine-token");
+                    "expel");
 
     private Main() {}
 
@@ -110,21 +107,11 @@ public final class Main {
                 case "read" -> Read.run(rest, Config.from(env), env);
                 case "rename" -> Rename.run(rest, Config.from(env));
                 case "room" -> Room.start(rest, env, out, err);
-                case "homeserver-token" -> HomeserverToken.run(rest, env, err);
+                case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "gate" -> Gate.run(rest, env, out, err);
-                case "publish" -> Publish.run(rest, env, out, err, new Publish.Systemd());
                 case "settings" -> SettingsCheck.run(rest, in, out);
-                case "setup",
-                        "enroll",
-                        "retire",
-                        "join",
-                        "part",
-                        "admit",
-                        "dismiss",
-                        "members",
-                        "clear" ->
+                case "setup", "enroll", "retire", "join", "part", "members", "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
-                case "machine-token" -> MachineTokenVerb.run(rest, env, out, new PodmanUnit(env));
                 case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env));
                 case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
                 default -> {

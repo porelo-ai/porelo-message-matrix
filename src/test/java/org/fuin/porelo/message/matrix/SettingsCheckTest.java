@@ -231,6 +231,19 @@ class SettingsCheckTest {
                 .singleElement()
                 .asString()
                 .contains("homeserver elsewhere");
+        for (final String host :
+                List.of("unix:/run/porelo-matrix/client.sock", "http://h.localhost:8008")) {
+            assertThat(
+                            texts(
+                                    check(
+                                                    "{\"homeserver\":\""
+                                                            + host
+                                                            + "\",\"room\":\"#p:h\","
+                                                            + "\"registration_token_file\":\"/etc/t\"}")
+                                            .path("refused")))
+                    .as("a host's gate takes no token: %s", host)
+                    .containsExactly(Settings.TOKEN_FILE_ON_A_HOST);
+        }
         final Path open = Files.writeString(dir.resolve("open"), "t");
         Files.setPosixFilePermissions(
                 open, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
@@ -285,5 +298,36 @@ class SettingsCheckTest {
                 .singleElement()
                 .asString()
                 .contains("room");
+    }
+
+    /**
+     * Harm guarded: a project file that still carries ca_certificate passes settings check or runs
+     * against a setting that went.
+     */
+    @Test
+    @DisplayName("ca_certificate is refused with 78 and in settings check, saying it went")
+    void caCertificateIsRefusedSayingItWent() throws IOException {
+        final String settings = "{\"ca_certificate\":\"-----BEGIN CERTIFICATE-----\\n\"}";
+
+        assertThat(texts(check(settings).path("refused")))
+                .as("settings check refuses ca_certificate saying it went")
+                .singleElement()
+                .asString()
+                .contains("ca_certificate")
+                .contains("went");
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        assertThat(
+                        Main.run(
+                                new String[] {"setup", "--project", "p"},
+                                Map.of(),
+                                new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8)),
+                                new PrintStream(OutputStream.nullOutputStream()),
+                                new PrintStream(err, true, StandardCharsets.UTF_8)))
+                .as("setup refuses ca_certificate with 78")
+                .isEqualTo(Exit.CONFIG);
+        assertThat(err.toString(StandardCharsets.UTF_8))
+                .as("setup says ca_certificate went")
+                .contains("ca_certificate")
+                .contains("went");
     }
 }

@@ -1,8 +1,6 @@
 package org.fuin.porelo.message.matrix;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -104,7 +102,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
         if (active()) {
             return;
         }
-        HomeserverToken.run(List.of(), env, new PrintStream(OutputStream.nullOutputStream()));
+        HomeserverToken.run(List.of(), env);
         try {
             Files.createDirectories(data);
             final ProcessBuilder builder = builder(List.of(), Map.of(), true);
@@ -218,7 +216,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
             settings.put("TUWUNEL_ALLOW_REGISTRATION", "true");
             settings.put("TUWUNEL_REGISTRATION_TOKEN_FILE", HomeserverToken.file(env).toString());
             settings.put("TUWUNEL_ADMIN_SIGNAL_EXECUTE", "[\"server backup-database\"]");
-            settings.putAll(tls());
+            settings.putAll(envFile());
         } else {
             settings.put("TUWUNEL_ALLOW_REGISTRATION", "false");
         }
@@ -227,20 +225,19 @@ final class ProcessUnit implements Unit, AutoCloseable {
         return builder;
     }
 
-    /** As podman's {@code --env-file} gives them, with the container's mount as this directory. */
-    private Map<String, String> tls() throws Failure {
+    /** As podman's {@code --env-file} gives them. */
+    private Map<String, String> envFile() throws Failure {
         final Path dir = LocalHomeserver.directory(env);
         final Map<String, String> settings = new HashMap<>();
         try {
             for (final String line :
-                    Files.readAllLines(dir.resolve(Publish.TLS_ENV), StandardCharsets.US_ASCII)) {
+                    Files.readAllLines(
+                            dir.resolve(HomeserverToken.TLS_ENV), StandardCharsets.US_ASCII)) {
                 if (!line.isBlank()) {
                     final int equals = line.indexOf('=');
                     settings.put(
                             line.substring(0, equals),
                             line.substring(equals + 1)
-                                    .replace(
-                                            Publish.MOUNT + "/", dir.resolve(Certificate.TLS) + "/")
                                     .replace(
                                             "/gate/",
                                             env.getOrDefault("XDG_RUNTIME_DIR", "")
@@ -248,7 +245,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
                 }
             }
         } catch (final IOException ex) {
-            throw new Failure(Exit.CONFIG, "cannot read " + Publish.TLS_ENV, ex);
+            throw new Failure(Exit.CONFIG, "cannot read " + HomeserverToken.TLS_ENV, ex);
         }
         return settings;
     }

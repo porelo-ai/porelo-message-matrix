@@ -45,6 +45,29 @@ class HomeserverTokenTest {
                 .isEqualTo("rwx------");
         assertThat(Files.readString(token(), StandardCharsets.US_ASCII))
                 .matches("[A-Za-z0-9_-]{43}");
+        final Path tlsEnv = home.resolve(".config/porelo/matrix").resolve(HomeserverToken.TLS_ENV);
+        assertThat(tlsEnv).as("the environment file the unit hands podman").isEmptyFile();
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(tlsEnv)))
+                .as("who may read tls.env")
+                .isEqualTo("rw-------");
+    }
+
+    /**
+     * Harm guarded: earlier TLS listener settings left in tls.env keep podman handing them to
+     * Tuwunel on restart.
+     */
+    @Test
+    @DisplayName("Earlier settings in tls.env are cleared to empty before start")
+    void clearsEarlierTlsSettingsFromTlsEnv() throws IOException {
+        final Path tlsEnv = home.resolve(".config/porelo/matrix").resolve(HomeserverToken.TLS_ENV);
+        Files.createDirectories(tlsEnv.getParent());
+        Files.writeString(tlsEnv, "TUWUNEL_TLS_CERTS=/tls/server.crt\n", StandardCharsets.US_ASCII);
+
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as(errBytes.toString(StandardCharsets.UTF_8))
+                .isEqualTo(Exit.OK);
+
+        assertThat(tlsEnv).as("tls.env is written empty before start").isEmptyFile();
     }
 
     @Test

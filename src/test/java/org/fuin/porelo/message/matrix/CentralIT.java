@@ -304,8 +304,8 @@ class CentralIT {
     }
 
     /**
-     * Harm guarded: a machine whose name a person (or the account's own admit) invited before it
-     * registered waits for a second task start it has no reason to need.
+     * Harm guarded: a machine whose name a person invited before it registered waits for a second
+     * task start it has no reason to need.
      */
     @Test
     @DisplayName("A machine invited before it registered is admitted at its first setup")

@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -50,15 +51,6 @@ final class LocalHomeserver {
     static final String PORT = "PORELO_MATRIX_PORT";
 
     static final String SERVER_NAME = "PORELO_MATRIX_SERVER_NAME";
-
-    /**
-     * The address and port the homeserver is also served on, over TLS, for another machine: a VPN
-     * address of this machine, never a wildcard. Unset, it is served on loopback alone.
-     */
-    static final String PUBLISH = "PORELO_MATRIX_PUBLISH";
-
-    /** The host name the published address is also reached by, which its certificate names. */
-    static final String PUBLISH_NAME = "PORELO_MATRIX_PUBLISH_NAME";
 
     /** The server name the unit gives the homeserver when its file names none. */
     private static final String DEFAULT_SERVER_NAME = "localhost";
@@ -150,9 +142,9 @@ final class LocalHomeserver {
     static String registrationToken(final Map<String, String> env) throws Failure {
         final Path file = HomeserverToken.file(env);
         try {
-            // The machines' tokens follow this machine's own, which is first.
             final String token =
-                    MachineTokens.local(Files.readString(file, StandardCharsets.US_ASCII));
+                    RegistrationTokenFile.firstToken(
+                            Files.readString(file, StandardCharsets.US_ASCII));
             if (token.isEmpty()) {
                 throw new Failure(Exit.CONFIG, file + " is empty");
             }
@@ -527,19 +519,6 @@ final class LocalHomeserver {
                 }
             }
         }
-        // The published address goes with the homeserver: nothing may listen for it any more.
-        final boolean published = Files.exists(Publish.dropIn(env));
-        boolean closed = true;
-        if (published) {
-            closed = Publish.Systemd.closeSocket();
-            if (closed) {
-                report.removed("the homeserver's published address: " + Publish.SOCKET + " closed");
-            } else {
-                report.kept(
-                        "the socket " + Publish.SOCKET,
-                        "systemctl --user disable --now " + Publish.SOCKET + " failed");
-            }
-        }
         try {
             // Only the unit's own container, by the id podman gave it: one somebody else named so
             // is not ours.
@@ -583,9 +562,43 @@ final class LocalHomeserver {
         if (Files.exists(earlier)) {
             delete(earlier, report, "the homeserver's registration token, " + earlier);
         }
-        forgetPublished(env, report, closed);
-        if (published) {
-            systemctl("daemon-reload");
+        final Path tlsEnv = directory(env).resolve(HomeserverToken.TLS_ENV);
+        delete(tlsEnv, report, "the homeserver's " + HomeserverToken.TLS_ENV + ", " + tlsEnv);
+        // The expelled logins and the gate's administrator go with the accounts they name; the
+        // gate's socket directory with the homeserver; and what an earlier version made to publish
+        // the homeserver, which nothing serves any more: its CA and keys, its machines' tokens and
+        // records, and the published address's drop-in.
+        final List<Path> records =
+                new ArrayList<>(
+                        List.of(
+                                directory(env).resolve(Expel.DIRECTORY),
+                                GateFiles.directory(env),
+                                directory(env).resolve("ca.crt"),
+                                directory(env).resolve("ca.key"),
+                                directory(env).resolve("tls"),
+                                directory(env).resolve(".certificate.lock"),
+                                directory(env).resolve(".tokens.lock"),
+                                directory(env).resolve("machine-tokens"),
+                                directory(env).resolve("expelled-machines"),
+                                directory(env).resolve("known-machines"),
+                                configHome(env)
+                                        .resolve(
+                                                "systemd/user/porelo-matrix-homeserver-vpn.socket.d")));
+        if (env.get("XDG_RUNTIME_DIR") != null) {
+            records.add(GateFiles.runtime(env));
+        }
+        for (final Path dir : records) {
+            if (Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
+                try (var walk = Files.walk(dir)) {
+                    for (final Path path :
+                            walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                        Files.delete(path);
+                    }
+                    report.removed("the homeserver's records in " + dir);
+                } catch (final IOException ex) {
+                    report.kept(dir.toString(), ex.getMessage());
+                }
+            }
         }
         for (final Path dir : List.of(HomeserverToken.directory(env), directory(env))) {
             try {
@@ -606,61 +619,6 @@ final class LocalHomeserver {
             }
         }
         return report;
-    }
-
-    /**
-     * What publishing made, once the socket is closed: its address, the CA and its key, the server
-     * certificate and its key, and the TLS settings. Files only, so a run again finds nothing.
-     */
-    static void forgetPublished(
-            final Map<String, String> env, final Lifecycle.Report report, final boolean closed)
-            throws Failure {
-        final Path dropIn = Publish.dropIn(env);
-        // A socket still open keeps its address, so the next clear knows to close it.
-        if (closed) {
-            delete(dropIn, report, "the socket's address, " + dropIn);
-        }
-        try {
-            final @Nullable Path dropIns = dropIn.getParent();
-            if (dropIns != null) {
-                Files.deleteIfExists(dropIns);
-            }
-        } catch (final IOException ex) {
-            // Somebody else's drop-in is in it, which is not the transport's to remove.
-        }
-        final Path dir = directory(env);
-        // A certificate made elsewhere is the host administrator's to remove, with its CA.
-        final boolean placed = Certificate.placed(dir);
-        for (final String file :
-                placed
-                        ? List.of(Publish.TLS_ENV, ".certificate.lock", ".tokens.lock")
-                        : List.of(
-                                Certificate.CA_CERTIFICATE,
-                                Certificate.CA_KEY,
-                                Publish.TLS_ENV,
-                                ".certificate.lock",
-                                ".tokens.lock")) {
-            delete(
-                    dir.resolve(file),
-                    report,
-                    "the homeserver's " + file + ", " + dir.resolve(file));
-        }
-        MachineTokens.forget(env, report);
-        if (placed) {
-            return;
-        }
-        final Path tls = dir.resolve(Certificate.TLS);
-        for (final String file : List.of(Certificate.SERVER_CERTIFICATE, Certificate.SERVER_KEY)) {
-            delete(
-                    tls.resolve(file),
-                    report,
-                    "the homeserver's " + file + ", " + tls.resolve(file));
-        }
-        try {
-            Files.deleteIfExists(tls);
-        } catch (final IOException ex) {
-            report.kept(tls.toString(), ex.getMessage());
-        }
     }
 
     static void delete(final Path file, final Lifecycle.Report report, final String what) {

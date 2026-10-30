@@ -1,12 +1,12 @@
 package org.fuin.porelo.message.matrix;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
@@ -14,16 +14,18 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.jspecify.annotations.Nullable;
 
 /**
  * {@code homeserver-token}: makes the local homeserver's registration token once, before its first
- * start, and its TLS settings before every start. Not a verb of Porelo's transport contract - the
- * homeserver's unit runs it. The token is a file readable by this account alone: the homeserver
- * reads it to let accounts register, and Porelo reads it to register the accounts of its tasks, so
- * it exists in one place.
+ * start, and writes its environment file before every start: empty, or in gate mode the
+ * homeserver's private Unix socket. Not a verb of Porelo's transport contract - the homeserver's
+ * unit runs it. The token is a file readable by this account alone: the homeserver reads it to let
+ * accounts register, and Porelo reads it to register the accounts of its tasks, so it exists in one
+ * place.
  */
 final class HomeserverToken {
+
+    static final String TLS_ENV = "tls.env";
 
     private static final Set<PosixFilePermission> OWNER_ONLY =
             PosixFilePermissions.fromString("rw-------");
@@ -39,17 +41,50 @@ final class HomeserverToken {
 
     private HomeserverToken() {}
 
-    static void run(final List<String> args, final Map<String, String> env, final PrintStream err)
-            throws Failure {
+    static void run(final List<String> args, final Map<String, String> env) throws Failure {
         if (!args.isEmpty()) {
             throw new Failure(Exit.USAGE, "usage: homeserver-token");
         }
         backups(env);
         token(env);
         gateDirectory(env);
-        final @Nullable String notice = Publish.prepare(env);
-        if (notice != null) {
-            err.println(Main.NAME + ": " + notice);
+        tlsEnv(env);
+    }
+
+    /**
+     * The environment file the unit hands podman, written before every start so no earlier listener
+     * setting stays in it: empty, or in gate mode the homeserver's private Unix socket.
+     */
+    private static void tlsEnv(final Map<String, String> env) throws Failure {
+        final Path file = LocalHomeserver.directory(env).resolve(TLS_ENV);
+        try {
+            ownDirectory(file);
+            final Path draft =
+                    Files.createTempFile(
+                            file.getParent(),
+                            ".tls-env-",
+                            ".draft",
+                            PosixFilePermissions.asFileAttribute(OWNER_ONLY));
+            try {
+                Files.writeString(
+                        draft,
+                        GateFiles.enabled(env)
+                                ? "TUWUNEL_UNIX_SOCKET_PATH=/gate/homeserver.sock\n"
+                                        + "TUWUNEL_UNIX_SOCKET_PERMS=600\n"
+                                : "",
+                        StandardCharsets.US_ASCII);
+                Files.move(draft, file, StandardCopyOption.ATOMIC_MOVE);
+            } finally {
+                Files.deleteIfExists(draft);
+            }
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot write the homeserver's environment file "
+                            + file
+                            + ": "
+                            + ex.getMessage(),
+                    ex);
         }
     }
 
@@ -90,7 +125,6 @@ final class HomeserverToken {
             } finally {
                 Files.deleteIfExists(draft);
             }
-            MachineTokens.include(env);
         } catch (final FileAlreadyExistsException ex) {
             // Another start made it between the check and the link: that one is the token.
             return;
@@ -135,9 +169,8 @@ final class HomeserverToken {
 
     /**
      * A token an earlier version kept beside the configuration moved into its own directory, once.
-     * The unit mounts that directory, not the file: a file mount keeps the file the container
-     * started with, so a machine admitted or dismissed later, whose token is written by a rename,
-     * would not be seen until a restart.
+     * The unit mounts that directory so nothing else of the account's configuration directory is
+     * visible inside the container.
      */
     private static void moveIntoItsDirectory(final Map<String, String> env, final Path file)
             throws IOException, Failure {

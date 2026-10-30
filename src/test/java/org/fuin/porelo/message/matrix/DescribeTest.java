@@ -78,8 +78,6 @@ class DescribeTest {
                         "retire",
                         "join",
                         "part",
-                        "admit",
-                        "dismiss",
                         "members",
                         "clear",
                         "settings");

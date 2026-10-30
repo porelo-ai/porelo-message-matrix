@@ -17,7 +17,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,9 +35,7 @@ import org.jspecify.annotations.Nullable;
 final class Lifecycle {
 
     static final List<String> VERBS =
-            List.of(
-                    "setup", "enroll", "retire", "join", "part", "admit", "dismiss", "members",
-                    "clear");
+            List.of("setup", "enroll", "retire", "join", "part", "members", "clear");
 
     /** As many persons as {@code members} keeps in a room, each with its accounts beside it. */
     static final int MAX_PERSONS = 500;
@@ -46,9 +43,7 @@ final class Lifecycle {
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
 
-    /**
-     * What a project's, a task's, a machine's or a person's name may be, as part of a Matrix id.
-     */
+    /** What a project's, a task's or a person's name may be, as part of a Matrix id. */
     private static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
 
     private Lifecycle() {}
@@ -62,7 +57,6 @@ final class Lifecycle {
             boolean loopbackOnly,
             @Nullable String display,
             @Nullable String login,
-            @Nullable String machine,
             boolean createRoom,
             @Nullable List<String> persons) {}
 
@@ -92,7 +86,7 @@ final class Lifecycle {
             return;
         }
         final Options options = options(verb, args);
-        final Settings settings = own(Settings.read(in).materialized(env), env);
+        final Settings settings = Settings.read(in).materialized(env);
         // As loud as the environment's switch: said on every start, so it never goes unnoticed.
         if (!settings.verifyTls()) {
             err.println(Main.NAME + " " + verb + ": " + Settings.VERIFY_OFF_WARNING);
@@ -126,8 +120,6 @@ final class Lifecycle {
                     case "retire" -> retire(options, settings, env);
                     case "join" -> join(options, settings, env);
                     case "part" -> part(options, settings, env);
-                    case "admit" -> admit(options, settings, env);
-                    case "dismiss" -> dismiss(options, settings, env);
                     case "members" -> members(options, settings, env);
                     case "clear" -> clear(options, settings, env);
                     default -> throw new IllegalArgumentException(verb);
@@ -154,8 +146,7 @@ final class Lifecycle {
         if (url == null) {
             throw new Failure(
                     Exit.NOT_PERMITTED,
-                    "members keeps a central homeserver's room; on the account's own homeserver"
-                            + " admit and dismiss keep its machines");
+                    "members keeps a central homeserver's room, not the account's own homeserver");
         }
         final String login = centralLogin(options, env);
         final String token =
@@ -184,8 +175,6 @@ final class Lifecycle {
                             + " homeserver setup makes the project's room itself");
         }
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
-        // The relay is named after the project, so the project's name is held to the same rule.
-        notAMachines(env, options.project());
         final URI url = local.url();
         final String reaches = "127.0.0.1:" + local.port();
         final String registrationToken = local.registrationToken();
@@ -197,17 +186,6 @@ final class Lifecycle {
         AdminRoom.of(asAdmin, admin.userId());
         final String server = AdminRoom.server(admin.userId());
         final String room = room(asAdmin, admin.userId(), options.project(), server);
-        // Named in the settings, as the signed file names it for every machine: this one's own.
-        if (settings.room() != null
-                && !settings.room().equals(room)
-                && !settings.room().equals(alias(options.project(), server))) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the project's settings name the room "
-                            + settings.room()
-                            + ", and this homeserver's room for the project is "
-                            + room);
-        }
 
         final Accounts.Session relay =
                 account(
@@ -218,7 +196,7 @@ final class Lifecycle {
                         env.get(Config.ACCESS_TOKEN),
                         registrationToken);
         displayName(nobody, relay, "Porelo (delivery)");
-        admit(asAdmin, room, relay, nobody);
+        joinRoom(asAdmin, room, relay, nobody);
 
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         answer.putObject("account").put(Config.ADMIN_TOKEN, admin.accessToken());
@@ -293,10 +271,10 @@ final class Lifecycle {
             }
         }
 
-        // A login just registered joins only where its name was invited before it existed, as
-        // `admit` does. Whatever fails then, its generated secret must reach Porelo, or the account
-        // is lost to it: so it answers not yet admitted, and the next setup, with the secret kept,
-        // joins or refuses the room in words.
+        // A login just registered joins only where its name was invited before it existed.
+        // Whatever fails then, its generated secret must reach Porelo, or the account is lost to
+        // it: so it answers not yet admitted, and the next setup, with the secret kept, joins or
+        // refuses the room in words.
         if (keptSecret == null || keptSecret.isBlank()) {
             try {
                 return invited(asLogin, configuredRoom)
@@ -391,7 +369,7 @@ final class Lifecycle {
                         env.get(Config.ACCESS_TOKEN),
                         registrationToken);
         displayName(nobody, relay, "Porelo (delivery)");
-        admit(asLogin, room, relay, nobody);
+        joinRoom(asLogin, room, relay, nobody);
 
         put(
                 answer.putObject("secrets"),
@@ -647,7 +625,6 @@ final class Lifecycle {
         }
         final String task = required(options.task(), "--task");
         final Place place = place(settings, env);
-        notAMachines(env, task);
         refuseAnotherProjects(place, options.project(), task);
         final Accounts.Session account =
                 account(
@@ -671,7 +648,7 @@ final class Lifecycle {
                                 .put(
                                         "displayname",
                                         options.display() == null ? task : options.display()));
-        admit(place.admin(), place.room(options.project()), account, place.nobody());
+        joinRoom(place.admin(), place.room(options.project()), account, place.nobody());
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         put(answer.putObject("secrets"), settings.environment(place.url(), account.accessToken()));
         // Not a secret: whom Porelo names with receipt --by, for what another task sent this one.
@@ -719,7 +696,7 @@ final class Lifecycle {
                                 .put(
                                         "displayname",
                                         options.display() == null ? task : options.display()));
-        admit(asLogin, room, account, nobody);
+        joinRoom(asLogin, room, account, nobody);
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         put(
                 answer.putObject("secrets"),
@@ -969,7 +946,6 @@ final class Lifecycle {
             throws Failure {
         final String person = localPerson(options, settings);
         final Place place = place(settings, env);
-        notAMachines(env, person);
         final String server = AdminRoom.server(place.adminId());
         final String id = "@" + person + ":" + server;
         final String password = Accounts.password();
@@ -998,7 +974,7 @@ final class Lifecycle {
         if (options.display() != null) {
             displayName(place.nobody(), account, options.display());
         }
-        admit(place.admin(), room, account, place.nobody());
+        joinRoom(place.admin(), room, account, place.nobody());
 
         if (options.token()) {
             final ObjectNode answer = MatrixClient.JSON.createObjectNode();
@@ -1070,317 +1046,6 @@ final class Lifecycle {
     }
 
     /**
-     * Settings that name this account's own homeserver by the name it is published under, as the
-     * signed settings name it for every machine: this machine keeps its own homeserver's path, its
-     * administrator and its room, while every other machine reaches it as a central one.
-     */
-    private static Settings own(final Settings settings, final Map<String, String> env)
-            throws Failure {
-        final @Nullable URI url = settings.homeserver();
-        if (url == null || !"https".equals(url.getScheme())) {
-            return settings;
-        }
-        final Path conf;
-        try {
-            conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
-        } catch (final Failure failure) {
-            // No home to hold a homeserver of the account's own: the settings' is another's.
-            return settings;
-        }
-        final @Nullable String name = Publish.name(conf);
-        // A host name has no case; the published one is kept in lower case.
-        if (name == null
-                || !name.equalsIgnoreCase(url.getHost())
-                || Publish.published(conf) == null) {
-            return settings;
-        }
-        final int port;
-        try {
-            final @Nullable String kept = LocalHomeserver.setting(conf, LocalHomeserver.PORT);
-            if (kept == null) {
-                // Which URL is this homeserver's cannot be told: refused, never guessed.
-                throw new Failure(
-                        Exit.CONFIG,
-                        conf
-                                + " publishes the homeserver as "
-                                + name
-                                + " and names no port for it; set a project up first");
-            }
-            port = Integer.parseInt(kept);
-        } catch (final IOException | NumberFormatException ex) {
-            throw new Failure(Exit.CONFIG, "cannot read the homeserver's port in " + conf, ex);
-        }
-        if (url.getPort() != port) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the project's homeserver "
-                            + url
-                            + " is this machine's published name, and its homeserver listens on port "
-                            + port
-                            + "; the settings must name that port");
-        }
-        return new Settings(null, null, true, null, settings.room(), null);
-    }
-
-    // --- admit, dismiss
-    // ------------------------------------------------------------------------------------------
-
-    /**
-     * Another machine admitted to the project's room on the account's own homeserver, published on
-     * an address of this machine: a registration token of the machine's own, and {@code
-     * @porelo.<machine>} invited, so the machine's own {@code setup} registers and joins it. Run
-     * again, the same token.
-     */
-    private static ObjectNode admit(
-            final Options options, final Settings settings, final Map<String, String> env)
-            throws Failure {
-        final String machine = local(options, settings, "admit");
-        if (options.loopbackOnly()) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "an offline project admits no other machine: its homeserver is this machine's"
-                            + " loopback alone");
-        }
-        final Path dir = LocalHomeserver.directory(env);
-        final Publish.@Nullable Address published =
-                Publish.published(dir.resolve("homeserver.conf"));
-        if (published == null) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the homeserver is published on no address another machine reaches; run"
-                            + " publish --address first");
-        }
-        // Everything that can fail before the token is made, so a refused admit leaves none.
-        final String caCertificate = Certificate.caCertificate(dir);
-        final List<String> admitted = MachineTokens.admitted(env);
-        for (final String other : admitted) {
-            if (!other.equals(machine)
-                    && (other.endsWith("." + machine) || machine.endsWith("." + other))) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        "the machine "
-                                + other
-                                + " is admitted already, and its accounts' names and "
-                                + machine
-                                + "'s would end alike; admit a machine of another name");
-            }
-        }
-        final Place place = place(settings, env);
-        final String room = place.room(options.project());
-        final String admin = machineAdmin(machine, place);
-        final String ending = ending(machine, place);
-        final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
-        // Before the first admission none of the machine's accounts exists: one named so, in any
-        // project's room here, is somebody else's, and dismissing the machine would put it out.
-        if (!admitted.contains(machine)) {
-            for (final String id :
-                    membersElsewhere(place.admin(), AdminRoom.server(place.adminId()), null)
-                            .keySet()) {
-                if (id.endsWith(ending) && !admin.equals(id)) {
-                    throw new Failure(
-                            Exit.CONFIG,
-                            id
-                                    + " is in a project's room and ends as "
-                                    + machine
-                                    + "'s accounts would; admit a machine of another name");
-                }
-            }
-        }
-        // Only what dismiss banned is lifted, once every check has passed.
-        for (final JsonNode member : place.admin().get(path + "/members").path("chunk")) {
-            final String id = member.path("state_key").asText("");
-            final JsonNode content = member.path("content");
-            if ((admin.equals(id) || id.endsWith(ending))
-                    && "ban".equals(content.path("membership").asText(""))
-                    && place.adminId().equals(member.path("sender").asText(""))
-                    && DISMISSED.equals(content.path("reason").asText(""))) {
-                place.admin()
-                        .post(
-                                path + "/unban",
-                                MatrixClient.JSON
-                                        .createObjectNode()
-                                        .put("user_id", id)
-                                        .put("reason", READMITTED));
-            }
-        }
-        invite(place, room, admin);
-        final String token = MachineTokens.issue(env, machine);
-
-        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
-        answer.putObject("admission")
-                .put("machine", machine)
-                .put("homeserver", "https://" + published.text())
-                .put("room", room)
-                .put("ca_certificate", caCertificate);
-        answer.putObject("secrets").put("registration_token", token);
-        return answer;
-    }
-
-    /**
-     * A machine admitted before put out again: its registration token refused from now on, and
-     * every account of it in the project's room - {@code @porelo.<machine>}, its relay and its
-     * tasks - banned from every project's room here. Run again, it finds nothing.
-     */
-    private static ObjectNode dismiss(
-            final Options options, final Settings settings, final Map<String, String> env)
-            throws Failure {
-        final String machine = local(options, settings, "dismiss");
-        final Place place = place(settings, env);
-        place.room(options.project());
-        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
-        final var removed = answer.putArray("removed");
-        // A machine never admitted has no accounts here: names that end so are somebody else's.
-        if (!MachineTokens.admitted(env).contains(machine)) {
-            return answer;
-        }
-        final String admin = machineAdmin(machine, place);
-        final String ending = ending(machine, place);
-        final String server = AdminRoom.server(place.adminId());
-        final Set<String> banned = new LinkedHashSet<>();
-        boolean revoked = false;
-        // The token is the homeserver's, so the machine goes from every project's room. Banned,
-        // not kicked: a member of it not yet put out could invite another back, so the rooms are
-        // read again until none is left; the token goes last, so a dismiss that stops half way
-        // finds the machine still admitted when run again.
-        for (int round = 0; round < ROUNDS; round++) {
-            boolean found = false;
-            for (final String room : projectRooms(place.admin(), server)) {
-                final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
-                final List<String> left = new ArrayList<>();
-                for (final JsonNode member : place.admin().get(path + "/members").path("chunk")) {
-                    final String id = member.path("state_key").asText("");
-                    if (present(member) && (admin.equals(id) || id.endsWith(ending))) {
-                        left.add(id);
-                    }
-                }
-                // Its administrator first, which invites the others.
-                left.sort((a, b) -> Boolean.compare(!admin.equals(a), !admin.equals(b)));
-                for (final String id : left) {
-                    place.admin()
-                            .post(
-                                    path + "/ban",
-                                    MatrixClient.JSON
-                                            .createObjectNode()
-                                            .put("user_id", id)
-                                            .put("reason", DISMISSED));
-                    banned.add(id);
-                    found = true;
-                }
-            }
-            if (!found && revoked) {
-                banned.forEach(removed::add);
-                return answer;
-            }
-            if (!found && MachineTokens.revoke(env, machine)) {
-                removed.add("the registration token of " + machine);
-            }
-            revoked = revoked || !found;
-        }
-        throw new Failure(
-                Exit.TEMPORARY,
-                "accounts of "
-                        + machine
-                        + " came back into a project's room "
-                        + ROUNDS
-                        + " times; run dismiss again");
-    }
-
-    /** The rooms here that are projects': the administrator's, under {@code #porelo-*:server}. */
-    private static List<String> projectRooms(final MatrixClient admin, final String server)
-            throws Failure {
-        final List<String> rooms = new ArrayList<>();
-        for (final JsonNode joined :
-                admin.get("/_matrix/client/v3/joined_rooms").path("joined_rooms")) {
-            final String id = joined.asText("");
-            final JsonNode canonical =
-                    id.isEmpty()
-                            ? null
-                            : admin.find(
-                                    "/_matrix/client/v3/rooms/"
-                                            + MatrixClient.segment(id)
-                                            + "/state/m.room.canonical_alias");
-            final String alias = canonical == null ? "" : canonical.path("alias").asText("");
-            if (alias.startsWith("#porelo-") && alias.endsWith(":" + server)) {
-                rooms.add(id);
-            }
-        }
-        return rooms;
-    }
-
-    /** The reason {@code dismiss} bans with, so {@code admit} lifts only its own bans. */
-    private static final String DISMISSED = "its machine was dismissed";
-
-    /**
-     * The reason an unban gives: a leave with a reason is never one {@code part} made, so no {@code
-     * join} takes such an account without {@code --reset}.
-     */
-    private static final String READMITTED = "its machine was admitted again";
-
-    private static String machineAdmin(final String machine, final Place place) {
-        return "@" + ADMIN + "." + machine + ":" + AdminRoom.server(place.adminId());
-    }
-
-    private static boolean present(final JsonNode member) {
-        final String membership = member.path("content").path("membership").asText("");
-        return "join".equals(membership) || "invite".equals(membership);
-    }
-
-    /** How often dismiss reads the room again for accounts of the machine that came back. */
-    private static final int ROUNDS = 5;
-
-    /** The ending every account of the machine has: {@code .<machine>:<server>}. */
-    private static String ending(final String machine, final Place place) {
-        return "." + machine + ":" + AdminRoom.server(place.adminId());
-    }
-
-    /**
-     * A name of this machine's own refused while it would end as an admitted machine's accounts do,
-     * since dismissing that machine would put it out with them.
-     */
-    private static void notAMachines(final Map<String, String> env, final String name)
-            throws Failure {
-        for (final String machine : MachineTokens.admitted(env)) {
-            if (name.endsWith("." + machine)) {
-                throw new Failure(
-                        Exit.CONFIG,
-                        "'"
-                                + name
-                                + "' ends as the accounts of the admitted machine "
-                                + machine
-                                + " do; take another name");
-            }
-        }
-    }
-
-    /** The machine named, on the account's own homeserver alone: a central one admits nobody. */
-    private static String local(final Options options, final Settings settings, final String verb)
-            throws Failure {
-        if (settings.homeserver() != null) {
-            throw new Failure(
-                    Exit.NOT_PERMITTED,
-                    verb
-                            + " acts on the account's own homeserver; machines are admitted to a"
-                            + " central one at the homeserver itself");
-        }
-        return required(options.machine(), "--machine");
-    }
-
-    /** Invited unless joined or invited already; an account not registered yet may be invited. */
-    private static void invite(final Place place, final String room, final String id)
-            throws Failure {
-        final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
-        final JsonNode member =
-                place.admin().find(path + "/state/m.room.member/" + MatrixClient.segment(id));
-        final String membership = member == null ? "" : member.path("membership").asText("");
-        if (!"join".equals(membership) && !"invite".equals(membership)) {
-            place.admin()
-                    .post(
-                            path + "/invite",
-                            MatrixClient.JSON.createObjectNode().put("user_id", id));
-        }
-    }
-
-    /**
      * Whether the administrator put {@code id} out of {@code room}, as {@code part} does. An
      * account that left by itself - a retired task's, deactivated - is not one, so no person takes
      * it over.
@@ -1394,7 +1059,7 @@ final class Lifecycle {
             if (id.equals(member.path("state_key").asText(""))) {
                 return "leave".equals(member.path("content").path("membership").asText(""))
                         && place.adminId().equals(member.path("sender").asText(""))
-                        // part kicks without a reason; dismiss and admit always give one.
+                        // part kicks without a reason.
                         && member.path("content").path("reason").asText("").isEmpty();
             }
         }
@@ -1467,7 +1132,6 @@ final class Lifecycle {
                                 alias(project, server),
                                 found.path("room_id").asText());
                 final Map<String, String> elsewhere = membersElsewhere(place.admin(), server, room);
-                final List<String> machines = MachineTokens.admitted(env);
                 for (final JsonNode member :
                         place.admin()
                                 .get(
@@ -1481,19 +1145,6 @@ final class Lifecycle {
                             || id.equals(place.adminId())
                             || !id.endsWith(":" + server)
                             || !("join".equals(membership) || "invite".equals(membership))) {
-                        continue;
-                    }
-                    // An admitted machine's accounts are that machine's: deactivated, it could not
-                    // come back to any project.
-                    final @Nullable String machine =
-                            machines.stream()
-                                    .filter(name -> id.endsWith("." + name + ":" + server))
-                                    .findFirst()
-                                    .orElse(null);
-                    if (machine != null) {
-                        report.kept(
-                                "the account " + id,
-                                "an account of the admitted machine " + machine);
                         continue;
                     }
                     // One account per person on the homeserver: deactivated, it would lose every
@@ -1553,7 +1204,7 @@ final class Lifecycle {
         try {
             loginId = loginId(nobody, asLogin, login);
         } catch (final Failure failure) {
-            // A token the homeserver no longer knows: it let this login go, dismissed or reset,
+            // A token the homeserver no longer knows: it let this login go, expelled or reset,
             // and nothing of it is left there to clear.
             if (!(failure.getCause() instanceof Failure refused
                     && refused.exitCode() == Exit.NOT_PERMITTED)) {
@@ -1990,7 +1641,7 @@ final class Lifecycle {
     }
 
     /** Into the room: invited by the administrator and joined, unless it is in already. */
-    private static void admit(
+    private static void joinRoom(
             final MatrixClient admin,
             final String room,
             final Accounts.Session account,
@@ -2032,7 +1683,6 @@ final class Lifecycle {
         boolean loopbackOnly = false;
         String display = null;
         String login = null;
-        String machine = null;
         boolean createRoom = false;
         List<String> persons = null;
         for (int i = 0; i < args.size(); i++) {
@@ -2049,10 +1699,7 @@ final class Lifecycle {
                 token = true;
                 continue;
             }
-            if ("--loopback-only".equals(arg)
-                    && !"retire".equals(verb)
-                    && !"clear".equals(verb)
-                    && !"dismiss".equals(verb)) {
+            if ("--loopback-only".equals(arg) && !"retire".equals(verb) && !"clear".equals(verb)) {
                 loopbackOnly = true;
                 continue;
             }
@@ -2065,16 +1712,10 @@ final class Lifecycle {
                 case "--task" -> task = name(value, "--task");
                 case "--person" -> person = name(value, "--person");
                 case "--login" -> {
-                    if (login != null || "admit".equals(verb) || "dismiss".equals(verb)) {
+                    if (login != null) {
                         throw usage(verb);
                     }
                     login = Login.name(value);
-                }
-                case "--machine" -> {
-                    if (!("admit".equals(verb) || "dismiss".equals(verb))) {
-                        throw usage(verb);
-                    }
-                    machine = machine(value);
                 }
                 case "--persons" -> {
                     if (!"members".equals(verb) || persons != null) {
@@ -2095,9 +1736,7 @@ final class Lifecycle {
                 switch (verb) {
                     case "setup" -> task == null && person == null;
                     case "enroll", "retire" -> task != null && person == null;
-                    case "join" -> person != null && task == null;
-                    case "part" -> person != null && task == null && machine == null;
-                    case "admit", "dismiss" -> machine != null && task == null && person == null;
+                    case "join", "part" -> person != null && task == null;
                     case "members" -> persons != null && task == null && person == null;
                     case "clear" -> task == null && person == null;
                     default -> false;
@@ -2114,7 +1753,6 @@ final class Lifecycle {
                 loopbackOnly,
                 display,
                 login,
-                machine,
                 createRoom,
                 persons);
     }
@@ -2160,23 +1798,6 @@ final class Lifecycle {
         return value;
     }
 
-    // A host name is case-insensitive and a Matrix localpart is lower case. Only ASCII is folded,
-    // so
-    // no other character can become one a name allows.
-    private static String machine(final String value) throws Failure {
-        final StringBuilder folded = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            final char c = value.charAt(i);
-            folded.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
-        }
-        if (!NAME.matcher(folded).matches()) {
-            throw new Failure(
-                    Exit.USAGE,
-                    "--machine must be letters, digits and . _ = - , not '" + value + "'");
-        }
-        return folded.toString();
-    }
-
     private static Failure usage(final String verb) {
         return new Failure(
                 Exit.USAGE,
@@ -2193,9 +1814,6 @@ final class Lifecycle {
                             case "clear" -> "clear [--project <project>] [--login <login>]";
                             case "part" ->
                                     "part --project <project> --person <person> [--login <login>] [--loopback-only]";
-                            case "admit" ->
-                                    "admit --project <project> --machine <machine> [--loopback-only]";
-                            case "dismiss" -> "dismiss --project <project> --machine <machine>";
                             default ->
                                     "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--login <login>] [--loopback-only]";
                         });

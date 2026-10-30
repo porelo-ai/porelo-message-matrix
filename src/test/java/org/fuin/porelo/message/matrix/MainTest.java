@@ -8,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class MainTest {
 
@@ -96,31 +98,17 @@ class MainTest {
                 .contains("its homeserver is https://matrix.example.org");
     }
 
-    /**
-     * Harm guarded: the administrator's token comes on a command line or in the environment because
-     * {@code machine-token} reads it from no input.
-     */
-    @Test
-    @DisplayName("machine-token takes the administrator's token from the input's secrets")
-    void machineTokenReadsTheAdminTokenFromTheInput() {
-        assertThat(runWithInput("{}", "machine-token", "expel", "../hosta"))
-                .as("with none")
-                .isEqualTo(Exit.CONFIG);
-        assertThat(stderr()).as("with none").contains("expel needs the administrator's token");
-        errBytes.reset();
-
-        final int exit =
-                runWithInput(
-                        "{\"secrets\":{\"" + Config.ADMIN_TOKEN + "\":\"t\"}}",
-                        "machine-token",
-                        "expel",
-                        "../hosta");
+    /** Harm guarded: a removed verb still runs instead of failing closed as an unknown verb. */
+    @ParameterizedTest
+    @ValueSource(strings = {"publish", "machine-token", "admit", "dismiss"})
+    @DisplayName("Each removed verb is refused with 64 as an unknown verb")
+    void removedVerbsAreRefusedAsUnknown(final String verb) {
+        final int exit = Main.run(new String[] {verb}, Map.of(), err, err);
 
         assertThat(exit).as(stderr()).isEqualTo(Exit.USAGE);
         assertThat(stderr())
-                .as("the token taken, the name refused before the homeserver is started")
-                .contains("not a machine's name")
-                .doesNotContain("administrator's token");
+                .as("refused as an unknown verb")
+                .contains("unknown verb '" + verb + "'");
     }
 
     /** Harm guarded: a draft handed the new way is checked as something else. */

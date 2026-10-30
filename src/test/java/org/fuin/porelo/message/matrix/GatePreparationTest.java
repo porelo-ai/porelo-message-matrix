@@ -60,7 +60,7 @@ class GatePreparationTest {
         assertThat(Main.run(new String[] {"homeserver-token"}, env, out, out))
                 .as("unit preparation")
                 .isZero();
-        assertThat(Files.readString(conf.getParent().resolve(Publish.TLS_ENV)))
+        assertThat(Files.readString(conf.getParent().resolve(HomeserverToken.TLS_ENV)))
                 .as("only the private socket is added to the container environment")
                 .isEqualTo(
                         "TUWUNEL_UNIX_SOCKET_PATH=/gate/homeserver.sock\nTUWUNEL_UNIX_SOCKET_PERMS=600\n");
