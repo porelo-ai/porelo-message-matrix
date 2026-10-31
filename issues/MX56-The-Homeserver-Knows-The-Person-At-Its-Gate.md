@@ -122,8 +122,9 @@ the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `us
 
 ## Accepted in review (2026-10-30)
 
-Read by a second model twice, before and after the security rewrite; every finding is fixed but these, each accepted
-for the test and left for a later issue if it matters there:
+Read by a second model twice, before and after the security rewrite; every finding is fixed but these.
+
+Accepted (operator, 2026-10-31):
 
 - The gate reads a request's body whole, up to 64 MiB, before it decides whether the caller may send it; one person
   can make the homeserver's account hold that much per connection.
@@ -131,6 +132,10 @@ for the test and left for a later issue if it matters there:
   account writes those files.
 - When the session made for a login fails after it was made, the gate does not log that session out.
 - In gate mode the host's port 8008 stays published, mapped to the container's 8009, where nothing listens.
-- The SSO redirect sends the login token to any absolute `https` or custom-scheme URL the client names; the token
-  is the caller's own, single use and two minutes long.
 - SSO redirects under `/_matrix/client/r0/` are refused; clients use `v3`.
+
+Not accepted (operator, 2026-10-31), kept only for the sprint 6m test on its test host:
+
+- The SSO redirect sends the login token to any absolute `http`, `https` or custom-scheme URL the client names.
+  [MX61](README.md#mx61) binds it to the homeserver's own clients
+  before any real use.
