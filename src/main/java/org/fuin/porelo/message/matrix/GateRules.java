@@ -113,6 +113,19 @@ final class GateRules {
         }
     }
 
+    /**
+     * An {@code Origin} whose page may read the gate's answers: none (a client that is no browser),
+     * Element Desktop's, or a page served from this machine's loopback. A page elsewhere could
+     * otherwise read a login answer the person's browser was made to ask for.
+     */
+    static boolean originAllowed(final String origin) {
+        if (origin.isEmpty() || origin.equals("vector://vector")) {
+            return true;
+        }
+        final String host = origin.replaceFirst("^https?://", "");
+        return !host.equals(origin) && !host.contains("/") && hostAllowed(host);
+    }
+
     static boolean clientPath(final String path) {
         return (path.startsWith("/_matrix/client/") || path.startsWith("/_matrix/media/"))
                 && Arrays.stream(path.split("/", -1))

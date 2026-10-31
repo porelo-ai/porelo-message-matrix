@@ -149,7 +149,8 @@ characters, and is neither `porelo` nor a name starting `porelo-`. A login recor
 `expelled-logins/<login>` beside `homeserver.conf` is refused too. A lock holds at the next request;
 a sync already held open completes at its own timeout.
 
-Clients see SSO named “Your login on this host”, token login, and password login. SSO creates the
+Clients see SSO named “Your login on this host” and token login. Password login is accepted but not
+listed: the transport's accounts sign in with theirs, and nobody knows a person account's. SSO creates the
 person's `@<login>` account if missing and redirects to the client with a gate token valid for two
 minutes, usable once by that host login alone. Only its SHA-256, login and expiry are kept, under
 `gate/login-tokens/` with mode 0600. Registration offers the `m.login.dummy` authentication stage;
@@ -160,7 +161,11 @@ no caller. Access tokens, in the header or query, are bound with `whoami`; each 
 most 64 identities by token hash.
 
 Only the client and media APIs pass. The gate answers discovery and sign-in flows, and hides admin,
-federation and key APIs with 404. Reserved room aliases `porelo-<project>` require the token of
+federation and key APIs with 404. A browser client such as Element Desktop is served under CORS: the
+gate answers its preflight without a token and names its origin in the headers of its own answers.
+Only Element Desktop's origin `vector://vector` and pages served from loopback or a `*.localhost`
+name are allowed; a request from any other origin is refused with 403, so a page elsewhere cannot
+read a sign-in answer the person's browser was made to ask for. Reserved room aliases `porelo-<project>` require the token of
 `@porelo.<login>` and that login on a line of `/etc/porelo-host/matrix/<project>.admins`; a missing
 or empty file grants nothing. Refusal logs contain only the login, method, path without its query,
 and status. The administrator token is read only for gate operations and is never returned to clients.

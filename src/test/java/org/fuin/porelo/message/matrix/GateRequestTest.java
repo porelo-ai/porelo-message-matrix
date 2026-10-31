@@ -58,6 +58,7 @@ class GateRequestTest {
                         "GET http://localhost/ HTTP/1.1\r\nHost: localhost\r\n\r\n",
                         "GET / HTTP/1.1\r\n\r\n",
                         "GET / HTTP/1.1\r\nHost: a\r\nHost: b\r\n\r\n",
+                        "GET / HTTP/1.1\r\nHost: a\r\nOrigin: vector://vector\r\nOrigin: https://x.example\r\n\r\n",
                         "POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\nx",
                         "POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
                         "POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 67108865\r\n\r\n",

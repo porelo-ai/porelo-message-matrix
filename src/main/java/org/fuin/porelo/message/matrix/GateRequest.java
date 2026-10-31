@@ -132,7 +132,8 @@ final class GateRequest {
                                     "content-length",
                                     "transfer-encoding",
                                     "authorization",
-                                    "connection")
+                                    "connection",
+                                    "origin")
                             .contains(name)) {
                 throw malformed();
             }
@@ -364,6 +365,11 @@ final class GateRequest {
 
     String host() {
         return fields.getOrDefault("host", "");
+    }
+
+    /** The {@code Origin} a browser client sends, empty from any other client. */
+    String origin() {
+        return fields.getOrDefault("origin", "");
     }
 
     String parameter(final String name) {

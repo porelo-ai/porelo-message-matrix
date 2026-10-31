@@ -149,6 +149,7 @@ final class Gate {
             if (request == null) {
                 return;
             }
+            final String origin = GateRules.originAllowed(request.origin()) ? request.origin() : "";
             final int status;
             try {
                 final GateResponse answer = decide(request);
@@ -162,10 +163,10 @@ final class Gate {
                     return;
                 } else {
                     status = answer.status();
-                    answer.write(out, request.close() || status == 400);
+                    answer.write(out, request.close() || status == 400, origin);
                 }
             } catch (final Failure | IOException ex) {
-                GateResponse.error(502, "M_UNKNOWN").write(out, true);
+                GateResponse.error(502, "M_UNKNOWN").write(out, true, origin);
                 refused(request.method(), request.path(), 502);
                 return;
             }
@@ -214,6 +215,9 @@ final class Gate {
         if (!GateRules.hostAllowed(request.host())) {
             return GateResponse.error(400, "M_UNRECOGNIZED");
         }
+        if (!GateRules.originAllowed(request.origin())) {
+            return forbidden();
+        }
         // No answer of the gate's own is framed for a request that takes none.
         if (request.method().equals("HEAD")) {
             return GateResponse.error(400, "M_UNRECOGNIZED");
@@ -238,6 +242,10 @@ final class Gate {
         final boolean wellKnown = method.equals("GET") && path.equals("/.well-known/matrix/client");
         if (!GateRules.clientPath(path) && !wellKnown) {
             return GateResponse.error(404, "M_UNRECOGNIZED");
+        }
+        // A browser asks before a request with a token; the question itself carries none.
+        if (method.equals("OPTIONS")) {
+            return GateResponse.preflight();
         }
         final String token = request.token();
         String id = "";
@@ -266,7 +274,14 @@ final class Gate {
             body.putObject("m.homeserver").put("base_url", "http://" + request.host());
             return new GateResponse(200, body);
         }
-        if (method.equals("GET") && path.equals(CLIENT + "versions")) {
+        // What a client reads before signing in; Element asks whether the homeserver delegates
+        // its sign-in, and takes the homeserver's answer.
+        if (method.equals("GET")
+                && List.of(
+                                CLIENT + "versions",
+                                CLIENT + "v1/auth_metadata",
+                                CLIENT + "unstable/org.matrix.msc2965/auth_issuer")
+                        .contains(path)) {
             return null;
         }
         final String endpoint = endpoint(path);
@@ -280,8 +295,9 @@ final class Gate {
                     .addObject()
                     .put("id", "porelo")
                     .put("name", "Your login on this host");
+            // A password login stays for the transport's accounts, which do not ask; a person's
+            // account has a password nobody knows, so Element is not shown a form for one.
             flows.addObject().put("type", "m.login.token");
-            flows.addObject().put("type", "m.login.password");
             return new GateResponse(200, body);
         }
         if (method.equals("POST") && endpoint.equals("login")) {

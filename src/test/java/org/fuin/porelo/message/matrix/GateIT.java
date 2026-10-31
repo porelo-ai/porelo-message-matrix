@@ -184,6 +184,29 @@ class GateIT {
                 assertThat(messages.path("chunk").findValuesAsText("body"))
                         .as("sent message is visible")
                         .contains("through the gate");
+                final String bearer = signedIn.body().path("access_token").asText();
+                for (final String[] asked :
+                        List.of(
+                                new String[] {"OPTIONS", "/_matrix/client/v3/sync", ""},
+                                new String[] {"GET", "/.well-known/matrix/client", ""},
+                                new String[] {"GET", "/_matrix/client/versions", ""},
+                                new String[] {"GET", "/_matrix/client/v3/login", ""},
+                                new String[] {
+                                    "GET", "/_matrix/client/v3/sync?timeout=0", bearer
+                                })) {
+                    final Wire.Reply reply = elementAsks(listener, asked[0], asked[1], asked[2]);
+                    assertThat(reply.statusCode())
+                            .as("Element's " + asked[0] + " " + asked[1])
+                            .isIn(200, 204);
+                    assertThat(header(reply.raw(), "Access-Control-Allow-Origin"))
+                            .as("Element may read " + asked[1])
+                            .isIn("vector://vector", "*");
+                }
+                final Wire.Reply discovery =
+                        elementAsks(listener, "GET", "/_matrix/client/v1/auth_metadata", "");
+                assertThat(discovery.statusCode())
+                        .as("the homeserver answers Element's sign-in discovery")
+                        .isNotEqualTo(401);
                 try (SocketChannel connection =
                         SocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
                     connection.connect(UnixDomainSocketAddress.of(listener));
@@ -474,6 +497,35 @@ class GateIT {
             Thread.sleep(100);
         }
         throw new IOException("the private homeserver did not start");
+    }
+
+    /** One request as Element Desktop sends it, on a connection of its own. */
+    private static Wire.Reply elementAsks(
+            final Path listener, final String method, final String target, final String token)
+            throws IOException {
+        try (SocketChannel connection = SocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
+            connection.connect(UnixDomainSocketAddress.of(listener));
+            final var out = Channels.newOutputStream(connection);
+            out.write(
+                    (method
+                                    + " "
+                                    + target
+                                    + " HTTP/1.1\r\nHost: walk.localhost:8448\r\n"
+                                    + "Origin: vector://vector\r\n"
+                                    + (method.equals("OPTIONS")
+                                            ? "Access-Control-Request-Method: GET\r\n"
+                                                    + "Access-Control-Request-Headers:"
+                                                    + " authorization\r\n"
+                                            : "")
+                                    + (token.isEmpty()
+                                            ? ""
+                                            : "Authorization: Bearer " + token + "\r\n")
+                                    + "Connection: close\r\n\r\n")
+                            .getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            return SocketWire.read(
+                    new BufferedInputStream(Channels.newInputStream(connection)), method);
+        }
     }
 
     private static String header(final byte[] raw, final String name) {

@@ -37,6 +37,11 @@ final class GateResponse {
                         .put("error", "Request refused by the host's gate"));
     }
 
+    /** The answer to a browser's preflight, its headers those of {@link #write}. */
+    static GateResponse preflight() {
+        return new GateResponse(204, new byte[0], new byte[0], "");
+    }
+
     static GateResponse redirect(final String location) {
         return new GateResponse(302, new byte[0], new byte[0], location);
     }
@@ -54,6 +59,15 @@ final class GateResponse {
     }
 
     void write(final OutputStream out, final boolean close) throws IOException {
+        write(out, close, "");
+    }
+
+    /**
+     * With {@code origin}, an allowed browser client's, named in the CORS headers; the homeserver's
+     * own answers carry its own.
+     */
+    void write(final OutputStream out, final boolean close, final String origin)
+            throws IOException {
         if (wire.length != 0) {
             out.write(wire);
         } else {
@@ -62,9 +76,19 @@ final class GateResponse {
                             + status
                             + " "
                             + reason(status)
-                            + "\r\nContent-Type: application/json\r\nContent-Length: "
+                            + (body.length == 0 ? "" : "\r\nContent-Type: application/json")
+                            + "\r\nContent-Length: "
                             + body.length
                             + "\r\nCache-Control: no-store\r\n"
+                            + (origin.isEmpty()
+                                    ? ""
+                                    : "Access-Control-Allow-Origin: "
+                                            + origin
+                                            + "\r\nAccess-Control-Allow-Methods: GET, HEAD,"
+                                            + " POST, PUT, DELETE, OPTIONS"
+                                            + "\r\nAccess-Control-Allow-Headers: X-Requested-With,"
+                                            + " Content-Type, Authorization"
+                                            + "\r\nVary: Origin\r\n")
                             + (close ? "Connection: close\r\n" : "")
                             + (location.isEmpty() ? "" : "Location: " + location + "\r\n")
                             + "\r\n";
@@ -77,6 +101,7 @@ final class GateResponse {
     private static String reason(final int status) {
         return switch (status) {
             case 200 -> "OK";
+            case 204 -> "No Content";
             case 302 -> "Found";
             case 400 -> "Bad Request";
             case 401 -> "Unauthorized";

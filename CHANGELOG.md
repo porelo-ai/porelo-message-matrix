@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - A host homeserver can run behind a Unix-socket gate that admits host logins, binds their Matrix accounts, handles registration and SSO, and protects project room aliases. `gate --prepare` keeps the administrator token private and configures the container without a reachable host TCP listener.
+- The host's gate serves Element Desktop and other browser clients: it answers their CORS preflight, names an
+  allowed origin in its own answers, refuses requests from a foreign origin, and passes sign-in discovery
+  to the homeserver. Its sign-in list offers SSO and token login only.
 - On a central homeserver, `poll` takes words as a person's, in the room and in a direct chat, only from a
   person's own account, a bare name with no dot, `send --to` reaches only one, and a central account's `secrets`
   name `PORELO_MATRIX_LOGIN`, which marks it so (empty on the account's own homeserver). Another person's tasks and relays no longer speak as a person.

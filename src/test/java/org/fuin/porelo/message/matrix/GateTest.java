@@ -116,6 +116,17 @@ class GateTest {
             final String body,
             final String host)
             throws Exception {
+        return request(method, path, token, body, host, "");
+    }
+
+    private int request(
+            final String method,
+            final String path,
+            final String token,
+            final String body,
+            final String host,
+            final String headers)
+            throws Exception {
         final String wire =
                 method
                         + " "
@@ -123,6 +134,7 @@ class GateTest {
                         + " HTTP/1.1\r\nHost: "
                         + host
                         + "\r\n"
+                        + headers
                         + (token.isEmpty() ? "" : "Authorization: Bearer " + token + "\r\n")
                         + "Content-Length: "
                         + body.getBytes(StandardCharsets.UTF_8).length
@@ -615,5 +627,114 @@ class GateTest {
                                 "",
                                 "{\"username\":\"alice\",\"password\":\"\",\"auth\":{\"type\":\"m.login.dummy\"}}"))
                 .isEqualTo(400);
+    }
+
+    /** Harm guarded: Element, a browser client, cannot reach the homeserver it signs in to. */
+    @Test
+    void elementsPreflightIsAnsweredWithoutAToken() throws Exception {
+        assertThat(
+                        request(
+                                "OPTIONS",
+                                "/_matrix/client/v3/sync",
+                                "",
+                                "",
+                                "walk.localhost:8448",
+                                "Origin: vector://vector\r\n"
+                                        + "Access-Control-Request-Method: GET\r\n"
+                                        + "Access-Control-Request-Headers: authorization\r\n"))
+                .isEqualTo(204);
+        assertThat(lastAnswer)
+                .contains("Access-Control-Allow-Origin: vector://vector\r\n")
+                .contains("Access-Control-Allow-Headers: ")
+                .containsIgnoringCase("authorization")
+                .contains("Access-Control-Allow-Methods: ");
+        assertThat(calls).as("nothing was sent upstream").isEmpty();
+    }
+
+    /** Harm guarded: a browser client refused the gate's own answers for want of CORS headers. */
+    @Test
+    void theGatesOwnAnswersAllowItsClientsOrigin() throws Exception {
+        for (final String origin :
+                List.of("vector://vector", "http://walk.localhost:8448", "http://127.0.0.1:8448")) {
+            for (final String path :
+                    List.of("/.well-known/matrix/client", "/_matrix/client/v3/login")) {
+                assertThat(
+                                request(
+                                        "GET",
+                                        path,
+                                        "",
+                                        "",
+                                        "walk.localhost:8448",
+                                        "Origin: " + origin + "\r\n"))
+                        .as(path + " from " + origin)
+                        .isEqualTo(200);
+                assertThat(lastAnswer)
+                        .as(path + " from " + origin)
+                        .contains("Access-Control-Allow-Origin: " + origin + "\r\n");
+            }
+        }
+        assertThat(
+                        request(
+                                "POST",
+                                "/_matrix/client/v3/login",
+                                "",
+                                "{}",
+                                "localhost",
+                                "Origin: vector://vector\r\n"))
+                .as("a refusal")
+                .isEqualTo(400);
+        assertThat(lastAnswer).contains("Access-Control-Allow-Origin: vector://vector\r\n");
+        request("GET", "/.well-known/matrix/client", "", "");
+        assertThat(lastAnswer).as("no origin, no CORS").doesNotContain("Access-Control-");
+    }
+
+    /** Harm guarded: a web page in the person's browser reads the gate's login answer. */
+    @Test
+    void aForeignOriginIsRefused() throws Exception {
+        for (final String origin :
+                List.of(
+                        "https://evil.example",
+                        "null",
+                        "http://localhost.evil.example",
+                        "vector://vector.evil.example",
+                        "https://app.element.io")) {
+            for (final String method : List.of("OPTIONS", "GET")) {
+                assertThat(
+                                request(
+                                        method,
+                                        "/_matrix/client/v3/login",
+                                        "",
+                                        "",
+                                        "localhost",
+                                        "Origin: " + origin + "\r\n"))
+                        .as(method + " from " + origin)
+                        .isEqualTo(403);
+                assertThat(lastAnswer).as(origin).doesNotContain("Access-Control-");
+            }
+        }
+        assertThat(calls).as("nothing was sent upstream").isEmpty();
+    }
+
+    /** Harm guarded: Element asks a person for a password nobody knows. */
+    @Test
+    void theLoginListOffersOnlyTheHostsLogin() throws Exception {
+        assertThat(request("GET", "/_matrix/client/v3/login", "", "")).isEqualTo(200);
+        final JsonNode flows =
+                MatrixClient.JSON
+                        .readTree(lastAnswer.substring(lastAnswer.indexOf("\r\n\r\n") + 4))
+                        .path("flows");
+        assertThat(flows.findValuesAsText("type")).containsExactly("m.login.sso", "m.login.token");
+    }
+
+    /** Harm guarded: Element refuses a homeserver whose sign-in discovery answers 401. */
+    @Test
+    void elementsSignInDiscoveryReachesTheHomeserver() throws Exception {
+        for (final String path :
+                List.of(
+                        "/_matrix/client/v1/auth_metadata",
+                        "/_matrix/client/unstable/org.matrix.msc2965/auth_issuer")) {
+            assertThat(request("GET", path, "", "")).as(path).isEqualTo(200);
+        }
+        assertThat(calls).hasSize(2);
     }
 }
