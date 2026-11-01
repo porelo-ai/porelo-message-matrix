@@ -197,7 +197,8 @@ final class ProcessUnit implements Unit, AutoCloseable {
             final List<String> args, final Map<String, String> secrets, final boolean serving)
             throws Failure {
         final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
-        final int port = LocalHomeserver.port(conf);
+        final int accountPort = LocalHomeserver.port(conf);
+        final int port = gated() ? unusedPortBut(accountPort) : accountPort;
         final List<String> command = new java.util.ArrayList<>(List.of(binary.toString()));
         command.addAll(args);
         final ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
@@ -223,6 +224,31 @@ final class ProcessUnit implements Unit, AutoCloseable {
         environment.putAll(settings);
         environment.putAll(secrets);
         return builder;
+    }
+
+    /**
+     * Behind the gate the unit forwards the account's port to a container port nothing listens on,
+     * so here too that port must not answer.
+     */
+    private boolean gated() throws Failure {
+        try {
+            return GateFiles.enabled(env);
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read homeserver.conf", ex);
+        }
+    }
+
+    private static int unusedPortBut(final int accountPort) throws Failure {
+        while (true) {
+            try (var socket =
+                    new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+                if (socket.getLocalPort() != accountPort) {
+                    return socket.getLocalPort();
+                }
+            } catch (final IOException ex) {
+                throw new Failure(Exit.CONFIG, "cannot find an unused port", ex);
+            }
+        }
     }
 
     /** As podman's {@code --env-file} gives them. */

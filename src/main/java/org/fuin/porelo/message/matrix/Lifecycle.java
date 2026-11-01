@@ -1481,6 +1481,10 @@ final class Lifecycle {
         try {
             return Accounts.whoami(admin);
         } catch (final Failure failure) {
+            // A homeserver that does not answer says nothing about the token.
+            if (failure.exitCode() == Exit.TEMPORARY) {
+                throw failure;
+            }
             if (failure.exitCode() == Exit.NOT_PERMITTED && Accounts.available(nobody, ADMIN)) {
                 throw new Failure(
                         Exit.CONFIG,

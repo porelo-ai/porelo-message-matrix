@@ -158,6 +158,51 @@ class ExpelTest {
                 .doesNotExist();
     }
 
+    /**
+     * Harm guarded: a homeserver behind the gate that died and left its socket answers 78, so the
+     * host's helper gives up on a purge it should retry and blames the administrator's token.
+     */
+    @Test
+    void expelBehindTheGateSaysTryAgainWhileTheHomeserverDoesNotAnswer() throws Exception {
+        final Map<String, String> env =
+                Map.of(
+                        "XDG_CONFIG_HOME",
+                        dir.resolve("config").toString(),
+                        "XDG_RUNTIME_DIR",
+                        dir.resolve("runtime").toString(),
+                        Config.ADMIN_TOKEN,
+                        "admin-token");
+        final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
+        Files.createDirectories(conf.getParent());
+        Files.writeString(conf, "PORELO_MATRIX_GATE=1\n");
+        final Path runtime = GateFiles.runtime(env);
+        Files.createDirectories(runtime);
+        Files.setPosixFilePermissions(runtime, PosixFilePermissions.fromString("rwx------"));
+        final Path socket = runtime.resolve("homeserver.sock");
+        try (var listener =
+                java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
+            listener.bind(java.net.UnixDomainSocketAddress.of(socket));
+        }
+        Files.setPosixFilePermissions(socket, PosixFilePermissions.fromString("rw-------"));
+
+        final Failure failure =
+                org.assertj.core.api.Assertions.catchThrowableOfType(
+                        Failure.class,
+                        () ->
+                                Expel.run(
+                                        List.of("bob"),
+                                        env,
+                                        new PrintStream(PrintStream.nullOutputStream()),
+                                        new KeepTest.StandIn()));
+
+        assertThat(failure).as("expel fails while nothing listens on the socket").isNotNull();
+        assertThat(failure.exitCode())
+                .as(
+                        "a homeserver that does not answer is worth another try: %s",
+                        failure.getMessage())
+                .isEqualTo(Exit.TEMPORARY);
+    }
+
     /** Harm guarded: a malformed login deactivates accounts of another person. */
     @ParameterizedTest
     @ValueSource(

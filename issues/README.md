@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx62"></a>[MX62](MX62-Expel-Reaches-The-Homeserver-Behind-Its-Gate.md) | S | - | `expel` reaches the homeserver behind the host's gate through its private socket, so a purged person's accounts are deactivated there too; today it waits on a TCP port nothing answers |
 | <a id="mx58"></a>[MX58](MX58-The-Transport-Reaches-The-Homeserver-On-A-Socket.md) | S | - | The transport reaches a homeserver on a Unix socket (`homeserver: unix:…`) and takes a `*.localhost` name as loopback, so neither needs a VPN or a certificate |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | S | - | On a central homeserver a task takes words as a person's only from a person's own account, `@<login>`, so the operator's direct chat with a task is the operator's own channel and no other person's task or relay speaks in it |
 | <a id="mx56"></a>[MX56](MX56-The-Homeserver-Knows-The-Person-At-Its-Gate.md) | L | - | On a host, every Matrix client reaches the homeserver through one Unix socket whose gate takes the caller's host login as who they are, binds every request to that login's accounts, and alone registers accounts under it; nothing else reaches the homeserver |
@@ -21,7 +22,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx62"></a>[MX62](MX62-Expel-Reaches-The-Homeserver-Behind-Its-Gate.md) | S | - | `expel` reaches the homeserver behind the host's gate through its private socket, so a purged person's accounts are deactivated there too; today it waits on a TCP port nothing answers |
 
 ## Backlog
 

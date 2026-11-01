@@ -374,6 +374,67 @@ class GateIT {
     }
 
     /**
+     * Harm guarded: on a host behind its gate, expel deactivates nobody, so a purged person's
+     * accounts can still sign in.
+     */
+    @Test
+    @Timeout(300)
+    void expelTakesAPurgedLoginsAccountsBehindTheGate() throws Exception {
+        final Map<String, String> env = new HashMap<>();
+        env.put("HOME", dir.resolve("home").toString());
+        env.put("XDG_CONFIG_HOME", dir.resolve("config").toString());
+        env.put("XDG_STATE_HOME", dir.resolve("state").toString());
+        env.put("XDG_RUNTIME_DIR", dir.resolve("runtime").toString());
+        final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
+        Files.createDirectories(conf.getParent());
+        try (var port =
+                new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+            Files.writeString(conf, "PORELO_MATRIX_PORT=" + port.getLocalPort() + "\n");
+        }
+        assertThat(Transport.run(env, "gate", "--prepare").exit()).as("gate mode").isZero();
+        final Path binary = ProcessUnit.binary(Files.createDirectories(dir.resolve("bin")));
+        try (ProcessUnit homeserver = new ProcessUnit(env, binary, dir.resolve("unit"))) {
+            homeserver.start();
+            awaitHomeserver(env, homeserver);
+            assertThat(Transport.run(env, "gate", "--prepare").exit())
+                    .as("administrator registered")
+                    .isZero();
+            final MatrixClient nobody = new GateHomeserver(env).client("");
+            final Accounts.Session bob =
+                    Accounts.register(
+                            nobody,
+                            "bob",
+                            Accounts.secret(),
+                            LocalHomeserver.registrationToken(env));
+            final ObjectNode input = MatrixClient.JSON.createObjectNode();
+            input.putObject("secrets")
+                    .put(
+                            Config.ADMIN_TOKEN,
+                            GateFiles.readToken(GateFiles.directory(env).resolve("admin-token")));
+
+            final Transport.Result expel =
+                    Transport.runWithInput(env, input.toString(), "expel", "bob");
+
+            assertThat(expel.exit()).as("expel behind the gate: %s", expel.err()).isZero();
+            final JsonNode answer = MatrixClient.JSON.readTree(expel.out());
+            assertThat(answer.path("known").asBoolean()).as("bob is known").isTrue();
+            assertThat(answer.path("expelled"))
+                    .as("bob's own account is expelled")
+                    .extracting(JsonNode::asText)
+                    .containsExactly(bob.userId());
+            assertThat(LocalHomeserver.directory(env).resolve(Expel.DIRECTORY).resolve("bob"))
+                    .as("the gate refuses bob from now on")
+                    .exists();
+            assertThat(
+                            nobody.as(bob.accessToken())
+                                    .exchange("GET", "/_matrix/client/v3/account/whoami", null)
+                                    .status())
+                    .as("the expelled account can no longer act")
+                    .isEqualTo(401);
+        }
+    }
+
+    /**
      * Harm guarded: concurrent registration uses the admin PUT as a reset of an existing password.
      */
     private static void concurrentRegistrationKeepsTheWinningPassword(

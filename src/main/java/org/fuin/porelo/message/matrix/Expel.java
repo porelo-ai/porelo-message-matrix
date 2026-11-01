@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
@@ -36,11 +37,43 @@ final class Expel {
                     Exit.CONFIG,
                     "expel needs the homeserver administrator's token among the secrets on stdin");
         }
-        final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
-        final MatrixClient nobody = new MatrixClient(new Config(local.url(), "", null, true));
+        final MatrixClient nobody = homeserver(env, unit);
         final Accounts.Session admin = Lifecycle.admin(nobody, env, "", unit);
         final AdminRoom room = AdminRoom.of(nobody.as(token), admin.userId());
         out.println(expel(env, login, AdminRoom.server(admin.userId()), room));
+    }
+
+    /**
+     * Behind the gate only its private socket reaches the homeserver, which the host keeps running;
+     * without it, the account's own homeserver on its loopback port.
+     */
+    private static MatrixClient homeserver(final Map<String, String> env, final Unit unit)
+            throws Failure {
+        if (!gated(env)) {
+            final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
+            return new MatrixClient(new Config(local.url(), "", null, true));
+        }
+        try {
+            return new GateHomeserver(env).client("");
+        } catch (final NoSuchFileException ex) {
+            throw new Failure(
+                    Exit.TEMPORARY,
+                    "the homeserver behind the gate is not running: " + ex.getMessage(),
+                    ex);
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "cannot reach the homeserver behind the gate: " + ex.getMessage(),
+                    ex);
+        }
+    }
+
+    private static boolean gated(final Map<String, String> env) throws Failure {
+        try {
+            return GateFiles.enabled(env);
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "cannot read homeserver.conf: " + ex.getMessage(), ex);
+        }
     }
 
     /** Record first, so the gate refuses new accounts while the existing ones are taken out. */

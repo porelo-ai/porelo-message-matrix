@@ -1,6 +1,6 @@
 # MX62 — Expel Reaches The Homeserver Behind Its Gate
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one verb and its tests, no contract change.
 **Severity:** High - on a host behind the gate, `expel` deactivates nobody, so a purged person's accounts stay
 able to sign in until someone takes them out by hand.

@@ -78,7 +78,10 @@ are refused with 78. On a host's gate (`unix:` or `*.localhost`) registration ne
 homeserver it still needs `registration_token_file` or `PORELO_MATRIX_REGISTRATION_TOKEN`.
 
 The host's helper runs `porelo-message-transport-matrix expel <login>` as the homeserver's account, with its
-administrator token among the secrets on stdin. It records a known login in `expelled-logins/<login>` beside
+administrator token among the secrets on stdin: behind the gate, the token in `gate/admin-token`. Like the gate's
+service, it needs that account's `HOME`, `XDG_CONFIG_HOME` and `XDG_RUNTIME_DIR`, the directories of its user
+homeserver unit. Behind the gate it reaches the running homeserver only through its private socket, and exits 75
+while nothing answers there. It records a known login in `expelled-logins/<login>` beside
 `homeserver.conf`, then deactivates the person's own account and every account whose final dot suffix is
 that login, `@porelo.<login>` first. It never takes `@task.x-bob` for `bob`'s. The answer is
 `{"login":"…","known":true|false,"expelled":[…]}`; running it again exits 0 with `known: true` and nothing

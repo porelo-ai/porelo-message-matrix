@@ -29,7 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Central homeservers accept `unix:<absolute path>` for HTTP over a Unix socket; `*.localhost` names reach loopback without DNS and retain the listener ownership check.
 - `expel <login>` deactivates a person's bare account and every account with that final login suffix,
   provisioning first, and records the login under `expelled-logins` for the host's gate. Unknown logins stay
-  available, repeated calls exit 0, and other logins' accounts remain active.
+  available, repeated calls exit 0, and other logins' accounts remain active. Behind the host's gate it reaches
+  the homeserver through the gate's private socket, with the gate's administrator token among the secrets on stdin.
 - On a central homeserver, `setup --project P --login L --create-room` makes the project's room
   `#porelo-<P>:<server>` as `@porelo.<login>`, invite-only, closed to guests and unlisted, or takes the room under that
   alias only if `@porelo.<login>` made it, and answers `"created_room": true`. `members --project P --persons A,B,…`,
