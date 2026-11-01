@@ -119,30 +119,70 @@ class GateRulesTest {
         }
     }
 
+    /**
+     * Harm guarded: a web page the person opens sends their browser to the gate and has the
+     * person's login token handed to a site of its own.
+     */
+    @Test
+    void aLoginTokenGoesOnlyToElementDesktopOrTheForwardTheRequestCameIn() {
+        final String forward = "walk.localhost:8448";
+        for (final String url :
+                List.of(
+                        "http://walk.localhost:8448/path?x=y#fragment",
+                        "http://walk.localhost:8448",
+                        "element://vector/webapp/?element-desktop-ssoid=abc#/home")) {
+            assertThat(GateRules.redirectAllowed(url, forward))
+                    .as("the homeserver's own client %s", url)
+                    .isTrue();
+        }
+        for (final String url :
+                List.of(
+                        "https://example.org/",
+                        "https://example.org",
+                        "element://evil.example/webapp/",
+                        "element:/vector/webapp/",
+                        "io.element.desktop://vector/webapp/",
+                        "http://walk.localhost:9999/",
+                        "http://other.localhost:8448/",
+                        "http://127.0.0.1:8448/",
+                        "http://walk.localhost:8448.example.org/",
+                        "https://walk.localhost:8448/",
+                        "http://walk.localhost:8448//evil.example/",
+                        "element://vector",
+                        "element://vector//evil.example/")) {
+            assertThat(GateRules.redirectAllowed(url, forward))
+                    .as("a client elsewhere %s", url)
+                    .isFalse();
+        }
+        assertThat(GateRules.redirectAllowed("https://example.org/", "example.org"))
+                .as("a Host the gate does not serve names no client of its own")
+                .isFalse();
+        assertThat(GateRules.redirectAllowed("http://.localhost/", ".localhost"))
+                .as("an authority that names no host")
+                .isFalse();
+    }
+
     /** Harm guarded: a login token is sent to executable content or an ambiguous redirect. */
     @Test
     void redirectsRequireAnAbsoluteSafeUrl() {
         for (final String url :
                 List.of(
-                        "http://localhost:8080/path?x=y#fragment",
-                        "https://example.org",
-                        "element://vector/webapp/")) {
-            assertThat(GateRules.redirectAllowed(url)).as("supported redirect").isTrue();
-        }
-        for (final String url :
-                List.of(
                         "custom:callback?loginToken=injected",
                         "/relative",
-                        "//example.org",
+                        "//walk.localhost:8448",
                         "javascript:alert(1)",
                         "JaVaScRiPt:alert(1)",
                         "data:text/plain,hello",
                         "http:/no-host",
-                        "https://user@example.org",
+                        "https://user@walk.localhost:8448",
                         "file:///tmp/client",
-                        "https://example.org/%0d%0aX:y",
-                        "https://example.org/?loginToken=old")) {
-            assertThat(GateRules.redirectAllowed(url)).as("unsafe redirect").isFalse();
+                        "https://walk.localhost:8448/%0d%0aX:y",
+                        "https://walk.localhost:8448/?loginToken=old",
+                        "element://vector/webapp/?loginToken=old",
+                        "element://user@vector/webapp/")) {
+            assertThat(GateRules.redirectAllowed(url, "walk.localhost:8448"))
+                    .as("unsafe redirect %s", url)
+                    .isFalse();
         }
     }
 

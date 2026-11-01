@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx61"></a>[MX61](MX61-The-Login-Token-Goes-Only-To-The-Homeservers-Own-Clients.md) | S | - | The gate's SSO redirect hands a login token only to the homeserver's own clients, so no web page the person opens can send their token elsewhere; before any real use |
 | <a id="mx62"></a>[MX62](MX62-Expel-Reaches-The-Homeserver-Behind-Its-Gate.md) | S | - | `expel` reaches the homeserver behind the host's gate through its private socket, so a purged person's accounts are deactivated there too; today it waits on a TCP port nothing answers |
 | <a id="mx58"></a>[MX58](MX58-The-Transport-Reaches-The-Homeserver-On-A-Socket.md) | S | - | The transport reaches a homeserver on a Unix socket (`homeserver: unix:…`) and takes a `*.localhost` name as loopback, so neither needs a VPN or a certificate |
 | <a id="mx30"></a>[MX30](MX30-Only-A-Person-Speaks-As-A-Person.md) | S | - | On a central homeserver a task takes words as a person's only from a person's own account, `@<login>`, so the operator's direct chat with a task is the operator's own channel and no other person's task or relay speaks in it |
@@ -22,7 +23,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx61"></a>[MX61](MX61-The-Login-Token-Goes-Only-To-The-Homeservers-Own-Clients.md) | S | - | The gate's SSO redirect hands a login token only to the homeserver's own clients, so no web page the person opens can send their token elsewhere; before any real use |
 
 ## Backlog
 

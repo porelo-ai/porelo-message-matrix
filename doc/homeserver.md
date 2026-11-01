@@ -156,7 +156,12 @@ Clients see SSO named “Your login on this host” and token login. Password lo
 listed: the transport's accounts sign in with theirs, and nobody knows a person account's. SSO creates the
 person's `@<login>` account if missing and redirects to the client with a gate token valid for two
 minutes, usable once by that host login alone. Only its SHA-256, login and expiry are kept, under
-`gate/login-tokens/` with mode 0600. Registration offers the `m.login.dummy` authentication stage;
+`gate/login-tokens/` with mode 0600. The token goes only to the homeserver's own clients: Element Desktop's
+callback `element://vector/…`, or an `http` page at the forward the request came in on, its `Host`, which the
+gate itself does not serve. A redirect anywhere else, a client listening on a loopback port of its own as some
+desktop clients do among them, is refused with 400 and issues no token, and so is a request that carries an
+`Origin`: a sign-in is a navigation, and a page that fetches it could read where it was sent. So a page elsewhere,
+or on another local port, that sends the person's browser to the gate cannot take their sign-in. Registration offers the `m.login.dummy` authentication stage;
 the gate creates an available account and signs it in with the supplied password. The caller may
 register or use only `@<login>` or `@<name>.<login>`, where `<name>` starts with a lower-case letter
 or digit and then contains lower-case letters, digits, underscores or hyphens. `@porelo` belongs to

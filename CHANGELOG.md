@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   removes every account of a login no longer listed while keeping the room maker and other listed logins.
 - A host's gate handles registration without a client-held registration token; external homeservers keep
   the token flow.
+- The host's gate hands an SSO login token only to Element Desktop's `element://vector/…` callback or to an `http`
+  page at the forward the request came in on; any other `redirectUrl`, and a sign-in request with an `Origin`, is
+  refused with 400.
 
 ### Added
 

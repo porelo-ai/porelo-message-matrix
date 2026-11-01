@@ -119,9 +119,24 @@ class GateIT {
                                         .status())
                         .as("own task registered")
                         .isEqualTo(200);
+                final Path loginTokens = GateFiles.directory(env).resolve("login-tokens");
+                assertThat(
+                                client.rawExchange(
+                                                "GET",
+                                                "/_matrix/client/v3/login/sso/redirect/porelo"
+                                                        + "?redirectUrl="
+                                                        + MatrixClient.segment(
+                                                                "https://example.org/"),
+                                                null)
+                                        .statusCode())
+                        .as("a redirect to a site elsewhere")
+                        .isEqualTo(400);
+                assertThat(issuedTokens(loginTokens))
+                        .as("no login token issued for a site elsewhere")
+                        .isEmpty();
                 final String target =
                         "/_matrix/client/v3/login/sso/redirect/porelo?redirectUrl="
-                                + MatrixClient.segment("element://client/callback?x=1#keep");
+                                + MatrixClient.segment("element://vector/webapp/?x=1#keep");
                 final Wire.Reply redirect = client.rawExchange("GET", target, null);
                 assertThat(redirect.statusCode()).as("SSO redirect").isEqualTo(302);
                 final String location = header(redirect.raw(), "Location");
@@ -431,6 +446,17 @@ class GateIT {
                                     .status())
                     .as("the expelled account can no longer act")
                     .isEqualTo(401);
+        }
+    }
+
+    /** The login tokens the gate keeps, by their hash's name; its lock file is none. */
+    private static List<Path> issuedTokens(final Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            return List.of();
+        }
+        try (var files = Files.list(dir)) {
+            return files.filter(file -> file.getFileName().toString().matches("[0-9a-f]{64}"))
+                    .toList();
         }
     }
 

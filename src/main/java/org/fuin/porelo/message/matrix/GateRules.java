@@ -85,7 +85,12 @@ final class GateRules {
                         && admins.contains(login);
     }
 
-    static boolean redirectAllowed(final String url) {
+    /**
+     * A target that gets the person's login token: Element Desktop's own callback, which is its
+     * page's {@code vector://vector} address under the scheme {@code element}, or a page at the
+     * forward the request came in on. Any other site may be one a page the person opened named.
+     */
+    static boolean redirectAllowed(final String url, final String host) {
         try {
             final URI uri = new URI(url);
             // An opaque URI's query is no query to Java, so a login token in it would go unseen.
@@ -96,12 +101,21 @@ final class GateRules {
                 return false;
             }
             final String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
-            if (List.of("javascript", "data", "file", "vbscript", "about", "blob")
-                    .contains(scheme)) {
-                return false;
-            }
-            if ((scheme.equals("http") || scheme.equals("https"))
-                    && (uri.getHost() == null || uri.getUserInfo() != null)) {
+            final String authority = uri.getRawAuthority();
+            final String path = uri.getRawPath();
+            // A path beginning "//" is another site to whatever later takes it as a reference.
+            final boolean onePath =
+                    path.isEmpty() || (path.startsWith("/") && !path.startsWith("//"));
+            // The forward speaks plain HTTP: an https page there would be another listener.
+            final boolean ownClient =
+                    scheme.equals("element")
+                            ? "vector".equals(authority) && !path.isEmpty()
+                            : scheme.equals("http")
+                                    && uri.getHost() != null
+                                    && uri.getPort() <= 65535
+                                    && host.equalsIgnoreCase(authority)
+                                    && hostAllowed(host);
+            if (!ownClient || !onePath) {
                 return false;
             }
             final String query = uri.getRawQuery();

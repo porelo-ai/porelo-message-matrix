@@ -344,6 +344,50 @@ class GateTest {
                 .noneMatch(path -> path.startsWith("/_synapse/admin/v2/users/"));
     }
 
+    /**
+     * Harm guarded: a page on another local port or name, or one that fetches instead of
+     * navigating, receives or reads the person's login token.
+     */
+    @Test
+    void ssoAnswersOnlyANavigationBackToTheForwardItCameIn() throws Exception {
+        final String forward = "walk.localhost:8448";
+        assertThat(sso("http://walk.localhost:8448/callback", forward, ""))
+                .as("a page at the forward the request came in on")
+                .isEqualTo(302);
+        for (final String elsewhere :
+                List.of(
+                        "http://localhost/callback",
+                        "http://walk.localhost:9999/callback",
+                        "https://walk.localhost:8448/callback")) {
+            assertThat(sso(elsewhere, forward, ""))
+                    .as("a client elsewhere %s", elsewhere)
+                    .isEqualTo(400);
+        }
+        for (final String origin :
+                List.of("http://walk.localhost:9999", "http://walk.localhost:8448")) {
+            assertThat(
+                            sso(
+                                    "http://walk.localhost:8448/callback",
+                                    forward,
+                                    "Origin: " + origin + "\r\n"))
+                    .as("a fetch from %s, which could read where it was sent", origin)
+                    .isEqualTo(400);
+        }
+        assertThat(lastAnswer).as("no token in a refusal").doesNotContain("loginToken");
+    }
+
+    private int sso(final String redirect, final String host, final String headers)
+            throws Exception {
+        return request(
+                "GET",
+                "/_matrix/client/v3/login/sso/redirect/porelo?redirectUrl="
+                        + MatrixClient.segment(redirect),
+                "",
+                "",
+                host,
+                headers);
+    }
+
     /** Harm guarded: password or token sign-in bypasses ownership when the homeserver disagrees. */
     @Test
     void ownSsoTokenIsConsumedAndReturnsOnlyThePersonsSession() throws Exception {
@@ -351,8 +395,7 @@ class GateTest {
                         request(
                                 "GET",
                                 "/_matrix/client/v3/login/sso/redirect/porelo?redirectUrl="
-                                        + MatrixClient.segment(
-                                                "element://client/callback?x=1#keep"),
+                                        + MatrixClient.segment("element://vector/webapp/?x=1#keep"),
                                 "",
                                 ""))
                 .as("SSO redirect")

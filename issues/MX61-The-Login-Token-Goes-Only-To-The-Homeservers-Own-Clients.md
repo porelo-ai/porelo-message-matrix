@@ -1,6 +1,6 @@
 # MX61 — The Login Token Goes Only To The Homeserver's Own Clients
 
-**Status:** Implementing; before any real use of a host's gate.
+**Status:** Review; before any real use of a host's gate.
 **Size:** S - one rule in `GateRules.redirectAllowed`, where the gate takes the clients it knows from, the doc's
 section on the gate, and `GateRulesTest` and `GateIT` cases.
 
@@ -23,9 +23,10 @@ first use.
   `element://vector/webapp/?element-desktop-ssoid=…`: its page's own `vector://vector/webapp/…` address with the
   scheme set to `element`, whatever protocol the build registers. A web client is served at the person's
   forward, the `Host` the request came in on. No list for the host to keep, and no confirmation page.
-- `GateRules.redirectAllowed(url, host)` keeps today's checks and passes only `element://vector/…`, or an
-  `http`/`https` URL whose authority is the request's own `Host`, which `hostAllowed` passes. `Gate.sso` hands it
-  `request.host()`.
+- `GateRules.redirectAllowed(url, host)` keeps today's checks and passes only `element://vector/…`, or an `http`
+  URL whose authority is the request's own `Host`, which `hostAllowed` passes, with a path that does not begin
+  `//`. `Gate.sso` hands it `request.host()` and refuses a request with an `Origin`: a sign-in is a navigation,
+  and a page on another local port that fetches it could read the token from where it was sent.
 - The doc's section on the gate says which targets get a token.
 - Red first: `GateRulesTest` sees `https://example.org/`, `element://evil/`, `http://127.0.0.1:<another port>/` and
   another `*.localhost` refused. `GateIT` sees a redirect to `https://example.org/` through the gate answer 400

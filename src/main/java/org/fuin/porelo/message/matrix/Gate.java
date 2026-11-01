@@ -467,7 +467,9 @@ final class Gate {
 
     private GateResponse sso(final GateRequest request) throws IOException, Failure {
         final String redirect = request.parameter("redirectUrl");
-        if (!GateRules.redirectAllowed(redirect)) {
+        // A sign-in is a navigation, which sends no Origin; a page that fetches could read the
+        // token.
+        if (!request.origin().isEmpty() || !GateRules.redirectAllowed(redirect, request.host())) {
             return GateResponse.error(400, "M_INVALID_PARAM");
         }
         final Administrator admin = administrator();
