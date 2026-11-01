@@ -1,6 +1,7 @@
 # MX62 — Expel Reaches The Homeserver Behind Its Gate
 
-**Status:** Idea.
+**Status:** Implementing.
+**Size:** S - one verb and its tests, no contract change.
 **Severity:** High - on a host behind the gate, `expel` deactivates nobody, so a purged person's accounts stay
 able to sign in until someone takes them out by hand.
 
@@ -16,9 +17,9 @@ where nothing listens. Measured in a test account with the packaged transport, a
 `gate --prepare` had answered `"administrator":true`: `expel bob` exits 75 after 180 s with "the homeserver at
 http://127.0.0.1:8008 did not answer within 180 s", and deactivates nothing.
 
-## Proposed fix
+## Plan
 
-- Size S: one verb and its tests, no contract change. `expel`'s stdin and its answer stay as `doc/homeserver.md`
+- `expel`'s stdin and its answer stay as `doc/homeserver.md`
   states them.
 - In gate mode (`GateFiles.enabled`), `Expel.run` starts the unit as today but takes its client from
   `GateHomeserver`, which checks the private socket's ownership before it sends the token. Without the gate it

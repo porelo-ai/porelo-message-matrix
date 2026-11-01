@@ -21,6 +21,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx62"></a>[MX62](MX62-Expel-Reaches-The-Homeserver-Behind-Its-Gate.md) | S | - | `expel` reaches the homeserver behind the host's gate through its private socket, so a purged person's accounts are deactivated there too; today it waits on a TCP port nothing answers |
 
 ## Backlog
 
@@ -40,7 +41,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx62"></a>[MX62](MX62-Expel-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | `expel` reaches the homeserver behind the host's gate through its private socket, so a purged person's accounts are deactivated there too; today it waits on a TCP port nothing answers |
 | <a id="mx61"></a>[MX61](MX61-The-Login-Token-Goes-Only-To-The-Homeservers-Own-Clients.md) | S | - | The gate's SSO redirect hands a login token only to the homeserver's own clients, so no web page the person opens can send their token elsewhere; before any real use |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | - | - | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name |
