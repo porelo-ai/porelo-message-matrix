@@ -1,12 +1,12 @@
 # MX61 — The Login Token Goes Only To The Homeserver's Own Clients
 
-**Status:** Backlog; before any real use of a host's gate.
+**Status:** Implementing; before any real use of a host's gate.
 **Size:** S - one rule in `GateRules.redirectAllowed`, where the gate takes the clients it knows from, the doc's
 section on the gate, and `GateRulesTest` and `GateIT` cases.
 
-**What must be true.** The gate's SSO redirect hands a login token only to a client of this homeserver's own: one
-whose redirect target the host names, such as Element Desktop's own scheme or a web client served at the person's
-forward, `http://<host>.localhost:<port>`. A redirect to any other URL is refused (400) and issues no token.
+**What must be true.** The gate's SSO redirect hands a login token only to a client of this homeserver's own: Element
+Desktop, by its own scheme, or a web client served at the person's forward, `http://<host>.localhost:<port>`, the
+address the request came in on. A redirect to any other URL is refused (400) and issues no token.
 
 ## Why
 
@@ -17,6 +17,20 @@ signs that browser's caller in as the person and hands the token to the other si
 for as long as the session lasts. The token is single use and lives two minutes, which limits its reuse, not the
 first use.
 
+## Plan
+
+- The clients the gate knows are the ones it already trusts by origin. Element Desktop sends its SSO callback as
+  `element://vector/webapp/?element-desktop-ssoid=…`: its page's own `vector://vector/webapp/…` address with the
+  scheme set to `element`, whatever protocol the build registers. A web client is served at the person's
+  forward, the `Host` the request came in on. No list for the host to keep, and no confirmation page.
+- `GateRules.redirectAllowed(url, host)` keeps today's checks and passes only `element://vector/…`, or an
+  `http`/`https` URL whose authority is the request's own `Host`, which `hostAllowed` passes. `Gate.sso` hands it
+  `request.host()`.
+- The doc's section on the gate says which targets get a token.
+- Red first: `GateRulesTest` sees `https://example.org/`, `element://evil/`, `http://127.0.0.1:<another port>/` and
+  another `*.localhost` refused. `GateIT` sees a redirect to `https://example.org/` through the gate answer 400
+  with no file in `gate/login-tokens/`. The fixtures' `element://client/callback` become Element's real target.
+
 ## Acceptance
 
 - `GateRulesTest`: a `redirectUrl` to another origin, another custom scheme, or the person's forward on another
@@ -24,8 +38,3 @@ first use.
 - `GateIT`: a redirect to a foreign origin through the gate gives 400 and leaves no login token in
   `gate/login-tokens/`.
 - Seen to fail first: today's rule passes `https://example.org/`.
-
-## To be checked
-
-- Which redirect targets Element Desktop, Element Web and Porelo's own clients send, measured, and whether a
-  confirmation page of the gate's ("Continue to <client>?"), as other homeservers show, is needed beside the list.
