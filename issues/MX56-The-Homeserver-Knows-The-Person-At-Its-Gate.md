@@ -1,6 +1,6 @@
 # MX56 — The Homeserver Knows The Person At Its Gate
 
-**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review.
 **Size:** L - grew from M: a new verb with its own HTTP handling and sign-in rules, a mode of the homeserver's unit,
 a verb that prepares the host's homeserver, docs, a decision and an integration test.
 
@@ -120,11 +120,11 @@ the Synapse admin API (`v2/users/{id}`, `v1/users/{id}/login`, `deactivate`, `us
   agreed with Agent Machines.
 - The gate runs as the homeserver's account, `porelo-matrix`, and reads its files there.
 
-## Accepted in review (2026-10-30)
+## Accepted in review
 
 Read by a second model twice, before and after the security rewrite; every finding is fixed but these.
 
-Accepted (operator, 2026-10-31):
+Accepted:
 
 - The gate reads a request's body whole, up to 64 MiB, before it decides whether the caller may send it; one person
   can make the homeserver's account hold that much per connection.
@@ -134,7 +134,7 @@ Accepted (operator, 2026-10-31):
 - In gate mode the host's port 8008 stays published, mapped to the container's 8009, where nothing listens.
 - SSO redirects under `/_matrix/client/r0/` are refused; clients use `v3`.
 
-Not accepted (operator, 2026-10-31), kept only for the sprint 6m test on its test host:
+Not accepted, kept only for the sprint 6m test on its test host:
 
 - The SSO redirect sends the login token to any absolute `http`, `https` or custom-scheme URL the client names.
   [MX61](README.md#mx61) binds it to the homeserver's own clients

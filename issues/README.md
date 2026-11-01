@@ -89,5 +89,5 @@ sequence.
 
 | # | Title | Why |
 |---|---|---|
-| <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Rejected (operator, 2026-10-30): replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
-| <a id="mx53"></a>[MX53](README.md#mx53) | A Person Added Again Keeps Their Name | Rejected (operator, 2026-10-30): replaced by the one-key design; a purged login is never made again on a host, so a person comes back under a new login ([MX57](README.md#mx57)) |
+| <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
+| <a id="mx53"></a>[MX53](README.md#mx53) | A Person Added Again Keeps Their Name | Replaced by the one-key design; a purged login is never made again on a host, so a person comes back under a new login ([MX57](README.md#mx57)) |

@@ -1,6 +1,6 @@
 # MX60 — The Gate Says Why It Failed
 
-**Status:** Idea, 2026-10-30.
+**Status:** Idea.
 
 **What must be true.** When the host's gate answers 502, or refuses a sign-in or a registration because it cannot act
 as the administrator, its log line on the host names the cause: the administrator's token is missing, unreadable, or

@@ -1,7 +1,6 @@
 # MX23 — The Transport Takes Its Tokens On Its Input
 
-**Status:** Review, published with `36adabe`; the transport's half of a contract change with porelo, which hands a
-transport its secrets on its input and so closes what making the running transport not dumpable leaves open.
+**Status:** Review.
 **Size:** M - one contract change, made here and in porelo together: every verb reads its secrets from its input
 instead of the environment, `describe` says so, and the environment stays a fallback for a Porelo of the old way;
 the tests of every verb that takes a token, `doc/transport.md`, and a VM run against a porelo that hands them so.

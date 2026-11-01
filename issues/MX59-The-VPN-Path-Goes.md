@@ -1,6 +1,6 @@
 # MX59 — The VPN Path Goes
 
-**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review.
 **Size:** M - deletions across `Publish`, `Certificate`, `MachineTokens`, `MachineTokenVerb`, `Lifecycle` (`admit`,
 `dismiss`, the published name), `Keep`, `HomeserverToken`, the VPN units, `pom.xml` and the packages'
 descriptions, with their tests and docs.

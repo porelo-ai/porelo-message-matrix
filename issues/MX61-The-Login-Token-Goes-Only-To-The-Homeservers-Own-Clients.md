@@ -1,6 +1,6 @@
 # MX61 — The Login Token Goes Only To The Homeserver's Own Clients
 
-**Status:** Review; before any real use of a host's gate.
+**Status:** Review.
 **Size:** S - one rule in `GateRules.redirectAllowed`, where the gate takes the clients it knows from, the doc's
 section on the gate, and `GateRulesTest` and `GateIT` cases.
 

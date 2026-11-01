@@ -1,8 +1,6 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Backlog. It needs porelo to show a
-transport's stderr while the verb runs; until then the lines reach a person only
-when the transport runs directly.
+**Status:** Backlog.
 **Size:** S - stderr lines in `LocalHomeserver.awaitUp`, `Keep` and `Publish`, with their tests; stdout's contract is
 unchanged.
 
@@ -11,8 +9,8 @@ it has waited. A silent minute no longer looks like a hang.
 
 ## Plan
 
-The operator's word after a test step hung silently: long CLI processes should not run without a
-status. The waits are `LocalHomeserver.awaitUp` (up to `START_TIMEOUT`, 180 s, after a start or restart: `setup`,
+Long CLI processes do not run without a status. The lines reach a person only once porelo shows a transport's
+stderr while the verb runs; until then only when the transport runs directly. The waits are `LocalHomeserver.awaitUp` (up to `START_TIMEOUT`, 180 s, after a start or restart: `setup`,
 `publish`, `restore`), `Keep` (`backup`/`restore`: stopping, copying, starting) and `Publish` (the certificate, then
 the restart).
 

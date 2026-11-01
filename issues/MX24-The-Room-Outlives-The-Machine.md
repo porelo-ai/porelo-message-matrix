@@ -1,6 +1,6 @@
 # MX24 — The Room Outlives The Machine
 
-**Status:** Review; the transport's part of keeping chosen data when a rented host goes.
+**Status:** Review.
 **Size:** M - two new verbs and a change to `setup`, the unit's mounts, a contract porelo-host reads, and an
 integration test with the real homeserver; no other repository changes.
 

@@ -1,6 +1,6 @@
 # MX57 — A Person's Accounts Are Named By Their Login
 
-**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review.
 **Size:** M - the machine's name replaced by the login through `Lifecycle`, `CentralRoom`, `Describe`, `Main` and their
 tests, `expel <login>` from `MachineTokens.expel`, docs.
 

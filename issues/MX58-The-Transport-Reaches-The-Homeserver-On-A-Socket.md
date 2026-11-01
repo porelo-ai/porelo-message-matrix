@@ -1,6 +1,6 @@
 # MX58 — The Transport Reaches The Homeserver On A Socket
 
-**Status:** Review since 2026-10-30.
+**Status:** Review.
 **Size:** S - `MatrixClient`, `Config`, `Settings` and `Lifecycle.loopback`, with unit tests and the central integration
 tests run once over a socket; no verb changes.
 

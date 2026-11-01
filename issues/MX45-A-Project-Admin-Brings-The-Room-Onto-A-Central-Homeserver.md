@@ -1,6 +1,6 @@
 # MX45 — A Project Admin Brings The Room Onto A Central Homeserver
 
-**Status:** Review since 2026-10-29. Estimated by the operator on 2026-10-28; Accepted on 2026-10-28. It builds on Porelo naming a transport's machine `<host>-<account>`.
+**Status:** Review.
 **Size:** M - two lifecycle verbs in central mode, read in today's local `room()`/`ours()` and central `setup`, a
 contract change porelo reads (`describe`, the answers), docs and integration tests.
 
@@ -78,6 +78,6 @@ told from a task's by its name, and Porelo names the tasks.
   room is answered 403.
 - **The room is of version 12, so its maker holds it by the create event**, above every level, with no entry under
   `users`. Invite is 0 and kick 50, so a developer's `@porelo.<M>` invites its own tasks, and could invite another
-  as the operator accepted under QH59, but takes nobody out.
+  (an accepted risk), but takes nobody out.
 - **A room under the alias that another account made** is refused by `setup --create-room` with nothing invited:
   a first setup keeps the account and answers `"admitted": false`.

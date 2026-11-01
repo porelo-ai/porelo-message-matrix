@@ -1,6 +1,6 @@
 # MX30 — Only A Person Speaks As A Person
 
-**Status:** Review since 2026-10-30; Estimated and Backlog (operator, 2026-10-30, sprint 6m).
+**Status:** Review.
 **Size:** S - shrank from M: a person is known by the shape of their account, so no setting and no change in
 Porelo; the room's and the direct chats' poll, `send`, and the central account's secrets.
 
