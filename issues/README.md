@@ -27,6 +27,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx61"></a>[MX61](MX61-The-Login-Token-Goes-Only-To-The-Homeservers-Own-Clients.md) | S | - | The gate's SSO redirect hands a login token only to the homeserver's own clients, so no web page the person opens can send their token elsewhere; before any real use |
 | <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `publish`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
@@ -41,7 +42,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx61"></a>[MX61](MX61-The-Login-Token-Goes-Only-To-The-Homeservers-Own-Clients.md) | S | - | The gate's SSO redirect hands a login token only to the homeserver's own clients, so no web page the person opens can send their token elsewhere; before any real use |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | - | - | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name |
 

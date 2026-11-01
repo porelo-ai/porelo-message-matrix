@@ -1,6 +1,6 @@
 # MX61 — The Login Token Goes Only To The Homeserver's Own Clients
 
-**Status:** Idea, 2026-10-31; before any real use of a host's gate (operator, 2026-10-31).
+**Status:** Backlog; before any real use of a host's gate.
 **Size:** S - one rule in `GateRules.redirectAllowed`, where the gate takes the clients it knows from, the doc's
 section on the gate, and `GateRulesTest` and `GateIT` cases.
 
