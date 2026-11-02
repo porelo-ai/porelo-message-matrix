@@ -1,7 +1,7 @@
 # MX65 — The Host Keeps A Project's Room
 
 **Status:** Backlog.
-**Size:** M - one new verb beside `expel`, one rule less in the gate, a contract the host's helper and Porelo read, docs and an integration test against the real homeserver.
+**Size:** M - two new verbs beside `expel`, one rule less in the gate, a contract the host's helper and Porelo read, docs and an integration test against the real homeserver.
 
 **What must be true.** On a host whose homeserver runs behind its gate, a project's room exists as soon as the host
 carries the project, and holds exactly the persons the host names: a person named is invited whether or not they have
@@ -38,8 +38,12 @@ host's helper, which already runs `expel` as the homeserver's account with the a
 - **The gate refuses every client a reserved alias `porelo-<project>`.** The admins file
   (`/etc/porelo-host/matrix/<project>.admins`), `PORELO_MATRIX_GATE_ADMINS_DIR` and `GateRules.aliasAllowed`'s admin
   branch go.
-- **A project on two hosts has two rooms**, one on each host's homeserver, and nothing connects them.
-- **What stays as it is:** `setup --create-room` and `members` for a homeserver elsewhere; `setup` without `--create-room` joins once `@porelo.<login>` is invited, and says "not
+- **A locked person is not named.** A member locked in a project goes off the list, so all their accounts are out of
+  the room; a kick is no ban, so naming them again after an unlock invites them again.
+- **A homeserver elsewhere has no administrator**, so its room stays with `setup --create-room` and `members`, which
+  only the account that made the room can run. Another admin of the project cannot keep it; one who leaves keeps their
+  place in it only until the maker's next `members`, and the maker's own login is never removed.
+- **What stays as it is:** `setup` without `--create-room` joins once `@porelo.<login>` is invited, and says "not
   admitted" until then; a person's `@porelo.<login>` invites its own relay and tasks; `expel`; the accounts' names.
 - **The administrator is a member of the room**, shown as "Porelo (administrator)", as in the account's own
   homeserver's room, because a kick needs its power. Removing it from view stays with the issue on helpers in the room.
@@ -77,4 +81,5 @@ host's helper, which already runs `expel` as the homeserver's account with the a
 - Whether a host login `porelo` is possible and what the gate does with it today.
 - What a relay and a task of a person do when their room was deleted and when a new one replaces it: `poll` refuses a
   position whose saved rooms the account is in none of (78), and whether their sessions must end.
+- That a person's relay and tasks come back without a hand after a lock and an unlock.
 - How long a run takes with 500 logins, against the helper's five-minute follow.
