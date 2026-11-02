@@ -424,6 +424,51 @@
             </build>
         </profile>
         <profile>
+            <!-- Mutation testing, by hand only: mutants run real code, so never where a real homeserver of this user runs. -->
+            <id>pit</id>
+            <properties>
+                <!-- What to mutate; a change's own classes with -Dpit.classes=org.fuin.porelo.message.matrix.Gate*,... -->
+                <pit.classes>org.fuin.porelo.message.matrix.*</pit.classes>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.30.1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.3</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <targetClasses>${pit.classes}</targetClasses>
+                            <targetTests>
+                                <param>org.fuin.porelo.message.matrix.*Test</param>
+                            </targetTests>
+                            <excludedClasses>
+                                <param>org.fuin.porelo.message.matrix.Hardening</param>
+                                <param>org.fuin.porelo.message.matrix.package-info</param>
+                            </excludedClasses>
+                            <excludedMethods>
+                                <param>main</param>
+                            </excludedMethods>
+                            <threads>4</threads>
+                            <!-- Some tests start a child JVM on the class path only Surefire names; it runs unmutated code. -->
+                            <argLine>-Dsurefire.test.class.path=${pit.test.class.path}</argLine>
+                            <timestampedReports>false</timestampedReports>
+                            <outputFormats>
+                                <param>HTML</param>
+                                <param>XML</param>
+                            </outputFormats>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <!-- A change to documents or issues: only the tests that read them, tagged so. -->
             <id>documents</id>
             <properties>

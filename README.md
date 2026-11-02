@@ -26,6 +26,17 @@ Java 25 (GraalVM for the native executable) and podman; `mvnw` brings the pinned
 
 `-Pnative` also needs `zlib1g-dev` and `rpmbuild`.
 
+Mutation testing runs by hand, never in the default build or CI, and only on a VM: a mutant is real code, and the tests
+call real `podman` and `systemctl`, so it could hit a homeserver of the same account. Tests that start a child JVM need
+the class path Surefire would name, and those children run unmutated code:
+
+    ./mvnw -s settings.xml test-compile dependency:build-classpath -Dmdep.outputFile=target/deps.cp
+    ./mvnw -s settings.xml -Ppit -Dpit.test.class.path="$PWD/target/test-classes:$PWD/target/classes:$(cat target/deps.cp)" \
+        test-compile org.pitest:pitest-maven:mutationCoverage
+
+`-Dpit.classes=<classes>` limits it to a change's own classes. The report lands in `target/pit-reports/`. The
+integration tests do not run under it, so what only they reach counts as not covered.
+
 ## Contributing
 
 How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md); a vulnerability is reported as [SECURITY.md](SECURITY.md)
