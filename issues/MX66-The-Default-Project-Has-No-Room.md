@@ -1,6 +1,6 @@
 # MX66 — The Default Project Has No Room
 
-**Status:** Idea.
+**Status:** Implementing.
 **Size:** S - one refusal where the lifecycle's options are read, its tests, the contract's table.
 
 **What must be true.** A task of the project `default` never joins a room, whatever the machine or host has and whatever
@@ -18,7 +18,6 @@ a project file, would put such a task in a room.
 
 - `Lifecycle.options`: `--project default` refused with 78, before any settings are read or any request is made, for
   `setup`, `enroll`, `join` and `members`. `retire`, `part` and `clear` stay allowed, so what is left over can go.
-- The host's room verbs take the same refusal: making and keeping a room for `default` is refused, deleting one is not.
 - `doc/transport.md`: the rule in the verbs' table.
 - Red first: `LifecycleTest`: each refused verb with `--project default` ends 78 and starts no homeserver. Today `setup`
   goes on to start one.

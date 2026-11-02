@@ -16,11 +16,13 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx66"></a>[MX66](MX66-The-Default-Project-Has-No-Room.md) | S | - | The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared |
 
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
 | <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`) |
 | <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `publish`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
@@ -36,7 +38,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx66"></a>[MX66](MX66-The-Default-Project-Has-No-Room.md) | S | - | The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |

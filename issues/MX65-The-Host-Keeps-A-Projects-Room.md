@@ -46,6 +46,8 @@ host's helper, which already runs `expel` as the homeserver's account with the a
 - **Nothing here assumes a homeserver on the host.** The transport's package needs none. Where no gate is prepared, both
   verbs are refused (77) and start nothing; they are not run for a project that names a homeserver elsewhere, even on a
   host that has one of its own.
+- **The project `default` has no room:** `keep-room --project default` is refused (78), `drop-room` is not, so a leftover
+  can go.
 - **What stays as it is:** `setup` without `--create-room` joins once `@porelo.<login>` is invited, and says "not
   admitted" until then; a person's `@porelo.<login>` invites its own relay and tasks; `expel`; the accounts' names.
 - **The administrator is a member of the room**, shown as "Porelo (administrator)", as in the account's own
