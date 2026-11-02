@@ -1,6 +1,6 @@
 # MX67 — The Registration Token Comes Only With The Secrets
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one setting less in `Settings`, `SettingsCheck` and `Lifecycle.elsewhereToken`, its tests, the contract's text.
 
 **What must be true.** A homeserver elsewhere's registration token is kept like a person's other tokens, in their vault,

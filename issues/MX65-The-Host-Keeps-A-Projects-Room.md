@@ -1,6 +1,6 @@
 # MX65 — The Host Keeps A Project's Room
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - three new verbs beside `expel`, one rule less in the gate, a contract the host's helper and Porelo read, docs and an integration test against the real homeserver.
 
 **What must be true.** On a host whose homeserver runs behind its gate, a project's room exists as soon as the host
