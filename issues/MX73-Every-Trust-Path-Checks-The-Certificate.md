@@ -1,6 +1,6 @@
 # MX73 — Every Trust Path Checks The Certificate
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one new test class over `Trust`, with certificates the build already makes or a fixed pair.
 
 **What must be true.** Each `checkServerTrusted` of the trust manager refuses a chain neither trust source knows, whichever overload is called, and a file with several CAs trusts all of them. Today only the path the HTTP client takes is held.

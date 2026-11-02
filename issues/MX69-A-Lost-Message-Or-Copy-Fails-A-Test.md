@@ -1,6 +1,6 @@
 # MX69 — A Lost Message Or Copy Fails A Test
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - cases in four test classes, some against fakes that must first record more; no production code unless a test finds a defect.
 
 **What must be true.** Whoever breaks what keeps a message or a copy whole sees a unit test fail: a message silently dropped, a gap in a sync not filled, a sender not recorded, a restore that holds nothing or the wrong homeserver's data.

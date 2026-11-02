@@ -1,6 +1,6 @@
 # MX71 — The Gate's Request Parser Is Held To Its Refusals
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - table cases over one class's reading of a request.
 
 **What must be true.** A request the gate's parser must refuse, one that could read differently to the gate and to the homeserver, fails a unit test if it ever passes.

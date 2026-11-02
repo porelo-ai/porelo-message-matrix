@@ -1,6 +1,6 @@
 # MX72 — A Token Is Random And An Admin Command Takes One Argument
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - a few cases in three test classes.
 
 **What must be true.** A homeserver token that stopped being random, an admin room command that took a user id unchecked, and a credential over its limit each fail a unit test.

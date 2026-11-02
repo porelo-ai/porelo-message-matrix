@@ -1,6 +1,6 @@
 # MX74 — Small Refusals Are Held By Tests
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - single cases in test classes that exist.
 
 **What must be true.** The smaller refusals, each cheap to hold, fail a unit test if removed.

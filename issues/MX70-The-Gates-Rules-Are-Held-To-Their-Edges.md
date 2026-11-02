@@ -1,6 +1,6 @@
 # MX70 — The Gate's Rules Are Held To Their Edges
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - table cases over plain functions in one test class.
 
 **What must be true.** `GateRules` decides who belongs to a login and which redirect is the person's own client; moving any of its edges fails a unit test.
