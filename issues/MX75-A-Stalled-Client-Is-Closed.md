@@ -1,6 +1,6 @@
 # MX75 — A Stalled Client Is Closed
 
-**Status:** Idea.
+**Status:** Accepted.
 
 **What must be true.** A client that stops halfway through a request loses its connection to the gate once the idle limit
 has passed, and one that finishes in time keeps it. Whoever removes the idle watch, or lets it fire on a request that

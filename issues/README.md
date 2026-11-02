@@ -39,13 +39,13 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
 ## Idea
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
