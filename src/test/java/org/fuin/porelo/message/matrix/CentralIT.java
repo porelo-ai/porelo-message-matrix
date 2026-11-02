@@ -12,7 +12,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -199,36 +198,63 @@ class CentralIT {
     }
 
     /**
-     * Harm guarded: Porelo hands a transport no variable of its own choosing, so without reading
-     * {@code registration_token_file} a machine on a central homeserver could not register at all.
+     * Harm guarded: a person's first setup or enroll cannot register without a token in a file, or
+     * a token left in the environment is used though Porelo hands the secrets on the input, or the
+     * token leaks into what the verb prints.
      */
     @Test
-    @DisplayName(
-            "setup on a central homeserver takes the machine's registration token from registration_token_file")
-    void setupTakesTheTokenFromItsFile() throws Exception {
-        final Path token = Files.writeString(dir.resolve("token"), tuwunel.registrationToken());
-        Files.setPosixFilePermissions(token, PosixFilePermissions.fromString("rw-------"));
-        settings =
-                "{\"homeserver\":\""
-                        + tuwunel.url()
-                        + "\",\"room\":\""
-                        + room
-                        + "\",\"registration_token_file\":\""
-                        + token
-                        + "\"}";
+    void setupAndEnrollRegisterWithTheTokenOnTheirInputAlone() throws Exception {
+        final String token = tuwunel.registrationToken();
+        final Map<String, String> env = Map.of("XDG_STATE_HOME", dir.resolve("state").toString());
+        final Map<String, String> strayEnv = new HashMap<>(env);
+        strayEnv.put(Config.REGISTRATION_TOKEN, token);
+        final String[] setup = {"setup", "--project", PROJECT, "--login", MACHINE_ONE};
 
-        final JsonNode answer =
-                run(new HashMap<>(), "setup", "--project", PROJECT, "--login", MACHINE_ONE);
-
-        final String adminToken = answer.path("account").path(Config.ADMIN_TOKEN).asText();
-        assertThat(adminToken).as("machine account token").isNotEmpty();
-        assertThat(answer.path("account").path(Config.MACHINE_SECRET).asText())
-                .as("machine secret kept in account")
+        final Transport.Result refused = Transport.runWithInput(strayEnv, onInput(Map.of()), setup);
+        assertThat(refused.exit()).as("no token on the input: %s", refused.err()).isEqualTo(78);
+        assertThat(refused.err()).as("the refusal names it").contains(Config.REGISTRATION_TOKEN);
+        assertThat(refused.err() + refused.out()).as("never its value").doesNotContain(token);
+        assertThat(tuwunel.register("porelo." + MACHINE_ONE).accessToken())
+                .as("nothing was registered: the name is still free")
                 .isNotEmpty();
-        assertThat(answer.path("login").asText())
-                .as("machine reported by setup")
-                .isEqualTo(MACHINE_ONE);
-        assertThat(status(adminToken)).as("machine token accepted by homeserver").isEqualTo(200);
+
+        final String[] other = {"setup", "--project", PROJECT, "--login", MACHINE_TWO};
+        final Map<String, String> lent = Map.of(Config.REGISTRATION_TOKEN, token);
+        final Transport.Result first = Transport.runWithInput(env, onInput(lent), other);
+        assertThat(first.exit()).as("setup: %s", first.err()).isZero();
+        assertThat(first.out() + first.err()).as("never its value").doesNotContain(token);
+        final JsonNode pre = MatrixClient.JSON.readTree(first.out());
+        invite(person, room, "@porelo." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
+        final Map<String, String> account = new HashMap<>(lent);
+        pre.path("account")
+                .properties()
+                .forEach(e -> account.put(e.getKey(), e.getValue().asText()));
+        final Transport.Result admitted = Transport.runWithInput(env, onInput(account), other);
+        assertThat(admitted.exit()).as("setup again: %s", admitted.err()).isZero();
+
+        final String[] enroll = {
+            "enroll", "--project", PROJECT, "--task", "worker", "--login", MACHINE_TWO
+        };
+        final Map<String, String> noToken = new HashMap<>(account);
+        noToken.remove(Config.REGISTRATION_TOKEN);
+        final Transport.Result noEnroll = Transport.runWithInput(env, onInput(noToken), enroll);
+        assertThat(noEnroll.exit()).as("no token: %s", noEnroll.err()).isEqualTo(78);
+        assertThat(noEnroll.err()).as("the refusal names it").contains(Config.REGISTRATION_TOKEN);
+        final Transport.Result enrolled = Transport.runWithInput(env, onInput(account), enroll);
+        assertThat(enrolled.exit()).as("enroll: %s", enrolled.err()).isZero();
+        assertThat(enrolled.out() + enrolled.err()).as("never its value").doesNotContain(token);
+        assertThat(MatrixClient.JSON.readTree(enrolled.out()).path("address").asText())
+                .as("the task's account was registered")
+                .isEqualTo("@worker." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
+    }
+
+    /** What a Porelo handing its secrets on the input writes there. */
+    private String onInput(final Map<String, String> secrets) throws IOException {
+        final ObjectNode input = MatrixClient.JSON.createObjectNode();
+        input.set("settings", MatrixClient.JSON.readTree(settings));
+        final ObjectNode held = input.putObject("secrets");
+        secrets.forEach(held::put);
+        return input.toString();
     }
 
     /**

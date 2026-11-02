@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- A homeserver elsewhere's registration token reaches the transport only among the secrets on its input: `describe`
+  asks Porelo to lend `PORELO_MATRIX_REGISTRATION_TOKEN` to `setup` and `enroll`, and the setting
+  `registration_token_file` is refused like any unknown one.
 - `setup`, `enroll`, `join` and `members` refuse the project `default` with 78, so a task of that project never joins a
   room, whatever settings reach the transport.
 - A person's accounts on a central homeserver are named by their login (`--login`, `PORELO_MATRIX_LOGIN`), and
@@ -48,8 +51,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   With secrets on stdin, no `PORELO_MATRIX_*` variable of the environment is read. A Porelo that still hands the
   bare settings on stdin and the secrets as the environment works as before.
 - `settings` takes `--loopback-only` for an offline project.
-- A project that names `registration_token_file` while `PORELO_MATRIX_REGISTRATION_TOKEN` is set is refused, since
-  which token was meant cannot be told.
 - `join --token [--display <name>]` returns a vault token with the user and room id, keeps the password
   private, and logs out every earlier session of an existing account. A new account keeps its registration
   session. `join --display` uses the same validation as `enroll`.
@@ -87,9 +88,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   administrator back, though Porelo's vault did not come with the copy. A `poll` while a backup copies the
   positions answers 75 at once, so a backup that hangs never hangs the polls.
 
-- A project on a homeserver elsewhere names its registration token's file as `registration_token_file`, so it
-  can be set up through Porelo, which hands a transport no variable of the person's choosing; `settings` checks
-  it while the project file is edited.
 
 ### Security
 

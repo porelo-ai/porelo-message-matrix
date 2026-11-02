@@ -1446,31 +1446,18 @@ final class Lifecycle {
     }
 
     /**
-     * A homeserver elsewhere's registration token: from the file the settings name, which is how a
-     * person gives it through Porelo, else from the environment.
+     * A homeserver elsewhere's registration token: lent from the person's vault among the secrets
+     * on the input, for the verbs {@code describe} names.
      */
     private static String elsewhereToken(final Settings settings, final Map<String, String> env)
             throws Failure {
-        if (settings.hosted()) {
-            return "";
-        }
-        final Path file = settings.registrationTokenFile();
-        final String given = env.get(Config.REGISTRATION_TOKEN);
-        if (file != null && given != null && !given.isBlank()) {
-            // Which of the two was meant cannot be told, so neither is guessed.
-            throw new Failure(
-                    Exit.CONFIG,
-                    "the project names registration_token_file and "
-                            + Config.REGISTRATION_TOKEN
-                            + " is set too; give the token one way");
-        }
-        return file != null
-                ? RegistrationTokenFile.read(file)
+        return settings.hosted()
+                ? ""
                 : required(
                         env,
                         Config.REGISTRATION_TOKEN,
-                        "the project's homeserver is not this account's own; name its token's file"
-                                + " as registration_token_file");
+                        "the project's homeserver is not this account's own; put its token in the"
+                                + " person's vault, and Porelo lends it");
     }
 
     private static Place place(final Settings settings, final Map<String, String> env)

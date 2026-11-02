@@ -220,30 +220,26 @@ class LifecycleTest {
         return Map.of("HOME", dir.toString(), "XDG_CONFIG_HOME", dir.resolve("config").toString());
     }
 
-    /** Harm guarded: the transport registers with a token other than the one meant. */
+    /**
+     * Harm guarded: the old setting still chooses a token from a file, or an account is registered
+     * before the setting is refused.
+     */
     @Test
-    void twoRegistrationTokensAreRefused() throws Exception {
+    void settingsNamingARegistrationTokenFileAreRefusedBeforeAnything() throws Exception {
         final java.nio.file.Path file =
                 java.nio.file.Files.writeString(dir.resolve("token"), "from-the-file");
         java.nio.file.Files.setPosixFilePermissions(
                 file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
-        final Map<String, String> env = new java.util.HashMap<>(account());
-        env.put(Config.REGISTRATION_TOKEN, "from-the-environment");
+        final String named =
+                "{\"homeserver\":\"https://192.0.2.2\",\"room\":\"#p:example.org\","
+                        + "\"registration_token_file\":\""
+                        + file
+                        + "\"}";
 
         org.assertj.core.api.Assertions.assertThat(
-                        exit(
-                                "{\"homeserver\":\"https://matrix.example.org\",\"room\":\"#p:example.org\","
-                                        + "\"registration_token_file\":\""
-                                        + file
-                                        + "\"}",
-                                env,
-                                "setup",
-                                "--project",
-                                "demo",
-                                "--login",
-                                "hosta"))
-                .as("which of the two was meant cannot be told")
-                .isEqualTo(Exit.CONFIG);
+                        reason(named, account(), "setup", "--project", "demo", "--login", "hosta"))
+                .as("refused by name, with no homeserver reached")
+                .startsWith(Exit.CONFIG + " the project's settings name 'registration_token_file'");
     }
 
     /** Harm guarded: a list mistyped drops every developer from the project's room. */

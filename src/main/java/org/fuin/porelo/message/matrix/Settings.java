@@ -21,11 +21,7 @@ import org.jspecify.annotations.Nullable;
  * nothing.
  */
 record Settings(
-        @Nullable URI homeserver,
-        @Nullable Path caFile,
-        boolean verifyTls,
-        @Nullable Path registrationTokenFile,
-        @Nullable String room) {
+        @Nullable URI homeserver, @Nullable Path caFile, boolean verifyTls, @Nullable String room) {
 
     /** Said on stderr whenever the project's settings switch the certificate check off. */
     static final String VERIFY_OFF_WARNING =
@@ -33,8 +29,7 @@ record Settings(
                     + " not checked, and whoever answers in its place receives the admin token. For"
                     + " development only.";
 
-    static final Set<String> KEYS =
-            Set.of("homeserver", "ca_file", "tls_verify", "registration_token_file", "room");
+    static final Set<String> KEYS = Set.of("homeserver", "ca_file", "tls_verify", "room");
 
     static final String CA_CERTIFICATE_WENT =
             "the project's settings name 'ca_certificate', which went with the published"
@@ -57,14 +52,6 @@ record Settings(
                                         .toLowerCase(Locale.ROOT)
                                         .endsWith(".localhost")));
     }
-
-    static final String TOKEN_FILE_ON_A_HOST =
-            "the project's registration_token_file is for a homeserver elsewhere; a host's"
-                    + " homeserver behind its gate takes no registration token";
-
-    static final String TOKEN_FILE_WITHOUT_HOMESERVER =
-            "the project's registration_token_file is for a homeserver elsewhere; this account's"
-                    + " own needs none";
 
     static final String HOMESERVER_WITHOUT_ROOM =
             "a homeserver in the settings is a central one and needs the project's room as `room`";
@@ -99,7 +86,7 @@ record Settings(
                     ex);
         }
         if (node == null || node.isNull()) {
-            return new Settings(null, null, true, null, null);
+            return new Settings(null, null, true, null);
         }
         if (!node.isObject()) {
             throw new Failure(Exit.CONFIG, "the project's settings on stdin are not a JSON object");
@@ -122,22 +109,11 @@ record Settings(
                         homeserver(node.path("homeserver")),
                         caFile(node.path("ca_file")),
                         verify(node.path("tls_verify")),
-                        absolutePath(
-                                node.path("registration_token_file"), "registration_token_file"),
                         room(node.path("room")));
         // Refused here, not first by the verb that reads the printed secrets: which was meant
         // cannot be told.
         if (settings.caFile() != null && !settings.verifyTls()) {
             throw new Failure(Exit.CONFIG, CONTRADICTION);
-        }
-        // The account's own homeserver has its token in the transport's own file; a second one
-        // here would silently do nothing.
-        if (settings.registrationTokenFile() != null && settings.homeserver() == null) {
-            throw new Failure(Exit.CONFIG, TOKEN_FILE_WITHOUT_HOMESERVER);
-        }
-        // A host's gate registers without a token; one named here would silently do nothing.
-        if (settings.registrationTokenFile() != null && settings.hosted()) {
-            throw new Failure(Exit.CONFIG, TOKEN_FILE_ON_A_HOST);
         }
         // A central homeserver's room is made by a person there; without it, setup has none to
         // join.
@@ -187,12 +163,7 @@ record Settings(
 
     /** These settings with any {@code ~/} paths resolved in the running account's home. */
     Settings materialized(final Map<String, String> env) throws Failure {
-        return new Settings(
-                homeserver,
-                inHome(caFile, env),
-                verifyTls,
-                inHome(registrationTokenFile, env),
-                room);
+        return new Settings(homeserver, inHome(caFile, env), verifyTls, room);
     }
 
     /** The first name of a path in the running account's home: {@code ~}. */
@@ -215,10 +186,6 @@ record Settings(
 
     static @Nullable Path caFile(final JsonNode value) throws Failure {
         return absolutePath(value, "ca_file");
-    }
-
-    static @Nullable Path registrationTokenFile(final JsonNode value) throws Failure {
-        return absolutePath(value, "registration_token_file");
     }
 
     static @Nullable String room(final JsonNode value) throws Failure {

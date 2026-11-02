@@ -209,56 +209,21 @@ class SettingsCheckTest {
     }
 
     /**
-     * Harm guarded: an editor that accepts a registration_token_file setup then refuses lets a
-     * person commit a project that cannot start, and one whose token file other accounts can read
-     * hands them the right to register on that homeserver.
+     * Harm guarded: an editor that accepts the setting lets a person commit a project that setup
+     * then refuses.
      */
     @Test
-    @DisplayName(
-            "registration_token_file: relative or without a homeserver refused, readable by others warned")
-    void registrationTokenFile() throws IOException {
+    void aRegistrationTokenFileIsRefusedLikeAnyUnknownSetting() throws IOException {
         assertThat(
                         texts(
                                 check(
                                                 "{\"homeserver\":\"https://matrix.example.org\","
                                                         + "\"room\":\"#p:matrix.example.org\","
-                                                        + "\"registration_token_file\":\"token\"}")
+                                                        + "\"registration_token_file\":\"/etc/t\"}")
                                         .path("refused")))
                 .singleElement()
                 .asString()
-                .contains("absolute path");
-        assertThat(texts(check("{\"registration_token_file\":\"/home/a/token\"}").path("refused")))
-                .singleElement()
-                .asString()
-                .contains("homeserver elsewhere");
-        for (final String host :
-                List.of("unix:/run/porelo-matrix/client.sock", "http://h.localhost:8008")) {
-            assertThat(
-                            texts(
-                                    check(
-                                                    "{\"homeserver\":\""
-                                                            + host
-                                                            + "\",\"room\":\"#p:h\","
-                                                            + "\"registration_token_file\":\"/etc/t\"}")
-                                            .path("refused")))
-                    .as("a host's gate takes no token: %s", host)
-                    .containsExactly(Settings.TOKEN_FILE_ON_A_HOST);
-        }
-        final Path open = Files.writeString(dir.resolve("open"), "t");
-        Files.setPosixFilePermissions(
-                open, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
-        final JsonNode answer =
-                check(
-                        "{\"homeserver\":\"https://matrix.example.org\","
-                                + "\"room\":\"#p:matrix.example.org\","
-                                + "\"registration_token_file\":\""
-                                + open
-                                + "\"}");
-        assertThat(texts(answer.path("refused"))).isEmpty();
-        assertThat(texts(answer.path("warnings")))
-                .singleElement()
-                .asString()
-                .contains("readable by other accounts");
+                .contains("registration_token_file");
     }
 
     /**

@@ -75,10 +75,7 @@ administrator token and login tokens, and the gate's socket directory. The login
 - **Settings:** `homeserver` (a central homeserver; requires `room`; `https`, loopback `http`, or
   `unix:<absolute path>`; a relative socket path is refused with 78), `room` (an alias `#local:server` or a room id,
   required with `homeserver` and refused without it), `ca_file` (absolute, or `~/…` in the running account's home),
-  `tls_verify` (`on`/`off`), `registration_token_file` (absolute, or `~/…` in the running account's home, so the
-  signed settings can name one for every person; only with a `homeserver` elsewhere, never with a host's behind its
-  gate, `unix:` or `*.localhost`; its first token is read). `ca_certificate`
-  and anything else is refused (78).
+  `tls_verify` (`on`/`off`). `ca_certificate` and anything else is refused (78).
 - **The printed `secrets` from `setup` and `enroll` name `PORELO_MATRIX_CA_FILE`, `PORELO_MATRIX_TLS_VERIFY` and
   `PORELO_MATRIX_LOGIN`** (empty on the account's own homeserver), so an inherited value never outweighs what the
   project configured.
@@ -95,9 +92,9 @@ administrator token and login tokens, and the gate's socket directory. The login
   `setup`; an option that differs from the kept login is refused with 78. A login begins with a lower-case
   letter, contains only lower-case letters, digits and `-`, has no dot, and is at most 32 characters.
   `porelo` and names starting with `porelo-` are reserved. Every other value is refused with 78, naming the rule.
-  On a host's gate (`unix:` or `*.localhost`), registration needs no client-held registration token. Elsewhere the token
-  comes from `registration_token_file`, readable by this account alone (78 otherwise), or from
-  `PORELO_MATRIX_REGISTRATION_TOKEN`; both at once is refused (78). `PORELO_MATRIX_MACHINE_SECRET` keeps its
+  On a host's gate (`unix:` or `*.localhost`), registration needs no client-held registration token. Elsewhere the token is
+  `PORELO_MATRIX_REGISTRATION_TOKEN` among the secrets on the input, which Porelo lends `setup` and `enroll` from the
+  person's vault as `describe`'s `credentials` ask (78 without it). `PORELO_MATRIX_MACHINE_SECRET` keeps its
   existing key and derives passwords for the login's accounts.
 - **The project's room is checked:** on the account's own homeserver it is taken only if it is Porelo's —
   made by its administrator, invite-only, guests forbidden — and a room under the alias that is anybody

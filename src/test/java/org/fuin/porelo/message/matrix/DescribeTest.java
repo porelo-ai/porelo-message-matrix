@@ -57,14 +57,6 @@ class DescribeTest {
         assertThat(description.path("display").asBoolean(false))
                 .as("enroll takes --display")
                 .isTrue();
-        assertThat(description.path("credentials"))
-                .singleElement()
-                .satisfies(
-                        credential -> {
-                            assertThat(credential.path("name").asText())
-                                    .isEqualTo(Config.ACCESS_TOKEN);
-                            assertThat(credential.path("as").asText()).isEqualTo("env");
-                        });
         assertThat(description.path("secrets").asText())
                 .as("the secrets are taken on the input")
                 .isEqualTo("input");
@@ -222,5 +214,27 @@ class DescribeTest {
     @DisplayName("Arguments it does not take are 64")
     void noArguments() {
         assertThat(describe("--verbose")).isEqualTo(Exit.USAGE);
+    }
+
+    /**
+     * Harm guarded: a Porelo reading no {@code lent} lends nothing, so a person's first setup on a
+     * homeserver elsewhere can never register; and a verb listed beyond these sends the person's
+     * token where it is not needed.
+     */
+    @Test
+    void theRegistrationTokenIsBorrowedForTheVerbsThatRegisterAlone() throws IOException {
+        assertThat(describe()).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.OK);
+        final JsonNode credentials =
+                MatrixClient.JSON
+                        .readTree(outBytes.toString(StandardCharsets.UTF_8))
+                        .path("credentials");
+        assertThat(credentials)
+                .as("the task's token, and the registration token lent to two verbs")
+                .extracting(JsonNode::toString)
+                .containsExactly(
+                        "{\"name\":\"" + Config.ACCESS_TOKEN + "\",\"as\":\"env\"}",
+                        "{\"name\":\""
+                                + Config.REGISTRATION_TOKEN
+                                + "\",\"as\":\"env\",\"lent\":[\"setup\",\"enroll\"]}");
     }
 }

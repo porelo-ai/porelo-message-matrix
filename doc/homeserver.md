@@ -78,7 +78,7 @@ and provisions only their own accounts: `@porelo.<login>`, `@porelo-relay-<proje
 A login starts with a lower-case letter, contains only lower-case letters, digits and `-`, and is at
 most 32 characters. It has no dot and is neither `porelo` nor a name beginning with `porelo-`; invalid logins
 are refused with 78. On a host's gate (`unix:` or `*.localhost`) registration needs no client-held token; on an external
-homeserver it still needs `registration_token_file` or `PORELO_MATRIX_REGISTRATION_TOKEN`.
+homeserver it needs `PORELO_MATRIX_REGISTRATION_TOKEN` among the secrets on its input.
 
 The host's helper runs `porelo-message-transport-matrix expel <login>` as the homeserver's account, with its
 administrator token among the secrets on stdin: behind the gate, the token in `gate/admin-token`. Like the gate's
@@ -103,9 +103,9 @@ What a person does on the central homeserver:
   `private_chat` preset, whose invite power level is 0) with guests forbidden (`m.room.guest_access` set to
   `forbidden`), and set its alias or room id as `room` in the project's settings.
 - **On an external homeserver, issue each login a registration token** as the homeserver's administrator:
-  `POST /_synapse/admin/v1/registration_tokens/new` with an administrator Bearer token. Put the token in the
-  file named by `registration_token_file`, readable by that account alone (`chmod 600`). A host's gate needs
-  none of this client-held token setup.
+  `POST /_synapse/admin/v1/registration_tokens/new` with an administrator Bearer token. The person keeps it in
+  their vault under `matrix-registration-token.<server>`, and Porelo lends it to `setup` and `enroll`. A host's gate
+  needs none of this client-held token setup.
 - **Invite each person's `@porelo.<login>` into the room.** The first `setup` registers it and prints
   `"admitted": false` until invited; the next `setup` joins the room, admits
   `@porelo-relay-<project>.<login>`, and prints `"admitted": true`. Central `join` remains refused (77);

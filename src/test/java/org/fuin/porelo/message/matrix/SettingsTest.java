@@ -189,36 +189,6 @@ class SettingsTest {
                 .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
     }
 
-    /**
-     * Harm guarded: a homeserver elsewhere could not be set up through Porelo at all, since nothing
-     * hands the transport its registration token; a relative path would be read against a directory
-     * that is Porelo's, and the setting on the account's own homeserver would silently do nothing.
-     */
-    @Test
-    @DisplayName(
-            "registration_token_file is taken as an absolute path for a homeserver elsewhere, else 78")
-    void registrationTokenFile() throws Failure {
-        assertThat(
-                        settings(
-                                        "{\"homeserver\":\"https://matrix.example.org\","
-                                                + "\"room\":\"#p:example.org\","
-                                                + "\"registration_token_file\":\"/home/a/token\"}")
-                                .registrationTokenFile())
-                .as("registration_token_file")
-                .hasToString("/home/a/token");
-        for (final String json :
-                List.of(
-                        "{\"homeserver\":\"https://matrix.example.org\","
-                                + "\"room\":\"#p:example.org\","
-                                + "\"registration_token_file\":\"token\"}",
-                        "{\"registration_token_file\":\"/home/a/token\"}")) {
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> settings(json))
-                    .as(json)
-                    .isInstanceOf(Failure.class)
-                    .satisfies(f -> assertThat(((Failure) f).exitCode()).isEqualTo(Exit.CONFIG));
-        }
-    }
-
     @org.junit.jupiter.api.io.TempDir private java.nio.file.Path home;
 
     private static String json(final String key, final String value) {
@@ -257,28 +227,25 @@ class SettingsTest {
     }
 
     /**
-     * Harm guarded: the signed settings name one token file for every machine, which only a path in
+     * Harm guarded: the signed settings name one CA file for every machine, which only a path in
      * each account's own home can be, and the transport refuses it or reads another account's.
      */
     @Test
-    void aTokenFileInTheHomeIsTheRunningAccounts() throws Exception {
+    void aCaFileInTheHomeIsTheRunningAccounts() throws Exception {
         final Settings settings =
-                settings(
-                                json(
-                                        "registration_token_file",
-                                        "~/.config/porelo/matrix/host-registration-token"))
+                settings(json("ca_file", "~/.config/porelo/matrix/ca.pem"))
                         .materialized(Map.of("HOME", home.toString()));
 
-        org.assertj.core.api.Assertions.assertThat(settings.registrationTokenFile())
+        org.assertj.core.api.Assertions.assertThat(settings.caFile())
                 .as("~/ is this account's home")
-                .isEqualTo(home.resolve(".config/porelo/matrix/host-registration-token"));
+                .isEqualTo(home.resolve(".config/porelo/matrix/ca.pem"));
     }
 
     /** Harm guarded: a path named in the home leads out of it to another account's file. */
     @Test
     void aPathInTheHomeStaysInIt() {
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                        () -> settings(json("registration_token_file", "~/../other/.config/token")))
+                        () -> settings(json("ca_file", "~/../other/.config/ca.pem")))
                 .as("~/.. leaves the home")
                 .isInstanceOfSatisfying(
                         Failure.class,
@@ -286,5 +253,26 @@ class SettingsTest {
                                 org.assertj.core.api.Assertions.assertThat(failure.exitCode())
                                         .as("refused")
                                         .isEqualTo(Exit.CONFIG));
+    }
+
+    /**
+     * Harm guarded: a token left in a file on a machine, readable to whatever runs as that account,
+     * when the person's vault is where it belongs.
+     */
+    @Test
+    void aRegistrationTokenFileIsASettingNoMore() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> settings(json("registration_token_file", "/home/a/token")))
+                .as("refused like any other unknown setting")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            org.assertj.core.api.Assertions.assertThat(failure.exitCode())
+                                    .as("refused")
+                                    .isEqualTo(Exit.CONFIG);
+                            org.assertj.core.api.Assertions.assertThat(failure.getMessage())
+                                    .as("named")
+                                    .contains("registration_token_file");
+                        });
     }
 }

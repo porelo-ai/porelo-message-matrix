@@ -59,11 +59,16 @@ final class Describe {
         // from the moment of exec; a Porelo that does not read this still hands them as below.
         description.put("secrets", "input");
         // One environment variable per credential, named per credential.
-        description
-                .putArray("credentials")
+        final var credentials = description.putArray("credentials");
+        credentials.addObject().put("name", Config.ACCESS_TOKEN).put("as", "env");
+        // Lent from the person's vault for the verbs that register on a homeserver elsewhere.
+        credentials
                 .addObject()
-                .put("name", Config.ACCESS_TOKEN)
-                .put("as", "env");
+                .put("name", Config.REGISTRATION_TOKEN)
+                .put("as", "env")
+                .putArray("lent")
+                .add("setup")
+                .add("enroll");
         // The homeserver the package installs, once it does; until then no host is claimed.
         description.putArray("hosts");
         // "sender" once Porelo defines the evidence that proves it; claimed without it, every
