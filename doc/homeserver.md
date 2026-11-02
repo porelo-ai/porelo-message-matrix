@@ -13,13 +13,16 @@ directory for the container, and the account still reads it.
 
 ## Settings and data
 
+`$XDG_CONFIG_HOME` and `$XDG_STATE_HOME` name the account's configuration and state folders; where one is not set, it is
+the XDG default in the account's home directory.
+
 | What | Where | Default |
 |---|---|---|
-| Port, on `127.0.0.1` only | `PORELO_MATRIX_PORT` in `~/.config/porelo/matrix/homeserver.conf`, under `$XDG_CONFIG_HOME` when it is set | the first free one from `8008` |
+| Port, on `127.0.0.1` only | `PORELO_MATRIX_PORT` in `$XDG_CONFIG_HOME/porelo/matrix/homeserver.conf` | the first free one from `8008` |
 | Server name, part of every account id; fixed once the database exists | `PORELO_MATRIX_SERVER_NAME` in the same file | `localhost` |
-| Registration token, made on first start, readable by the account alone | `~/.config/porelo/matrix/tokens/registration-token`, under `$XDG_CONFIG_HOME` when it is set; the unit mounts the directory `tokens` | - |
+| Registration token, made on first start, readable by the account alone | `$XDG_CONFIG_HOME/porelo/matrix/tokens/registration-token`; the unit mounts the directory `tokens` | - |
 | Database | the podman volume `porelo-matrix-homeserver` | - |
-| Backups, up to 48, made on `SIGUSR2`; the account's alone, since they hold every token and password hash | `~/.local/state/porelo/matrix/backups`, under `$XDG_STATE_HOME` when it is set | - |
+| Backups, up to 48, made on `SIGUSR2`; the account's alone, since they hold every token and password hash | `$XDG_STATE_HOME/porelo/matrix/backups` | - |
 | Container | `matrix-homeserver`, acted on only by the id in `$XDG_RUNTIME_DIR/porelo-matrix-homeserver.cid` | - |
 | Environment file the unit hands podman, written before every start: empty, or in gate mode the homeserver's private socket | `tls.env` beside `homeserver.conf` | - |
 
@@ -52,10 +55,10 @@ stops and says the homeserver "was reset":
 1. `systemctl --user stop porelo-matrix-homeserver` and `podman volume rm porelo-matrix-homeserver`;
 2. what Porelo keeps of the transport: `porelo vault remove transport/matrix/account` and
    `porelo vault remove transport/matrix/project/<project>` for each project;
-3. the transport's state: `rm -r ~/.local/state/porelo/transports/matrix`.
+3. the transport's state: `rm -r "$XDG_STATE_HOME/porelo/transports/matrix"`, with the folder written out where the variable is not set.
 
 `tokens/registration-token` and `homeserver.conf` stay. The next task start registers `@porelo` again. A
-host behind its gate also removes `~/.config/porelo/matrix/expelled-logins` and `~/.config/porelo/matrix/gate`
+host behind its gate also removes `$XDG_CONFIG_HOME/porelo/matrix/expelled-logins` and `$XDG_CONFIG_HOME/porelo/matrix/gate`
 when its database is reset, and runs `gate --prepare` again once the homeserver is up: until then the gate holds
 the old database's administrator token and refuses every registration and sign-in.
 

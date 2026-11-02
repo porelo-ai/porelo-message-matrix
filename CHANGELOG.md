@@ -82,7 +82,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `backup <dir>` and `restore <dir>`, for a host's playbook: the local homeserver's conversation copied into a
   directory and put back on another machine, its rooms, messages and people's accounts as they were. The
-  homeserver package keeps up to 48 online backups in `~/.local/state/porelo/matrix/backups`, made on
+  homeserver package keeps up to 48 online backups in `$XDG_STATE_HOME/porelo/matrix/backups`, made on
   `SIGUSR2`; a restored relay hands over only what it had not, and the first `setup` after a restore takes the
   administrator back, though Porelo's vault did not come with the copy. A `poll` while a backup copies the
   positions answers 75 at once, so a backup that hangs never hangs the polls.
@@ -141,7 +141,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A first `setup` beside a homeserver that already runs stops it before it chooses the port, so the homeserver keeps
   its port and comes back where the file says, instead of `setup` waiting three minutes on a port nothing listens on.
 - A registration token changed while the homeserver runs is read at once. The registration token
-  moved into `~/.config/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
+  moved into `$XDG_CONFIG_HOME/porelo/matrix/tokens/`, and the unit mounts that directory: a mounted file kept the token
   file the container started with, so a new token got `401 Invalid registration token` until a restart. The
   unit's next start moves an existing token file there, and `setup` restarts
   a homeserver an earlier version started.

@@ -306,7 +306,7 @@ class KeepTest {
         final Path copy = copy("8008");
         Files.writeString(
                 copy.resolve("homeserver.conf"),
-                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=10.0.0.1:8448\n"
+                "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.1:8448\n"
                         + "PORELO_MATRIX_PUBLISH_NAME=host.example\n");
 
         Keep.restore(copy, env, unit);

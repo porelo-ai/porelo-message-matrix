@@ -83,7 +83,7 @@ class ListenerTest {
     @Test
     @DisplayName("Another uid listening on 127.0.0.1 at the port: 78, naming that uid")
     void anotherUidOnLoopback() throws IOException {
-        final List<Path> tables = tables(List.of(tcp("0100007F:1F48", "0A", 1009)), List.of());
+        final List<Path> tables = tables(List.of(tcp("0100007F:1F48", "0A", 4242)), List.of());
 
         assertThatThrownBy(() -> Listener.ensureOwn(HOMESERVER, tables, OWN))
                 .as("another uid on 127.0.0.1")
@@ -94,13 +94,13 @@ class ListenerTest {
                                         .as("refused as configuration")
                                         .isEqualTo(Exit.CONFIG))
                 .hasMessageContaining("127.0.0.1:8008")
-                .hasMessageContaining("uid 1009");
+                .hasMessageContaining("uid 4242");
     }
 
     @Test
     @DisplayName("Another uid on 0.0.0.0, which takes connections to 127.0.0.1 too: 78")
     void anotherUidOnTheWildcard() throws IOException {
-        final List<Path> tables = tables(List.of(tcp("00000000:1F48", "0A", 1009)), List.of());
+        final List<Path> tables = tables(List.of(tcp("00000000:1F48", "0A", 4242)), List.of());
 
         assertThatThrownBy(() -> Listener.ensureOwn(HOMESERVER, tables, OWN))
                 .as("another uid on 0.0.0.0")
@@ -114,7 +114,7 @@ class ListenerTest {
                 List.of(
                         "00000000000000000000000000000000:1F48",
                         "0000000000000000FFFF00000100007F:1F48")) {
-            final List<Path> tables = tables(List.of(), List.of(tcp6(local, "0A", 1009)));
+            final List<Path> tables = tables(List.of(), List.of(tcp6(local, "0A", 4242)));
 
             assertThatThrownBy(() -> Listener.ensureOwn(HOMESERVER, tables, OWN))
                     .as(local)
@@ -129,8 +129,8 @@ class ListenerTest {
         final List<Path> tables =
                 tables(
                         List.of(
-                                tcp("0100007F:1F49", "0A", 1009),
-                                tcp("0100007F:1F48", "01", 1009),
+                                tcp("0100007F:1F49", "0A", 4242),
+                                tcp("0100007F:1F48", "01", 4242),
                                 tcp("0100007F:1F48", "0A", OWN)),
                         List.of());
 
@@ -146,7 +146,7 @@ class ListenerTest {
         final List<Path> tables =
                 tables(
                         List.of(tcp("0100007F:1F48", "0A", OWN)),
-                        List.of(tcp6("00000000000000000000000001000000:1F48", "0A", 1009)));
+                        List.of(tcp6("00000000000000000000000001000000:1F48", "0A", 4242)));
 
         assertThatCode(() -> Listener.ensureOwn(HOMESERVER, tables, OWN))
                 .as("127.0.0.1 is the account's own")
@@ -178,8 +178,8 @@ class ListenerTest {
         final Path status =
                 Files.writeString(
                         dir.resolve("status"),
-                        "Name:\tjava\nUmask:\t0002\nState:\tS (sleeping)\nUid:\t1009\t1009\t1009\t1009\n");
+                        "Name:\tjava\nUmask:\t0002\nState:\tS (sleeping)\nUid:\t4242\t4242\t4242\t4242\n");
 
-        assertThat(Listener.ownUid(status)).as("the real uid, the first of four").isEqualTo(1009);
+        assertThat(Listener.ownUid(status)).as("the real uid, the first of four").isEqualTo(4242);
     }
 }
