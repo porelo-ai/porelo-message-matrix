@@ -390,3 +390,11 @@ immediate cancellation would require tracking and interrupting outstanding syncs
 token lives up to two minutes in a file only the homeserver account reads, as a hash with its login
 and expiry, and is consumed under a shared lock. Processes of that trusted account can read or
 alter these records; a separate credential service would be needed to narrow that trust boundary.
+The gate reads a request's body whole, up to 64 MiB, before it decides whether the caller may send
+it, so one person can make the homeserver's account hold that much per connection. The gate checks
+a file of its own and then reads it, and the file can change in between; only the homeserver's
+account writes those files. When the session made for a login fails after it was made, the gate
+does not log that session out. In gate mode the host's port 8008 stays published, mapped to the
+container's 8009, where nothing listens. SSO redirects under `/_matrix/client/r0/` are refused;
+clients use `v3`. A size limit before reading, an atomic read, a logout on failure or an unpublished
+port would each close one of these; none of them lets a person act as another login.
