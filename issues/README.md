@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 | <a id="mx66"></a>[MX66](MX66-The-Default-Project-Has-No-Room.md) | S | - | The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared |
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
@@ -17,7 +18,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 
 ## Backlog
 
@@ -45,6 +45,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |

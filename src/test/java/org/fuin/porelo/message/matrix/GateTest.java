@@ -31,7 +31,28 @@ class GateTest {
     private final String sessionToken = Accounts.secret();
     private boolean taken;
     private int identityStatus = 200;
+    private static final String ADMIN_DETAIL = "database at 192.0.2.7 refused";
+    private static final String INTERNAL_ADDRESS = "https://internal.example.org";
+
+    private int createStatus = 200;
+    private int adminLoginStatus = 200;
+    private int loginStatus = 200;
+    private int availabilityStatus = 200;
+    private boolean answeredNotAvailable;
+    private boolean takenAtSecondAsk;
+    private int asked;
+    private int forwardStatus = 200;
     private String lastAnswer = "";
+
+    /** As a real administrator's API words a failure: what the caller must not read. */
+    private static GateResponse adminFailure(final int status) {
+        return new GateResponse(
+                status,
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("errcode", "M_UNKNOWN")
+                        .put("error", ADMIN_DETAIL));
+    }
 
     @BeforeEach
     void prepare() throws Exception {
@@ -65,8 +86,34 @@ class GateTest {
                                                                     : identity)
                                                     .put("device_id", "device"));
                                 }
-                                if (path.contains("username_available") && taken) {
-                                    return GateResponse.error(400, "M_USER_IN_USE");
+                                if (path.contains("username_available")) {
+                                    asked++;
+                                    if (taken || takenAtSecondAsk && asked > 1) {
+                                        return GateResponse.error(400, "M_USER_IN_USE");
+                                    }
+                                    if (availabilityStatus != 200) {
+                                        return adminFailure(availabilityStatus);
+                                    }
+                                    return new GateResponse(
+                                            200,
+                                            MatrixClient.JSON
+                                                    .createObjectNode()
+                                                    .put("available", !answeredNotAvailable));
+                                }
+                                if (path.startsWith("/_synapse/admin/v2/users/")) {
+                                    return createStatus == 200 || createStatus == 201
+                                            ? new GateResponse(
+                                                    createStatus,
+                                                    MatrixClient.JSON.createObjectNode())
+                                            : adminFailure(createStatus);
+                                }
+                                if (path.startsWith("/_synapse/")
+                                        && path.endsWith("/login")
+                                        && adminLoginStatus != 200) {
+                                    return GateResponse.error(adminLoginStatus, "M_FORBIDDEN");
+                                }
+                                if (path.endsWith("/v3/login") && loginStatus != 200) {
+                                    return GateResponse.error(loginStatus, "M_FORBIDDEN");
                                 }
                                 if (path.startsWith("/_synapse/") && path.endsWith("/login")) {
                                     return new GateResponse(
@@ -82,7 +129,8 @@ class GateTest {
                                                     .createObjectNode()
                                                     .put("user_id", identity)
                                                     .put("access_token", Accounts.secret())
-                                                    .put("device_id", "device"));
+                                                    .put("device_id", "device")
+                                                    .put("well_known", INTERNAL_ADDRESS));
                                 }
                                 return new GateResponse(
                                         200,
@@ -95,9 +143,10 @@ class GateTest {
                             public int forward(final GateRequest request, final OutputStream out)
                                     throws java.io.IOException {
                                 calls.add(request.path());
-                                new GateResponse(200, MatrixClient.JSON.createObjectNode())
+                                new GateResponse(
+                                                forwardStatus, MatrixClient.JSON.createObjectNode())
                                         .write(out, false);
-                                return 200;
+                                return forwardStatus;
                             }
                         },
                         new PrintStream(log, true, StandardCharsets.UTF_8));
@@ -298,6 +347,19 @@ class GateTest {
         assertThat(log.toString(StandardCharsets.UTF_8))
                 .as("one redacted refusal")
                 .isEqualTo("alice GET /_matrix/client/v3/sync 403\n");
+    }
+
+    /**
+     * Harm guarded: a decoded space in a refused path makes the log line read as another status.
+     */
+    @Test
+    void aDecodedSpaceInARefusedPathCannotShiftTheLogsColumns() throws Exception {
+        assertThat(request("GET", "/_matrix/client/v3/sync%20200", "", ""))
+                .as("past the parser, and refused for having no token")
+                .isEqualTo(401);
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .as("the decoded space is masked, so 401 stays the only status")
+                .isEqualTo("alice GET /_matrix/client/v3/sync?200 401\n");
     }
 
     /**
@@ -779,5 +841,332 @@ class GateTest {
             assertThat(request("GET", path, "", "")).as(path).isEqualTo(200);
         }
         assertThat(calls).hasSize(2);
+    }
+
+    private static final String ALIAS_PATH = "/_matrix/client/v3/directory/room/";
+
+    private void assertNothingOfTheAliasIsForwarded() {
+        assertThat(calls)
+                .as("nothing forwarded")
+                .noneMatch(path -> path.contains("directory/room"));
+    }
+
+    /** Harm guarded: a person takes a project's reserved alias, and with it the project's room. */
+    @Test
+    void aPutOfAReservedAliasIsRefusedToWhoeverIsNoProjectAdmin() throws Exception {
+        final String path = ALIAS_PATH + "%23porelo-demo%3Aexample.org";
+        assertThat(request("PUT", path, Accounts.secret(), "{}")).as("person").isEqualTo(403);
+        assertNothingOfTheAliasIsForwarded();
+        identity = "@porelo.alice:example.org";
+        assertThat(request("PUT", path, Accounts.secret(), "{}"))
+                .as("the project's account, with no host file")
+                .isEqualTo(403);
+        assertNothingOfTheAliasIsForwarded();
+    }
+
+    /** Harm guarded: another form of the same path passes the alias check by. */
+    @Test
+    void anAliasNotInTheFormOfOneIsRefusedAndOnlyAPutIsChecked() throws Exception {
+        final String token = Accounts.secret();
+        for (final String alias : List.of("porelo-demo%3Aexample.org", "%23%3Aexample.org")) {
+            assertThat(request("PUT", ALIAS_PATH + alias, token, "{}")).as(alias).isEqualTo(403);
+        }
+        assertNothingOfTheAliasIsForwarded();
+        assertThat(request("PUT", ALIAS_PATH + "%23a%3Aexample.org", token, "{}"))
+                .as("the shortest alias of nobody's")
+                .isEqualTo(200);
+        assertThat(request("GET", ALIAS_PATH + "%23porelo-demo%3Aexample.org", token, ""))
+                .as("reading a reserved alias changes nothing")
+                .isEqualTo(200);
+    }
+
+    /** Harm guarded: a reserved alias under a bad name, or a host file nobody can read, lets by. */
+    @Test
+    void aBadProjectNameAndAnUnreadableHostFileAreRefused() throws Exception {
+        identity = "@porelo.alice:example.org";
+        final String token = Accounts.secret();
+        final String create = "/_matrix/client/v3/createRoom";
+        Files.createDirectories(dir.resolve("projects"));
+        Files.writeString(dir.resolve("projects/A B.admins"), "alice\n");
+        assertThat(request("POST", create, token, "{\"room_alias_name\":\"porelo-A B\"}"))
+                .as("no project's name, though a file under it names the caller")
+                .isEqualTo(403);
+        Files.write(dir.resolve("projects/demo.admins"), new byte[] {(byte) 0xff, (byte) 0xfe});
+        assertThat(request("POST", create, token, "{\"room_alias_name\":\"porelo-demo\"}"))
+                .as("a host file that cannot be read")
+                .isEqualTo(403);
+        assertThat(calls).as("nothing forwarded").noneMatch(path -> path.equals(create));
+    }
+
+    /** Harm guarded: a second name in a login, which the homeserver may take for the account. */
+    @Test
+    void aLoginNamingAnyoneElseOrAnotherIdentifierIsRefused() throws Exception {
+        final String login = "/_matrix/client/v3/login";
+        assertThat(
+                        request(
+                                "POST",
+                                login,
+                                "",
+                                "{\"type\":\"m.login.password\",\"user\":\"bob\",\"password\":\"x\","
+                                        + "\"identifier\":{\"type\":\"m.id.user\",\"user\":\"alice\"}}"))
+                .as("the caller in the identifier, another as the user")
+                .isEqualTo(403);
+        assertThat(
+                        request(
+                                "POST",
+                                login,
+                                "",
+                                "{\"type\":\"m.login.password\",\"password\":\"x\","
+                                        + "\"identifier\":{\"type\":\"m.id.phone\",\"user\":\"alice\"}}"))
+                .as("an identifier of another type")
+                .isEqualTo(403);
+        assertThat(request("POST", login, "", "no json")).as("no JSON").isEqualTo(400);
+        assertThat(calls).as("none reaches the homeserver").isEmpty();
+        assertThat(
+                        request(
+                                "POST",
+                                login,
+                                "",
+                                "{\"type\":\"m.login.password\",\"user\":\"alice\",\"password\":\"x\","
+                                        + "\"identifier\":{\"type\":\"m.id.user\",\"user\":\"alice\"}}"))
+                .as("the caller, named twice")
+                .isEqualTo(200);
+    }
+
+    /** Harm guarded: a refused sign-in answered as if the gate had a session to give. */
+    @Test
+    void aHomeserversRefusedLoginIsAnsweredWithNoSession() throws Exception {
+        loginStatus = 403;
+        assertThat(
+                        request(
+                                "POST",
+                                "/_matrix/client/v3/login",
+                                "",
+                                "{\"type\":\"m.login.password\",\"user\":\"alice\",\"password\":\"x\"}"))
+                .as("wrong password")
+                .isEqualTo(403);
+        assertThat(lastAnswer).doesNotContain("access_token");
+        assertThat(calls).as("nothing to log out").containsExactly("/_matrix/client/v3/login");
+        final String token =
+                new GateLoginTokens(
+                                GateFiles.directory(env).resolve("login-tokens"),
+                                java.time.Clock.systemUTC())
+                        .issue("alice");
+        adminLoginStatus = 403;
+        assertThat(
+                        request(
+                                "POST",
+                                "/_matrix/client/v3/login",
+                                "",
+                                "{\"type\":\"m.login.token\",\"token\":\"" + token + "\"}"))
+                .as("the administrator's login refused")
+                .isEqualTo(403);
+        assertThat(lastAnswer).doesNotContain("access_token");
+    }
+
+    /** Harm guarded: a group file nobody can read admits whoever asks. */
+    @Test
+    void aGroupFileThatCannotBeReadAdmitsNobody() throws Exception {
+        Files.delete(group);
+        assertThat(request("GET", "/_matrix/client/versions", "", "")).isEqualTo(403);
+        assertThat(calls).as("nothing passed").isEmpty();
+    }
+
+    private String registration(final String username) {
+        return MatrixClient.JSON
+                .createObjectNode()
+                .put("username", username)
+                .put("password", "fixture")
+                .set("auth", MatrixClient.JSON.createObjectNode().put("type", "m.login.dummy"))
+                .toString();
+    }
+
+    private int register(final String body) throws Exception {
+        return request("POST", "/_matrix/client/v3/register", "", body);
+    }
+
+    private void assertNoAccountWasMade() {
+        assertThat(calls)
+                .as("no account made")
+                .noneMatch(path -> path.startsWith("/_synapse/admin/v2/users/"));
+    }
+
+    /** Harm guarded: a registration on another server's name, or in a form the gate cannot read. */
+    @Test
+    void aRegistrationInAnotherNameOrFormIsRefused() throws Exception {
+        assertThat(register(registration("@alice:other.example.org")))
+                .as("the caller's name on another server")
+                .isEqualTo(400);
+        assertThat(lastAnswer).contains("M_INVALID_USERNAME");
+        assertThat(calls)
+                .as("not even asked about")
+                .noneMatch(p -> p.contains("username_available"));
+        assertThat(register("no json")).as("no JSON").isEqualTo(400);
+        assertThat(lastAnswer).contains("M_BAD_JSON");
+        assertThat(
+                        register(
+                                "{\"username\":\"alice\",\"password\":\"x\","
+                                        + "\"auth\":{\"type\":\"m.login.other\"}}"))
+                .as("another stage than the one offered")
+                .isEqualTo(400);
+        assertThat(lastAnswer).contains("M_BAD_JSON");
+        assertThat(register("{\"username\":\"alice\",\"password\":1}"))
+                .as("a password that is no text")
+                .isEqualTo(400);
+        assertThat(lastAnswer).contains("M_BAD_JSON");
+        assertNoAccountWasMade();
+    }
+
+    /** Harm guarded: a name someone holds is reset instead of refused, also between two asks. */
+    @Test
+    void aTakenNameIsRefusedHoweverTheHomeserverSaysSo() throws Exception {
+        answeredNotAvailable = true;
+        assertThat(register(registration("alice"))).as("answered not available").isEqualTo(400);
+        assertThat(lastAnswer).contains("M_USER_IN_USE");
+        assertNoAccountWasMade();
+        answeredNotAvailable = false;
+        takenAtSecondAsk = true;
+        asked = 0;
+        assertThat(register(registration("alice"))).as("taken since the first ask").isEqualTo(400);
+        assertThat(lastAnswer).contains("M_USER_IN_USE");
+        assertNoAccountWasMade();
+    }
+
+    /** Harm guarded: what the administrator's API answers reaches the caller. */
+    @Test
+    void aFailedCreationIsAnsweredOnlyAsAFailureAndNoLoginFollows() throws Exception {
+        createStatus = 500;
+        assertThat(register(registration("alice"))).as("creation failed").isEqualTo(502);
+        assertThat(lastAnswer).as("what creation said").doesNotContain(ADMIN_DETAIL);
+        assertThat(calls).as("no login").noneMatch(path -> path.endsWith("/v3/login"));
+        availabilityStatus = 500;
+        calls.clear();
+        assertThat(register(registration("alice"))).as("asking failed").isEqualTo(502);
+        assertThat(lastAnswer).as("what asking said").doesNotContain(ADMIN_DETAIL);
+        assertNoAccountWasMade();
+    }
+
+    /** Harm guarded: the homeserver's own answer to a login reaches the caller unfiltered. */
+    @Test
+    void aRegistrationAnswersOnlyTheSessionTheGateBuilt() throws Exception {
+        for (final int created : List.of(200, 201)) {
+            createStatus = created;
+            assertThat(register(registration("@alice:example.org")))
+                    .as("created with %d, the full name of this server", created)
+                    .isEqualTo(200);
+            assertThat(lastAnswer).contains("access_token").doesNotContain(INTERNAL_ADDRESS);
+        }
+    }
+
+    /** Harm guarded: a sign-in made for an account the homeserver did not confirm. */
+    @Test
+    void aRegistrationWhoseLoginIsRefusedHasNoSession() throws Exception {
+        loginStatus = 403;
+        assertThat(register(registration("alice"))).isEqualTo(403);
+        assertThat(lastAnswer).doesNotContain("access_token");
+    }
+
+    /** Harm guarded: a sign-in overwrites an existing account, or goes on after a failure. */
+    @Test
+    void aSignInCreatesOnlyAnAbsentAccountAndStopsAtAFailure() throws Exception {
+        final String redirect = "element://vector/login";
+        taken = true;
+        assertThat(sso(redirect, "localhost", "")).as("existing account").isEqualTo(302);
+        assertThat(lastAnswer).contains("loginToken=");
+        assertNoAccountWasMade();
+        taken = false;
+        availabilityStatus = 500;
+        assertThat(sso(redirect, "localhost", "")).as("asking failed").isEqualTo(502);
+        assertThat(lastAnswer).doesNotContain("loginToken");
+        assertNoAccountWasMade();
+        availabilityStatus = 200;
+        createStatus = 500;
+        assertThat(sso(redirect, "localhost", "")).as("creation failed").isEqualTo(502);
+        assertThat(lastAnswer).doesNotContain("loginToken");
+        createStatus = 201;
+        assertThat(sso(redirect, "localhost", "")).as("created").isEqualTo(302);
+        assertThat(lastAnswer).contains("loginToken=");
+    }
+
+    /** Harm guarded: a request after a refusal reads as part of the one before it. */
+    @Test
+    void aBadRequestsAnswerEndsTheConnection() throws Exception {
+        final String body = "{\"username\":\"bob\"}";
+        final String refused =
+                "POST /_matrix/client/v3/register HTTP/1.1\r\nHost: localhost\r\n"
+                        + "Content-Length: "
+                        + body.length()
+                        + "\r\n\r\n"
+                        + body;
+        final String next = "GET /_matrix/client/versions HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        final var out = new ByteArrayOutputStream();
+        gate.serve(
+                new ByteArrayInputStream((refused + next).getBytes(StandardCharsets.UTF_8)), out);
+        assertThat(out.toString(StandardCharsets.UTF_8))
+                .as("the answer says the connection ends")
+                .contains("Connection: close");
+        assertThat(calls).as("the next request is not read").isEmpty();
+    }
+
+    /** Harm guarded: a failure nobody sees, as the log is the only trace of a refusal. */
+    @Test
+    void everyRefusalAndFailureIsLoggedAndNothingElse() throws Exception {
+        assertThat(request("GET", "/_matrix/client/versions", "", "")).isEqualTo(200);
+        assertThat(log.toString(StandardCharsets.UTF_8)).as("a success is not logged").isEmpty();
+        forwardStatus = 400;
+        assertThat(request("GET", "/_matrix/client/versions", "", "")).isEqualTo(400);
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .as("a homeserver's refusal")
+                .isEqualTo("alice GET /_matrix/client/versions 400\n");
+        log.reset();
+        assertThat(register("{\"username\":\"bob\"}")).isEqualTo(400);
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .as("the gate's own refusal")
+                .isEqualTo("alice POST /_matrix/client/v3/register 400\n");
+        log.reset();
+        final var out = new ByteArrayOutputStream();
+        gate.serve(
+                new ByteArrayInputStream("no request\r\n\r\n".getBytes(StandardCharsets.UTF_8)),
+                out);
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .as("a request that cannot be read")
+                .isEqualTo("alice - - 400\n");
+        log.reset();
+        GateFiles.write(GateFiles.directory(env).resolve("admin-token"), Accounts.secret(), true);
+        assertThat(register(registration("alice"))).as("a failure inside the gate").isEqualTo(502);
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .isEqualTo("alice POST /_matrix/client/v3/register 502\n");
+    }
+
+    /** Harm guarded: a connection ends unasked, or stays open against what the client asked. */
+    @Test
+    void anAnswerByTheGateEndsTheConnectionOnlyWhenAsked() throws Exception {
+        final String body = "{\"username\":\"alice\"}";
+        final String request =
+                "POST /_matrix/client/v3/register HTTP/1.1\r\nHost: localhost\r\n%s"
+                        + "Content-Length: "
+                        + body.length()
+                        + "\r\n\r\n"
+                        + body;
+        final var kept = new ByteArrayOutputStream();
+        gate.serve(
+                new ByteArrayInputStream(
+                        (request.formatted("") + request.formatted(""))
+                                .getBytes(StandardCharsets.UTF_8)),
+                kept);
+        assertThat(kept.toString(StandardCharsets.UTF_8))
+                .as("both are answered, on a connection left open")
+                .doesNotContain("Connection: close")
+                .containsSubsequence("HTTP/1.1 401", "HTTP/1.1 401");
+        final var ended = new ByteArrayOutputStream();
+        final String closing = request.formatted("Connection: close\r\n");
+        gate.serve(
+                new ByteArrayInputStream(
+                        (closing + request.formatted("")).getBytes(StandardCharsets.UTF_8)),
+                ended);
+        assertThat(ended.toString(StandardCharsets.UTF_8))
+                .as("only the first is answered")
+                .contains("Connection: close")
+                .containsOnlyOnce("HTTP/1.1 401");
     }
 }
