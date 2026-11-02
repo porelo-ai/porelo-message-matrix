@@ -47,7 +47,6 @@ final class Gate {
     private final String login;
     private final Map<String, String> env;
     private final Path group;
-    private final Path admins;
     private final Backend backend;
     private final PrintStream err;
     private final GateLoginTokens tokens;
@@ -57,14 +56,12 @@ final class Gate {
             final String login,
             final Map<String, String> env,
             final Path group,
-            final Path admins,
             final Backend backend,
             final PrintStream err)
             throws Failure {
         this.login = login;
         this.env = env;
         this.group = group;
-        this.admins = admins;
         this.backend = backend;
         this.err = err;
         tokens =
@@ -101,10 +98,6 @@ final class Gate {
                                 Path.of(
                                         env.getOrDefault(
                                                 "PORELO_MATRIX_GATE_GROUP_FILE", "/etc/group")),
-                                Path.of(
-                                        env.getOrDefault(
-                                                "PORELO_MATRIX_GATE_ADMINS_DIR",
-                                                "/etc/porelo-host/matrix")),
                                 new GateHomeserver(env),
                                 err)
                         .serve(
@@ -320,7 +313,7 @@ final class Gate {
         if (token.isEmpty()) {
             return GateResponse.error(401, "M_MISSING_TOKEN");
         }
-        return aliasRefusal(request, endpoint, id);
+        return aliasRefusal(request, endpoint);
     }
 
     private static String endpoint(final String path) {
@@ -539,8 +532,7 @@ final class Gate {
         }
     }
 
-    private @Nullable GateResponse aliasRefusal(
-            final GateRequest request, final String endpoint, final String id) {
+    private @Nullable GateResponse aliasRefusal(final GateRequest request, final String endpoint) {
         String alias = "";
         if (request.method().equals("POST") && endpoint.equals("createRoom")) {
             try {
@@ -556,21 +548,7 @@ final class Gate {
             }
             alias = full.substring(1, colon);
         }
-        if (!alias.startsWith("porelo-")) {
-            return null;
-        }
-        final String project = alias.substring("porelo-".length());
-        if (!GateRules.project(project)) {
-            return forbidden();
-        }
-        final Path file = admins.resolve(project + ".admins");
-        try {
-            final List<String> allowed =
-                    Files.isRegularFile(file) ? Files.readAllLines(file) : List.of();
-            return GateRules.aliasAllowed(alias, id, login, allowed) ? null : forbidden();
-        } catch (final IOException ex) {
-            return forbidden();
-        }
+        return GateRules.aliasAllowed(alias) ? null : forbidden();
     }
 
     private record Administrator(String token, String server) {

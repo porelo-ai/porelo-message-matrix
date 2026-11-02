@@ -90,15 +90,10 @@ that login, `@porelo.<login>` first. It never takes `@task.x-bob` for `bob`'s. T
 `{"login":"…","known":true|false,"expelled":[…]}`; running it again exits 0 with `known: true` and nothing
 left to expel. An unknown login is left available. The gate refuses registrations for an expelled login;
 the person returns under a new login. Locking a login or one project's access deactivates nothing: the gate
-refuses a locked login, and `members` removes persons absent from that project's access list.
+refuses a locked login, and the host's `keep-room` takes a person it no longer names out of the project's room.
 
 What a person does on the central homeserver:
 
-- **Let the project admin's Porelo make the room and keep it:** `setup --login <login> --create-room` makes
-  `#porelo-<project>:<server>` as `@porelo.<login>`. `members --project <project> --persons alice,bob` invites
-  each listed person's bare account and provisioning account. It removes every account of a login the list
-  drops from that room, preserving other logins and the maker. Running it again with the same list changes
-  nothing ([the contract](transport.md#the-lifecycle)). The project's settings name that alias as `room`.
 - **Make the project's room** from a Matrix client as invite-only (`join_rule: invite`, such as the
   `private_chat` preset, whose invite power level is 0) with guests forbidden (`m.room.guest_access` set to
   `forbidden`), and set its alias or room id as `room` in the project's settings.
@@ -176,7 +171,5 @@ federation and key APIs with 404. A browser client such as Element Desktop is se
 gate answers its preflight without a token and names its origin in the headers of its own answers.
 Only Element Desktop's origin `vector://vector` and pages served from loopback or a `*.localhost`
 name are allowed; a request from any other origin is refused with 403, so a page elsewhere cannot
-read a sign-in answer the person's browser was made to ask for. Reserved room aliases `porelo-<project>` require the token of
-`@porelo.<login>` and that login on a line of `/etc/porelo-host/matrix/<project>.admins`; a missing
-or empty file grants nothing. Refusal logs contain only the login, method, path without its query,
+read a sign-in answer the person's browser was made to ask for. Room aliases `porelo-<project>` are reserved: no client makes or takes one, and the host's helper keeps a project's room as the administrator (see [the transport](transport.md)). Refusal logs contain only the login, method, path without its query,
 and status. The administrator token is read only for gate operations and is never returned to clients.

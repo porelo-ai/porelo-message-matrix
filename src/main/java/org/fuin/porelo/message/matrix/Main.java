@@ -30,9 +30,10 @@ public final class Main {
                     "retire",
                     "join",
                     "part",
-                    "members",
                     "clear",
-                    "expel");
+                    "expel",
+                    "keep-room",
+                    "drop-room");
 
     private Main() {}
 
@@ -110,9 +111,10 @@ public final class Main {
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "gate" -> Gate.run(rest, env, out, err);
                 case "settings" -> SettingsCheck.run(rest, in, out);
-                case "setup", "enroll", "retire", "join", "part", "members", "clear" ->
+                case "setup", "enroll", "retire", "join", "part", "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
                 case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env));
+                case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, out);
                 case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");

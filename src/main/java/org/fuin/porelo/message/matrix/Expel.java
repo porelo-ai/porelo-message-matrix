@@ -53,6 +53,11 @@ final class Expel {
             final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
             return new MatrixClient(new Config(local.url(), "", null, true));
         }
+        return behindGate(env);
+    }
+
+    /** The homeserver the host keeps running, through its private socket alone. */
+    static MatrixClient behindGate(final Map<String, String> env) throws Failure {
         try {
             return new GateHomeserver(env).client("");
         } catch (final NoSuchFileException ex) {
@@ -68,7 +73,7 @@ final class Expel {
         }
     }
 
-    private static boolean gated(final Map<String, String> env) throws Failure {
+    static boolean gated(final Map<String, String> env) throws Failure {
         try {
             return GateFiles.enabled(env);
         } catch (final IOException ex) {

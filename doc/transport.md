@@ -65,8 +65,6 @@ takes the project's settings (`mail.transports.matrix`) and the secrets Porelo k
 | `retire --project P --task T [--login L]` | On the account's own homeserver, deactivates `@<T>`; on a central homeserver, `@<T>.<login>` leaves the room and logs out every session, so the name can be used again. One in another project's room is refused (78) and left active | `{}` |
 | `join --project P --person N [--reset] [--token] [--display N] [--login L] [--loopback-only]` | On the account's own homeserver: a person's account in the room, with a new password. An existing account is refused (77) without `--reset`, except one `part` took out of this project's room that is joined or invited in no project's room: it is taken back without `--reset`. An account that left by itself, such as a retired task's, never is. `--display` sets the display name with the same validation as `enroll`. `--token` logs out every earlier session, including on reset and when taking back a parted account, and keeps the password private. On a central homeserver: refused (77); people are managed at the homeserver itself | Without `--token`: `login` and `shown`; the password is printed once, and the admin-room command that set it and its reply are redacted at once. With `--token`: exactly `{"login":{"user":"@N:server","room":"!room-id"},"secrets":{"PORELO_MATRIX_ACCESS_TOKEN":"<token>"}}`; no password or `shown`, and no other secret |
 | `part --project P --person N [--loopback-only]` | On the account's own homeserver: the administrator kicks a joined or invited person out of the project's room. In no other project's room, the account gets a fresh password nobody is shown and logs out every session through the client API; it is never deactivated, so `join` without `--reset` can take it back. In another project's room too, its password and sessions stay valid. No account or no membership: nothing to do. On a central homeserver: refused (77) | `{"removed":"@N:server"}` when locked; `{"kept":"@N:server","why":"a member of #porelo-Q:server too"}` when another project keeps it; `{}` when nothing was done; exit 0 in all three |
-| `setup --project P --login L --create-room` | On a central homeserver, for the project admin's login: once `@porelo.<login>` is registered, makes the project's room `#porelo-<P>:<server>` with `@porelo.<login>` as its maker, invite-only, closed to guests and unlisted, as the account's own homeserver makes its room, or takes the room under that alias only if `@porelo.<login>` made it; any other room under the alias is refused (78) and nobody is put into it. The project's settings name that alias as `room`, else refused (78): a room of another name before any account is made, the alias on another server once the account shows the server's name. The first setup, whatever fails after the account is made, answers its account and `"admitted": false`, with `"created_room": true` when the room was made by then. Then as central `setup`: the relay admitted, the room answered. On the account's own homeserver refused (77) | as central `setup`, and `"created_room": true` |
-| `members --project P --persons A,B,… [--login L]` | On a central homeserver, run as the room maker's `@porelo.<login>`: keeps the room to the persons listed, sorted by login, and run again with the same list changes nothing. Invites both `@<login>` and `@porelo.<login>` for each listed person not yet invited or joined, registered or not. Kicks every joined or invited account belonging to a login no longer listed: its bare account, provisioning account, relays and tasks, with every provisioning account removed first. The last dot separates the login from the task or relay name, so `bob` never owns `@task.x-bob`. The room is read again until none is left; after five rounds it stops with 75. The maker's login is kept even when absent from the list. An empty list (`--persons ""`) keeps only the maker's login. Each login follows the rule below, at most 500 distinct logins. A room under the alias the maker did not make is refused (78); a listed person's bare or provisioning account banned from the room is refused (78), before any invitations. On the account's own homeserver refused (77) | `{"invited":["@<login>:<server>","@porelo.<login>:<server>",…],"removed":["@….<login>:<server>",…]}` |
 | `clear --project P [--login L]` | On the account's own homeserver: deactivates every account in the project's room (its tasks', its relay's, its people's) that is in no other project's room, deletes the room with its alias, and forgets the relay's poll position. On a central homeserver: this login's relay `@porelo-relay-<P>.<login>` and its tasks `@<T>.<login>` in the room leave the room and log out every session, so their names can be used again, and the relay's poll position is forgotten; `@porelo.<login>`, the room, people and other logins' accounts stay. A homeserver that no longer knows the login's token has let it go already: `clear` ends 0 and says so in `kept`. A homeserver not reached is 75. An account in another project's room too stays active there and is named in `kept` | `removed` (what went) and `kept` (each `what` and `why`) |
 | `clear [--login L]` | The account's own homeserver once no project uses it: stops and disables it, removes its container, database and backups, its port, registration token and environment file, every poll and room position, the expelled logins, the gate's
 administrator token and login tokens, and the gate's socket directory. The login is validated and changes nothing. Reads no settings | the same |
@@ -79,7 +77,7 @@ administrator token and login tokens, and the gate's socket directory. The login
 - **The printed `secrets` from `setup` and `enroll` name `PORELO_MATRIX_CA_FILE`, `PORELO_MATRIX_TLS_VERIFY` and
   `PORELO_MATRIX_LOGIN`** (empty on the account's own homeserver), so an inherited value never outweighs what the
   project configured.
-- **The project `default` has no room:** `setup`, `enroll`, `join` and `members` with `--project default` are refused
+- **The project `default` has no room:** `setup`, `enroll` and `join` with `--project default` are refused
   (78) before any settings are read or any request is made, whatever the settings name. `retire`, `part` and `clear`
   stay open, so a leftover can still go.
 - **Run again, each keeps what exists.** `part` twice is harmless: the second prints `{}`. `retire` twice
@@ -121,6 +119,31 @@ It prints `{"login":"…","known":true|false,"expelled":[…]}` with full accoun
 with `known: true` and an empty `expelled` list once all accounts are gone. An unknown login, with no record
 and no account, is left available and answers `known: false`. It needs and changes no registration
 token. Accounts of other logins, including `@task.x-bob` when expelling `bob`, are never touched.
+
+## Keeping a project's room behind the gate
+
+The host's helper keeps a project's room, as the homeserver's account, with the gate's administrator token on stdin
+under `secrets.PORELO_MATRIX_ADMIN_TOKEN` and the homeserver reached only through its private socket. These are host
+commands, outside `describe`'s lifecycle. Where no gate is prepared they are refused (77) and start nothing; the token
+missing or not the administrator's is 78; a room under the alias the administrator did not make is refused (78) and
+left as it is. Each ends 75 when the homeserver is not reached or five rounds leave someone in, so the helper tries
+again at its next follow.
+
+- **`keep-room --project P --persons A,B,…`** makes `#porelo-<P>:<server>` if it is missing, with the administrator as
+  its maker, invite-only, closed to guests and unlisted, then keeps it to the list: it invites `@<login>` and
+  `@porelo.<login>` of each login named, signed in or not, and takes every account of a login no longer named out of
+  this room, `@porelo.<login>` first. Run again with the same list it changes nothing. `--persons ""` is a project with
+  no members: its room stays. At most 500 logins; the project `default` is refused (78). A kick is no ban, so a login
+  named again is invited again. It answers
+  `{"room":"#porelo-P:server","conversation":"!…","created_room":true|false,"invited":[…],"removed":[…]}`.
+- **A person taken out reads nothing said after it**, and still what was said up to it: a Matrix homeserver answers a
+  former member's history to the moment they left. `removed` in the answer names who went.
+- **A person taken out comes back through Porelo.** Their relay's `poll` answers 78 and their tasks are out until
+  Porelo runs `setup` and `enroll` again; `setup` then forgets a relay position lying only in rooms the relay has left, so
+  a room that replaced a deleted one is read from its start.
+- **`drop-room --project P`** takes every member out and deletes the room with its alias and conversation. Nobody's
+  account is deactivated. No such room: nothing to do, exit 0. It answers
+  `{"room":"#porelo-P:server","deleted":true|false,"removed":[…]}`.
 
 ## Talking in the room
 
@@ -195,7 +218,7 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
 
 | Verb | What it does |
 |---|---|
-| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `waitsOn: "the room's homeserver"` (one line, at most 80 characters), `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, `takes: ["login", "create-room"]`, `secrets: "input"`, its credential and its lifecycle verbs |
+| `describe` | Prints what the transport is, reading nothing: scheme `matrix`, `waitsOn: "the room's homeserver"` (one line, at most 80 characters), `poll`, `confirms: read`, `max_bytes: 10240`, `shown: true`, `persons: true`, `direct: true`, `waits: true`, `mention: true`, `display: true`, `takes: ["login"]`, `secrets: "input"`, its credentials, the registration token lent to `setup` and `enroll`, and its lifecycle verbs |
 | `check` | Whether it could work now: the configuration complete, the homeserver answering, the token accepted. 0 usable, 2 not |
 | `send <file> <sig> --to <room id \| @user:server> [--shown <line>] [--mention @user:server]...` | To a person's user id: into the acting account's direct chat with them, opened (invite-only, marked direct) if there is none. One `m.text` event: the message in `org.fuin.porelo.message`, the signature in `org.fuin.porelo.signature`, and as its `body`, what a client shows, the line `--shown` names. In a room, each `--mention` is named in `m.mentions` and shown as a pill, by the name that person's or task's account shows, before the line, so that person's client highlights it; without one, `m.mentions` is empty and the message notifies nobody. In a direct chat nobody is mentioned. Prints `{"reference":"<event id>"}`. A retry is the same event |
 | `rename --display <nickname>` | Run with a task's token: the name its account shows in the room and its direct chats becomes the nickname. Its id, its token and every address stay. Prints nothing |

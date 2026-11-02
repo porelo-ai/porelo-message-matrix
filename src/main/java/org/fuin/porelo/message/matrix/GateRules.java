@@ -75,14 +75,9 @@ final class GateRules {
         return PROJECT.matcher(project).matches();
     }
 
-    static boolean aliasAllowed(
-            final String alias, final String id, final String login, final List<String> admins) {
-        return !alias.startsWith("porelo-")
-                || project(alias.substring("porelo-".length()))
-                        && id.startsWith("@")
-                        && localpart(id).equals("porelo." + login)
-                        && belongs(id, login)
-                        && admins.contains(login);
+    /** A project's alias is the host's helper's to make, as the administrator, never a client's. */
+    static boolean aliasAllowed(final String alias) {
+        return !alias.startsWith("porelo-");
     }
 
     /**

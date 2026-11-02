@@ -9,10 +9,11 @@
 image:
     base_image: "docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
     snippet: |
-        # From Ubuntu: the C toolchain and zlib's headers for native-image, rpm for the .rpm and its checks.
+        # From Ubuntu: the C toolchain and zlib's headers for native-image, rpm for the .rpm and its checks,
+        # systemd for the systemd-socket-activate the gate's integration tests start it with.
         RUN apt-get update \
             && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-                build-essential zlib1g-dev ca-certificates curl git unzip rpm \
+                build-essential zlib1g-dev ca-certificates curl git unzip rpm systemd \
             && rm -rf /var/lib/apt/lists/*
         RUN curl -fsSL -o /tmp/graalvm.tar.gz \
                 https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.4.4.1.1/graalvm-community-jdk-25i4-25.0.4.1.1_linux-x64_bin.tar.gz \

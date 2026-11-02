@@ -165,7 +165,7 @@ final class Poll {
         // A homeserver answers a position from an earlier database as if it were current, with
         // nothing new
         // in it: whatever was sent there before this poll would be lost without a word.
-        if (!position.rooms().isEmpty() && position.rooms().stream().noneMatch(joined::contains)) {
+        if (position.takenOnlyInRoomsOutside(joined)) {
             throw new Failure(
                     Exit.CONFIG,
                     "the sync position in "
@@ -475,7 +475,15 @@ final class Poll {
     }
 
     /** Where the last poll stopped, and the rooms the account was in then. */
-    record Position(@Nullable String since, List<String> rooms) {}
+    record Position(@Nullable String since, List<String> rooms) {
+
+        /**
+         * Taken only in rooms an account in {@code joined} has left, so no poll can go on from it.
+         */
+        boolean takenOnlyInRoomsOutside(final List<String> joined) {
+            return !rooms.isEmpty() && rooms.stream().noneMatch(joined::contains);
+        }
+    }
 
     /**
      * The first line is the position; each further line a room - absent in a file from before they

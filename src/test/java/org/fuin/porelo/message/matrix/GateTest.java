@@ -65,7 +65,6 @@ class GateTest {
                         "alice",
                         env,
                         group,
-                        dir.resolve("projects"),
                         new Gate.Backend() {
                             @Override
                             public GateResponse exchange(
@@ -575,38 +574,19 @@ class GateTest {
         assertThat(
                         request(
                                 "POST",
-                                "/_matrix/client/v3/createRoom",
-                                projectToken,
-                                "{\"room_alias_name\":\"porelo-demo\"}"))
-                .as("missing host file")
-                .isEqualTo(403);
-        Files.createDirectories(dir.resolve("projects"));
-        Files.writeString(dir.resolve("projects/demo.admins"), "");
-        assertThat(
-                        request(
-                                "POST",
-                                "/_matrix/client/v3/createRoom",
-                                projectToken,
-                                "{\"room_alias_name\":\"porelo-demo\"}"))
-                .as("empty host file")
-                .isEqualTo(403);
-        Files.writeString(dir.resolve("projects/demo.admins"), "alice\n");
-        assertThat(
-                        request(
-                                "POST",
                                 "/_matrix/client/r0/createRoom",
                                 projectToken,
                                 "{\"room_alias_name\":\"porelo-demo\"}"))
-                .as("authorized project admin")
-                .isEqualTo(200);
+                .as("a project admin's provisioning account makes no project's room")
+                .isEqualTo(403);
         assertThat(
                         request(
                                 "PUT",
                                 "/_matrix/client/v3/directory/room/%23porelo-demo%3Aexample.org",
                                 projectToken,
                                 "{}"))
-                .as("authorized directory entry")
-                .isEqualTo(200);
+                .as("nor takes its alias")
+                .isEqualTo(403);
     }
 
     /** Harm guarded: a failed admin-issued login releases an account of another login. */
@@ -853,13 +833,13 @@ class GateTest {
 
     /** Harm guarded: a person takes a project's reserved alias, and with it the project's room. */
     @Test
-    void aPutOfAReservedAliasIsRefusedToWhoeverIsNoProjectAdmin() throws Exception {
+    void aPutOfAReservedAliasIsRefusedToEveryClient() throws Exception {
         final String path = ALIAS_PATH + "%23porelo-demo%3Aexample.org";
         assertThat(request("PUT", path, Accounts.secret(), "{}")).as("person").isEqualTo(403);
         assertNothingOfTheAliasIsForwarded();
         identity = "@porelo.alice:example.org";
         assertThat(request("PUT", path, Accounts.secret(), "{}"))
-                .as("the project's account, with no host file")
+                .as("a project admin's provisioning account")
                 .isEqualTo(403);
         assertNothingOfTheAliasIsForwarded();
     }
@@ -880,20 +860,18 @@ class GateTest {
                 .isEqualTo(200);
     }
 
-    /** Harm guarded: a reserved alias under a bad name, or a host file nobody can read, lets by. */
+    /** Harm guarded: a reserved alias under a name no project could have lets a client by. */
     @Test
-    void aBadProjectNameAndAnUnreadableHostFileAreRefused() throws Exception {
+    void aReservedAliasIsRefusedWhateverNameFollowsIt() throws Exception {
         identity = "@porelo.alice:example.org";
-        final String token = Accounts.secret();
         final String create = "/_matrix/client/v3/createRoom";
-        Files.createDirectories(dir.resolve("projects"));
-        Files.writeString(dir.resolve("projects/A B.admins"), "alice\n");
-        assertThat(request("POST", create, token, "{\"room_alias_name\":\"porelo-A B\"}"))
-                .as("no project's name, though a file under it names the caller")
-                .isEqualTo(403);
-        Files.write(dir.resolve("projects/demo.admins"), new byte[] {(byte) 0xff, (byte) 0xfe});
-        assertThat(request("POST", create, token, "{\"room_alias_name\":\"porelo-demo\"}"))
-                .as("a host file that cannot be read")
+        assertThat(
+                        request(
+                                "POST",
+                                create,
+                                Accounts.secret(),
+                                "{\"room_alias_name\":\"porelo-A B\"}"))
+                .as("no project's name")
                 .isEqualTo(403);
         assertThat(calls).as("nothing forwarded").noneMatch(path -> path.equals(create));
     }

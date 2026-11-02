@@ -64,19 +64,11 @@ class DescribeTest {
         assertThat(description.path("lifecycle"))
                 .as("the lifecycle verbs Porelo may run")
                 .extracting(JsonNode::asText)
-                .containsExactly(
-                        "setup",
-                        "enroll",
-                        "retire",
-                        "join",
-                        "part",
-                        "members",
-                        "clear",
-                        "settings");
+                .containsExactly("setup", "enroll", "retire", "join", "part", "clear", "settings");
         assertThat(description.path("takes"))
-                .as("central lifecycle verbs take --login, and the admin's setup --create-room")
+                .as("central lifecycle verbs take --login")
                 .extracting(JsonNode::asText)
-                .containsExactly("login", "create-room");
+                .containsExactly("login");
     }
 
     /** Harm guarded: Porelo needs the declared dependency to explain a start while it waits. */

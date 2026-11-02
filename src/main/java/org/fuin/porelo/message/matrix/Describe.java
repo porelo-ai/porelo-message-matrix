@@ -82,8 +82,7 @@ final class Describe {
         // committed.
         lifecycle.add("settings");
         // --login scopes the accounts made on a central homeserver to one person.
-        // create-room: on a central homeserver, the project admin's setup makes the project's room.
-        description.putArray("takes").add("login").add("create-room");
+        description.putArray("takes").add("login");
         try {
             out.println(MatrixClient.JSON.writeValueAsString(description));
         } catch (final JacksonException ex) {

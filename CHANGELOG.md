@@ -10,13 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A homeserver elsewhere's registration token reaches the transport only among the secrets on its input: `describe`
   asks Porelo to lend `PORELO_MATRIX_REGISTRATION_TOKEN` to `setup` and `enroll`, and the setting
   `registration_token_file` is refused like any unknown one.
-- `setup`, `enroll`, `join` and `members` refuse the project `default` with 78, so a task of that project never joins a
+- `setup`, `enroll` and `join` refuse the project `default` with 78, so a task of that project never joins a
   room, whatever settings reach the transport.
 - A person's accounts on a central homeserver are named by their login (`--login`, `PORELO_MATRIX_LOGIN`), and
   `setup` answers `login`; `describe` lists `login` among `takes`. Logins have at most
   32 lower-case letters, digits and `-`, start with a letter, and exclude `porelo` and `porelo-` names.
-- `members --persons` invites each person's bare and provisioning accounts, and
-  removes every account of a login no longer listed while keeping the room maker and other listed logins.
 - A host's gate handles registration without a client-held registration token; external homeservers keep
   the token flow.
 - The host's gate hands an SSO login token only to Element Desktop's `element://vector/…` callback or to an `http`
@@ -25,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Behind the host's gate, the host's helper keeps a project's room as the administrator: `keep-room --project P
+  --persons A,B,…` makes it and keeps it to the persons named, whether or not they have signed in, and `drop-room
+  --project P` deletes it with its conversation. No client can make or take a project's alias through the gate.
 - A host homeserver can run behind a Unix-socket gate that admits host logins, binds their Matrix accounts, handles registration and SSO, and protects project room aliases. `gate --prepare` keeps the administrator token private and configures the container without a reachable host TCP listener.
 - The host's gate serves Element Desktop and other browser clients: it answers their CORS preflight, names an
   allowed origin in its own answers, refuses requests from a foreign origin, and passes sign-in discovery
@@ -39,12 +40,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   provisioning first, and records the login under `expelled-logins` for the host's gate. Unknown logins stay
   available, repeated calls exit 0, and other logins' accounts remain active. Behind the host's gate it reaches
   the homeserver through the gate's private socket, with the gate's administrator token among the secrets on stdin.
-- On a central homeserver, `setup --project P --login L --create-room` makes the project's room
-  `#porelo-<P>:<server>` as `@porelo.<login>`, invite-only, closed to guests and unlisted, or takes the room under that
-  alias only if `@porelo.<login>` made it, and answers `"created_room": true`. `members --project P --persons A,B,…`,
-  run by that login, keeps the room to the list: it invites each listed person's own account and `@porelo` not yet in, and takes
-  every account of a login ever in the room that the list drops out of that room alone, `@porelo` first, never
-  one a listed login owns; a central task named `porelo.…` is refused; `describe` offers both.
 - Every verb that takes a token reads the secrets Porelo kept from stdin, as `{"settings": {...}, "secrets": {...}}`,
   and `describe` says so with `"secrets": "input"`. A token handed so is never in the transport's environment, which
   another process of the account could read in `/proc` in the moment before the transport makes itself unreadable.

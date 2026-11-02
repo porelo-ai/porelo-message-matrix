@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
@@ -34,11 +35,7 @@ import org.jspecify.annotations.Nullable;
  */
 final class Lifecycle {
 
-    static final List<String> VERBS =
-            List.of("setup", "enroll", "retire", "join", "part", "members", "clear");
-
-    /** As many persons as {@code members} keeps in a room, each with its accounts beside it. */
-    static final int MAX_PERSONS = 500;
+    static final List<String> VERBS = List.of("setup", "enroll", "retire", "join", "part", "clear");
 
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
@@ -46,9 +43,9 @@ final class Lifecycle {
     /** What a project's, a task's or a person's name may be, as part of a Matrix id. */
     private static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
 
-    private static final String DEFAULT_PROJECT = "default";
+    static final String DEFAULT_PROJECT = "default";
 
-    private static final Set<String> GIVES_A_ROOM = Set.of("setup", "enroll", "join", "members");
+    private static final Set<String> GIVES_A_ROOM = Set.of("setup", "enroll", "join");
 
     private Lifecycle() {}
 
@@ -60,9 +57,7 @@ final class Lifecycle {
             boolean token,
             boolean loopbackOnly,
             @Nullable String display,
-            @Nullable String login,
-            boolean createRoom,
-            @Nullable List<String> persons) {}
+            @Nullable String login) {}
 
     /**
      * A nickname a person gives a task: shown in the room and the direct chat, what @ completes to.
@@ -125,7 +120,6 @@ final class Lifecycle {
                     case "retire" -> retire(options, settings, env);
                     case "join" -> join(options, settings, env);
                     case "part" -> part(options, settings, env);
-                    case "members" -> members(options, settings, env);
                     case "clear" -> clear(options, settings, env);
                     default -> throw new IllegalArgumentException(verb);
                 };
@@ -156,27 +150,6 @@ final class Lifecycle {
         }
     }
 
-    /** The central room kept to the listed logins, by the login that made it. */
-    private static ObjectNode members(
-            final Options options, final Settings settings, final Map<String, String> env)
-            throws Failure {
-        final URI url = settings.homeserver();
-        if (url == null) {
-            throw new Failure(
-                    Exit.NOT_PERMITTED,
-                    "members keeps a central homeserver's room, not the account's own homeserver");
-        }
-        final String login = centralLogin(options, env);
-        final String token =
-                required(env, Config.ADMIN_TOKEN, "members runs as the login that made the room");
-        return CentralRoom.members(
-                client(url, token, settings),
-                login,
-                options.project(),
-                Objects.requireNonNull(settings.room()),
-                required(options.persons()));
-    }
-
     private static ObjectNode setup(
             final Options options,
             final Settings settings,
@@ -185,12 +158,6 @@ final class Lifecycle {
             throws Failure {
         if (settings.homeserver() != null) {
             return setupCentral(options, settings, env);
-        }
-        if (options.createRoom()) {
-            throw new Failure(
-                    Exit.NOT_PERMITTED,
-                    "--create-room makes a central homeserver's room; on the account's own"
-                            + " homeserver setup makes the project's room itself");
         }
         final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
         final URI url = local.url();
@@ -242,17 +209,6 @@ final class Lifecycle {
         final String secret =
                 keptSecret != null && !keptSecret.isBlank() ? keptSecret : Accounts.secret();
         final MatrixClient nobody = client(url, "", settings);
-        // Refused before an account is made: the room --create-room makes is the project's alias.
-        if (options.createRoom() && !configuredRoom.startsWith(alias(options.project(), ""))) {
-            throw new Failure(
-                    Exit.CONFIG,
-                    "--create-room makes the room "
-                            + alias(options.project(), "<server>")
-                            + ", and the project's settings name the room "
-                            + configuredRoom
-                            + "; name that alias as the project's room");
-        }
-
         final Accounts.Session loginAccount =
                 loginAccount(nobody, login, secret, env.get(Config.ADMIN_TOKEN), registrationToken);
         final MatrixClient asLogin = nobody.as(loginAccount.accessToken());
@@ -262,32 +218,6 @@ final class Lifecycle {
                 .put(Config.ADMIN_TOKEN, loginAccount.accessToken())
                 .put(Config.MACHINE_SECRET, secret)
                 .put(Config.LOGIN, login);
-
-        if (options.createRoom()) {
-            // Whatever fails once the account is made, its generated secret must reach Porelo.
-            try {
-                final String room =
-                        CentralRoom.make(
-                                asLogin, loginAccount.userId(), options.project(), configuredRoom);
-                answer.put("created_room", true);
-                return admittedIn(
-                        options,
-                        settings,
-                        env,
-                        answer,
-                        nobody,
-                        asLogin,
-                        loginAccount,
-                        secret,
-                        registrationToken,
-                        room);
-            } catch (final Failure failure) {
-                if (keptSecret == null || keptSecret.isBlank()) {
-                    return notAdmitted(answer, login, loginAccount, configuredRoom);
-                }
-                throw failure;
-            }
-        }
 
         // A login just registered joins only where its name was invited before it existed.
         // Whatever fails then, its generated secret must reach Porelo, or the account is lost to
@@ -388,6 +318,7 @@ final class Lifecycle {
                         registrationToken);
         displayName(nobody, relay, "Porelo (delivery)");
         joinRoom(asLogin, room, relay, nobody);
+        forgetAPositionFromRoomsLeft(env, nobody, relay);
 
         put(
                 answer.putObject("secrets"),
@@ -397,6 +328,33 @@ final class Lifecycle {
         answer.put("login", login);
         answer.put("admitted", true);
         return answer;
+    }
+
+    /**
+     * A relay admitted again whose position lies only in rooms it has left, as when a deleted room
+     * was replaced: {@code poll} would refuse that position for good, and the rooms it is in are
+     * read from their start. A relay still in one of those rooms goes on from its position.
+     */
+    private static void forgetAPositionFromRoomsLeft(
+            final Map<String, String> env, final MatrixClient nobody, final Accounts.Session relay)
+            throws Failure {
+        final List<String> joined = new ArrayList<>();
+        nobody.as(relay.accessToken())
+                .get("/_matrix/client/v3/joined_rooms")
+                .path("joined_rooms")
+                .forEach(room -> joined.add(room.asText()));
+        final Report report = new Report();
+        forgetPosition(
+                Poll.stateDirectory(env),
+                Poll.key(nobody.config(), relay.userId()),
+                relay.userId(),
+                report,
+                POLL_WAIT,
+                position -> position.takenOnlyInRoomsOutside(joined));
+        final JsonNode kept = report.answer().path("kept");
+        if (!kept.isEmpty()) {
+            throw new Failure(Exit.TEMPORARY, "setup again: " + kept.get(0).path("why").asText());
+        }
     }
 
     /** The socket's path, or host and port with the scheme's own port where the URL names none. */
@@ -1332,6 +1290,21 @@ final class Lifecycle {
             final String relay,
             final Report report,
             final Duration wait) {
+        forgetPosition(stateDir, key, relay, report, wait, position -> true);
+    }
+
+    /**
+     * As {@link #forgetPosition(Path, String, String, Report, Duration)}, for a position {@code
+     * forgettable} says goes, asked of it under the lock: a poll that ended during the wait may
+     * have saved another.
+     */
+    static void forgetPosition(
+            final Path stateDir,
+            final String key,
+            final String relay,
+            final Report report,
+            final Duration wait,
+            final Predicate<Poll.Position> forgettable) {
         final Path lockFile = stateDir.resolve(key + ".lock");
         if (!Files.exists(lockFile) && !Files.exists(stateDir.resolve(key + ".since"))) {
             return;
@@ -1348,12 +1321,15 @@ final class Lifecycle {
                 return;
             }
             try (held) {
+                if (!forgettable.test(Poll.readPosition(stateDir.resolve(key + ".since")))) {
+                    return;
+                }
                 if (Files.deleteIfExists(stateDir.resolve(key + ".since"))) {
                     report.removed("the poll position of " + relay);
                 }
                 Files.deleteIfExists(lockFile);
             }
-        } catch (final IOException ex) {
+        } catch (final IOException | Failure ex) {
             report.kept("the poll position of " + relay, ex.getMessage());
         }
     }
@@ -1692,14 +1668,8 @@ final class Lifecycle {
         boolean loopbackOnly = false;
         String display = null;
         String login = null;
-        boolean createRoom = false;
-        List<String> persons = null;
         for (int i = 0; i < args.size(); i++) {
             final String arg = args.get(i);
-            if ("--create-room".equals(arg) && "setup".equals(verb) && !createRoom) {
-                createRoom = true;
-                continue;
-            }
             if ("--reset".equals(arg) && "join".equals(verb)) {
                 reset = true;
                 continue;
@@ -1726,12 +1696,6 @@ final class Lifecycle {
                     }
                     login = Login.name(value);
                 }
-                case "--persons" -> {
-                    if (!"members".equals(verb) || persons != null) {
-                        throw usage(verb);
-                    }
-                    persons = persons(value);
-                }
                 case "--display" -> {
                     if (!("enroll".equals(verb) || "join".equals(verb)) || display != null) {
                         throw usage(verb);
@@ -1746,40 +1710,13 @@ final class Lifecycle {
                     case "setup" -> task == null && person == null;
                     case "enroll", "retire" -> task != null && person == null;
                     case "join", "part" -> person != null && task == null;
-                    case "members" -> persons != null && task == null && person == null;
                     case "clear" -> task == null && person == null;
                     default -> false;
                 };
         if (project == null || !ok) {
             throw usage(verb);
         }
-        return new Options(
-                project,
-                task,
-                person,
-                reset,
-                token,
-                loopbackOnly,
-                display,
-                login,
-                createRoom,
-                persons);
-    }
-
-    /** The sorted logins kept in the room; an empty value keeps only the maker. */
-    private static List<String> persons(final String value) throws Failure {
-        final Set<String> persons = new java.util.TreeSet<>();
-        if (!value.isEmpty()) {
-            for (final String name : value.split(",", -1)) {
-                persons.add(Login.name(name));
-            }
-        }
-        if (persons.size() > MAX_PERSONS) {
-            throw new Failure(
-                    Exit.USAGE,
-                    "--persons names at most " + MAX_PERSONS + " persons, not " + persons.size());
-        }
-        return List.copyOf(persons);
+        return new Options(project, task, person, reset, token, loopbackOnly, display, login);
     }
 
     static String display(final String value) throws Failure {
@@ -1813,9 +1750,7 @@ final class Lifecycle {
                 "usage: "
                         + switch (verb) {
                             case "setup" ->
-                                    "setup --project <project> [--login <login>] [--create-room] [--loopback-only]";
-                            case "members" ->
-                                    "members --project <project> --persons <login>,… [--login <login>]";
+                                    "setup --project <project> [--login <login>] [--loopback-only]";
                             case "enroll" ->
                                     "enroll --project <project> --task <task> [--display <nickname>] [--login <login>] [--loopback-only]";
                             case "retire" ->
@@ -1826,11 +1761,6 @@ final class Lifecycle {
                             default ->
                                     "join --project <project> --person <person> [--reset] [--token] [--display <nickname>] [--login <login>] [--loopback-only]";
                         });
-    }
-
-    private static List<String> required(@Nullable final List<String> persons) {
-        // The options make members only with --persons.
-        return Objects.requireNonNull(persons);
     }
 
     private static String required(@Nullable final String value, final String option)

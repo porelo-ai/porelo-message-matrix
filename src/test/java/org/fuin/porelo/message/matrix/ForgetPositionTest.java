@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,6 +61,56 @@ class ForgetPositionTest {
         assertThat(report.answer().path("removed").get(0).asText())
                 .as("what was removed")
                 .isEqualTo("the poll position of " + RELAY);
+    }
+
+    private void forgetUnlessStillIn(final String... joined) {
+        Lifecycle.forgetPosition(
+                state,
+                KEY,
+                RELAY,
+                new Lifecycle.Report(),
+                Duration.ofSeconds(20),
+                position -> position.takenOnlyInRoomsOutside(List.of(joined)));
+    }
+
+    /** Harm guarded: a position forgotten for a room joined beside, so all is handed over again. */
+    @Test
+    void aPositionInARoomTheRelayIsStillInIsKept() throws Exception {
+        Files.writeString(state.resolve(KEY + ".since"), "s1\n!old:x\n");
+
+        forgetUnlessStillIn("!old:x", "!new:x");
+
+        assertThat(state.resolve(KEY + ".since")).as("the position").hasContent("s1\n!old:x");
+    }
+
+    /** Harm guarded: a position only in rooms left stays, and every later poll refuses it. */
+    @Test
+    void aPositionOnlyInRoomsLeftIsForgotten() throws Exception {
+        Files.writeString(state.resolve(KEY + ".since"), "s1\n!old:x\n");
+
+        forgetUnlessStillIn("!new:x");
+
+        assertThat(state.resolve(KEY + ".since")).as("the position").doesNotExist();
+    }
+
+    /**
+     * Harm guarded: a position saved while a second setup waited for the lock is forgotten on what
+     * was read before, and what that poll delivered is handed over twice.
+     */
+    @Test
+    void whatIsAskedIsThePositionFoundUnderTheLock() throws Exception {
+        Files.writeString(state.resolve(KEY + ".since"), "s1\n!old:x\n");
+        Files.createFile(state.resolve(KEY + ".lock"));
+        final Process poll = holdLock(state.resolve(KEY + ".lock"));
+        final Thread setup = new Thread(() -> forgetUnlessStillIn("!new:x"));
+        setup.start();
+        Thread.sleep(500);
+        Files.writeString(state.resolve(KEY + ".since"), "s2\n!new:x\n");
+        poll.getOutputStream().close();
+        poll.waitFor();
+        setup.join();
+
+        assertThat(state.resolve(KEY + ".since")).as("the newer position").hasContent("s2\n!new:x");
     }
 
     /** A poll of the relay in a process of its own, holding the lock as long as it runs. */

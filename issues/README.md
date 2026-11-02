@@ -13,13 +13,13 @@ sequence.
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
 | <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | - | On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
+| <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`); on a homeserver elsewhere a person keeps the room by hand |
+| <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
 
 ## Implementing
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`); `room-members` says who is in it, read-only |
-| <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
 
 ## Backlog
 

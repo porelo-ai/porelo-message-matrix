@@ -93,8 +93,7 @@ class LifecycleTest {
             strings = {
                 "setup --project default",
                 "enroll --project default --task t",
-                "join --project default --person p",
-                "members --project default --persons a"
+                "join --project default --person p"
             })
     void theDefaultProjectGetsNoRoomOnAnyHomeserver(final String command) throws Exception {
         final List<String> args = List.of(command.split(" "));
@@ -242,81 +241,6 @@ class LifecycleTest {
                 .startsWith(Exit.CONFIG + " the project's settings name 'registration_token_file'");
     }
 
-    /** Harm guarded: a list mistyped drops every developer from the project's room. */
-    @org.junit.jupiter.params.ParameterizedTest(name = "case {index}")
-    @org.junit.jupiter.params.provider.ValueSource(
-            strings = {"", "hosta,../hostb", "hosta,,hostb", "hosta;hostb", "--persons"})
-    @org.junit.jupiter.api.DisplayName(
-            "members refuses malformed login lists before changing a room")
-    void membersTakesAListOfPersons(final String list) {
-        final List<String> args =
-                "".equals(list)
-                        ? List.of("members", "--project", "demo")
-                        : List.of("members", "--project", "demo", "--persons", list);
-        org.assertj.core.api.Assertions.assertThat(
-                        exit(
-                                central("https://matrix.example.org"),
-                                centralAccount(),
-                                args.toArray(String[]::new)))
-                .as("members %s", args)
-                .isEqualTo(list.isEmpty() ? Exit.USAGE : Exit.CONFIG);
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName("members takes no more persons than a room holds members")
-    void membersRefusesAListTooLong() {
-        final String list =
-                java.util.stream.IntStream.rangeClosed(1, 501)
-                        .mapToObj(i -> "host" + i)
-                        .collect(java.util.stream.Collectors.joining(","));
-        org.assertj.core.api.Assertions.assertThat(
-                        reason(
-                                central("https://matrix.example.org"),
-                                centralAccount(),
-                                "members",
-                                "--project",
-                                "demo",
-                                "--persons",
-                                list))
-                .startsWith(Exit.USAGE + " --persons names at most 500 persons");
-    }
-
-    /**
-     * Harm guarded: the account's own homeserver's room has accounts put out by a list meant for a
-     * central homeserver.
-     */
-    @Test
-    @org.junit.jupiter.api.DisplayName(
-            "members and setup --create-room are refused with 77 on the account's own homeserver")
-    void centralVerbsAreRefusedLocally() {
-        org.assertj.core.api.Assertions.assertThat(
-                        reason(
-                                "{}",
-                                account(),
-                                "members",
-                                "--project",
-                                "demo",
-                                "--persons",
-                                "hosta"))
-                .startsWith(Exit.NOT_PERMITTED + " members keeps a central homeserver's room");
-        org.assertj.core.api.Assertions.assertThat(
-                        reason("{}", account(), "setup", "--project", "demo", "--create-room"))
-                .startsWith(
-                        Exit.NOT_PERMITTED + " --create-room makes a central homeserver's room");
-        org.assertj.core.api.Assertions.assertThat(
-                        exit(
-                                central("https://matrix.example.org"),
-                                centralAccount(),
-                                "enroll",
-                                "--project",
-                                "demo",
-                                "--task",
-                                "t",
-                                "--create-room"))
-                .as("--create-room on another verb")
-                .isEqualTo(Exit.USAGE);
-    }
-
     /** Harm guarded: an invalid suffix can claim another login's accounts. */
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(
@@ -381,8 +305,7 @@ class LifecycleTest {
      */
     @Test
     void centralVerbsRefuseTheMachineOption() {
-        for (final String verb :
-                List.of("setup", "enroll", "retire", "join", "part", "members", "clear")) {
+        for (final String verb : List.of("setup", "enroll", "retire", "join", "part", "clear")) {
             org.assertj.core.api.Assertions.assertThat(
                             reason("{}", account(), verb, "--project", "demo", "--machine", "bob"))
                     .as("%s no longer takes --machine", verb)
@@ -403,10 +326,9 @@ class LifecycleTest {
                                 "--project",
                                 "demo",
                                 "--login",
-                                "bob",
-                                "--create-room"))
-                .as("gate registration needs no token before the room settings are checked")
-                .startsWith(Exit.CONFIG + " --create-room makes the room");
+                                "bob"))
+                .as("gate registration asks no token, whatever then comes of reaching it")
+                .doesNotContain(Config.REGISTRATION_TOKEN);
         org.assertj.core.api.Assertions.assertThat(
                         reason(
                                 central("https://matrix.example.org"),
@@ -415,8 +337,7 @@ class LifecycleTest {
                                 "--project",
                                 "demo",
                                 "--login",
-                                "bob",
-                                "--create-room"))
+                                "bob"))
                 .as("an external homeserver still requires its registration token")
                 .startsWith(Exit.CONFIG + " " + Config.REGISTRATION_TOKEN + " is not set");
     }

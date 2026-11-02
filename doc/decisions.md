@@ -20,6 +20,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 | [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each person's Porelo acts only as the accounts of its login, with passwords derived by HMAC-SHA256 from the person's secret in `account`. |
+| [The host keeps a project's room; elsewhere a person does](#the-host-keeps-a-projects-room-elsewhere-a-person-does) | Behind the gate only the administrator makes and keeps it; on a homeserver elsewhere a person keeps it by hand. |
 | [A task account of another project is refused, not renamed](#a-task-account-of-another-project-is-refused-not-renamed) | `enroll` and `retire` answer 78 for a task account in another project's room; an account's id stays its task's name. |
 
 ## The homeserver is Tuwunel
@@ -131,8 +132,10 @@ before, with the position alone, is taken and gains the rooms.
 **Why:** measured on Tuwunel, a position from a database since removed is answered with 200, no events
 and the new database's own position - so everything sent there before that poll would be lost without a
 word. A position is opaque by the Matrix specification, so comparing it with the server's is not ours
-to do; room ids are random, and a reset makes new ones. Nothing is repaired by the transport: a room the
-account was taken out of looks the same from here, and a person should decide.
+to do; room ids are random, and a reset makes new ones. `poll` repairs nothing: a room the account was taken
+out of looks the same from there. Only a central `setup` that has just admitted the relay forgets a position
+lying only in rooms the relay has left, deciding under the poll's lock: the poll would refuse it for good, and a
+relay still in one of those rooms goes on from its position.
 
 **What would change the answer:** a homeserver refusing a position it did not give out.
 
@@ -352,6 +355,22 @@ under another login.
 too, so each account could have an independent random password of its own; or Matrix offering scoped
 provisioning credentials per login namespace.
 
+## The host keeps a project's room; elsewhere a person does
+
+**Decided:** behind the gate the host's helper makes a project's room and keeps it to the persons the host names, as
+the homeserver's administrator; no client can make or take the alias. On a homeserver elsewhere a person there makes
+the room, invites each `@porelo.<login>` and takes out whoever leaves; the transport does neither.
+
+**Why:** a project's members live outside the host and the project admin need not be on it, so the host's helper is the
+one actor always present. A second way for a project admin's Porelo to keep a room elsewhere would be a second copy of
+the same rule, for a case a person can handle.
+
+**Risk accepted:** on a homeserver elsewhere, a person dropped from the project stays in the room until somebody there
+takes them out. A project with a homeserver of its own may also have an unused room on its host, since the host does
+not read that name. Moved to another host, a project starts with a new room; its conversation stays only in the host's
+copies. What would change the answer: a project on a homeserver elsewhere that loses people faster than a person
+there can follow.
+
 ## A task account of another project is refused, not renamed
 
 **Decided:** a task's account is `@<task>` on the account's own homeserver, named by the task alone. When `enroll` or
@@ -374,7 +393,7 @@ to act as one account.
 to the host login obtained from `SO_PEERCRED`. The homeserver's socket and administrator token are
 private to its own account. The gate registers only that login's available names, creates the
 administrator before client registration, binds access tokens with `whoami`, and permits reserved
-project aliases only for a project admin named by the host. Password sign-in remains available;
+project aliases for no client: the host's helper makes them as the administrator. Password sign-in remains available;
 SSO trades the host login for a short-lived gate token and an administrator-issued session.
 
 **Why:** a shared TCP loopback port cannot identify the caller and can be taken by another account

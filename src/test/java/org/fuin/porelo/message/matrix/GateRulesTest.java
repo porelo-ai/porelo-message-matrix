@@ -80,42 +80,19 @@ class GateRulesTest {
                 .isFalse();
     }
 
-    /** Harm guarded: another account takes a project's reserved room alias. */
+    /** Harm guarded: a client takes a project's reserved room alias. */
     @Test
-    void projectAliasesRequireTheExactAccountAndHostAuthorization() {
-        assertThat(GateRules.aliasAllowed("ordinary", "@alice:example.org", "alice", List.of()))
-                .as("ordinary aliases")
-                .isTrue();
-        assertThat(
-                        GateRules.aliasAllowed(
-                                "porelo-demo",
-                                "@porelo.alice:example.org",
-                                "alice",
-                                List.of("alice")))
-                .as("the project's named administrator")
-                .isTrue();
-        for (final String id :
-                List.of(
-                        "@alice:example.org",
-                        "@task.alice:example.org",
-                        "@porelo.bob:example.org",
-                        "@porelo:example.org")) {
-            assertThat(GateRules.aliasAllowed("porelo-demo", id, "alice", List.of("alice")))
-                    .as("reserved alias owner")
-                    .isFalse();
-        }
-        assertThat(
-                        GateRules.aliasAllowed(
-                                "porelo-demo", "@porelo.alice:example.org", "alice", List.of()))
-                .as("missing or empty admin file grants nothing")
-                .isFalse();
+    void noClientTakesAProjectsAlias() {
+        assertThat(GateRules.aliasAllowed("ordinary")).as("ordinary aliases").isTrue();
+        assertThat(GateRules.aliasAllowed("porelo")).as("no project's alias").isTrue();
         for (final String alias :
-                List.of("porelo-", "porelo-../escape", "porelo-Demo", "porelo-a/b")) {
-            assertThat(
-                            GateRules.aliasAllowed(
-                                    alias, "@porelo.alice:example.org", "alice", List.of("alice")))
-                    .as("project path cannot escape")
-                    .isFalse();
+                List.of(
+                        "porelo-demo",
+                        "porelo-",
+                        "porelo-../escape",
+                        "porelo-Demo",
+                        "porelo-a/b")) {
+            assertThat(GateRules.aliasAllowed(alias)).as("reserved: %s", alias).isFalse();
         }
     }
 

@@ -272,9 +272,6 @@ class GateIT {
                 "PORELO_MATRIX_GATE_GROUP_FILE",
                 Files.writeString(dir.resolve("group"), "porelo-people:x:101:" + login + "\n")
                         .toString());
-        final Path admins = Files.createDirectories(dir.resolve("admins"));
-        Files.writeString(admins.resolve("demo.admins"), login + "\n");
-        env.put("PORELO_MATRIX_GATE_ADMINS_DIR", admins.toString());
         final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
         Files.createDirectories(conf.getParent());
         try (var port =
@@ -300,16 +297,26 @@ class GateIT {
                         "{\"homeserver\":\"unix:"
                                 + listener.toUri().getRawPath()
                                 + "\",\"room\":\"#porelo-demo:localhost\"}";
-                final Transport.Result setup =
+                final ObjectNode administrator = MatrixClient.JSON.createObjectNode();
+                administrator
+                        .putObject("secrets")
+                        .put(
+                                Config.ADMIN_TOKEN,
+                                GateFiles.readToken(
+                                        GateFiles.directory(env).resolve("admin-token")));
+                final Transport.Result kept =
                         Transport.runWithInput(
-                                porelo,
-                                settings,
-                                "setup",
+                                env,
+                                administrator.toString(),
+                                "keep-room",
                                 "--project",
                                 "demo",
-                                "--login",
-                                login,
-                                "--create-room");
+                                "--persons",
+                                login);
+                assertThat(kept.exit()).as("the host keeps the room: %s", kept.err()).isZero();
+                final Transport.Result setup =
+                        Transport.runWithInput(
+                                porelo, settings, "setup", "--project", "demo", "--login", login);
                 assertThat(setup.exit()).as("setup: %s", setup.err()).isZero();
                 final JsonNode made = MatrixClient.JSON.readTree(setup.out());
                 assertThat(made.path("secrets").path(Config.LOGIN).asText())
@@ -518,7 +525,7 @@ class GateIT {
         return request;
     }
 
-    private Process startGate(final Map<String, String> env, final Path socket) throws IOException {
+    static Process startGate(final Map<String, String> env, final Path socket) throws IOException {
         final List<String> command =
                 new ArrayList<>(
                         List.of(
@@ -550,7 +557,7 @@ class GateIT {
         return builder.start();
     }
 
-    private static void awaitSocket(final Path socket, final Process process) throws Exception {
+    static void awaitSocket(final Path socket, final Process process) throws Exception {
         final long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
         while (!Files.exists(socket) && process.isAlive() && System.nanoTime() < deadline) {
             Thread.sleep(20);
@@ -560,7 +567,7 @@ class GateIT {
                 .isTrue();
     }
 
-    private static void awaitHomeserver(final Map<String, String> env, final ProcessUnit unit)
+    static void awaitHomeserver(final Map<String, String> env, final ProcessUnit unit)
             throws Exception {
         final long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
         String previous = "";
