@@ -19,13 +19,15 @@ together with Porelo's lending of the token; until Porelo lends it, the file is 
 - `Settings`, `SettingsCheck`: `registration_token_file` is refused (78) like any other unknown setting.
 - `Lifecycle.elsewhereToken`: only `Config.REGISTRATION_TOKEN`, and the refusal names the vault as its source.
 - `RegistrationTokenFile.read` goes; `firstToken` stays, for the local homeserver's own file.
+- `Describe`: `credentials` gains `{"name":"PORELO_MATRIX_REGISTRATION_TOKEN","as":"env","lent":["setup","enroll"]}`, so
+  Porelo lends the token on those verbs, the only ones that register on a homeserver elsewhere, and names no transport.
 - `doc/transport.md`, `doc/homeserver.md`, the change log.
 - Red first: `LifecycleIT`: settings naming `registration_token_file` are refused with 78 and nothing is registered. Today
   they pass.
 
 ## Acceptance
 
-- Measured against a real homeserver with registration tokens: a first `setup` with the token on its input registers
-  the account; with none it ends 78, naming the token, and registers nothing.
+- Measured against a real homeserver with registration tokens: a first `setup` and a first `enroll` with the token on
+  their input register the account; with none each ends 78, naming the token, and registers nothing.
 - Seen to fail: a token in the environment of a Porelo that hands secrets on the input is used; the token appears in an
   answer, a log or an error.
