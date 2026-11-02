@@ -1,6 +1,6 @@
 # MX66 — The Default Project Has No Room
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one refusal where the lifecycle's options are read, its tests, the contract's table.
 
 **What must be true.** A task of the project `default` never joins a room, whatever the machine or host has and whatever
@@ -30,3 +30,8 @@ a project file, would put such a task in a room.
 - Seen to fail: any refused verb with `--project default` makes an account or a room.
 - `poll`, `send` and `read` take no project: they act only with the tokens and the conversation `setup` and `enroll`
   answered, so with no such answer there is nothing for them to act on.
+
+## Declined in review
+
+- No test holds that the refusal comes before the settings are read, only that it comes before any request and before a
+  homeserver is looked at. Settings read first do no harm: they reach nothing, and the verb is refused either way.

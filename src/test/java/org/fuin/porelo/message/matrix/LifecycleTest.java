@@ -65,6 +65,105 @@ class LifecycleTest {
 
     @org.junit.jupiter.api.io.TempDir private java.nio.file.Path dir;
 
+    /** Answers every call as a unit that is not there, and records that it was asked. */
+    private static Unit recording(final List<String> calls) {
+        return (Unit)
+                java.lang.reflect.Proxy.newProxyInstance(
+                        Unit.class.getClassLoader(),
+                        new Class<?>[] {Unit.class},
+                        (proxy, method, args) -> {
+                            calls.add(method.getName());
+                            final Class<?> type = method.getReturnType();
+                            if (type == boolean.class) {
+                                return false;
+                            }
+                            if (type == String.class) {
+                                return "";
+                            }
+                            return type == List.class ? List.of() : null;
+                        });
+    }
+
+    /**
+     * Harm guarded: a task of the project with no conversation joins a room, where it reads and is
+     * read by others, because one wrong call or a room peer left over reached the transport.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {
+                "setup --project default",
+                "enroll --project default --task t",
+                "join --project default --person p",
+                "members --project default --persons a"
+            })
+    void theDefaultProjectGetsNoRoomOnAnyHomeserver(final String command) throws Exception {
+        final List<String> args = List.of(command.split(" "));
+        final List<String> unitCalls = new java.util.ArrayList<>();
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            for (final String settings : List.of("{}", central(homeserver.url()))) {
+                assertThatThrownBy(
+                                () ->
+                                        Lifecycle.run(
+                                                args.getFirst(),
+                                                args.subList(1, args.size()),
+                                                centralAccount(),
+                                                new java.io.ByteArrayInputStream(
+                                                        settings.getBytes(
+                                                                java.nio.charset.StandardCharsets
+                                                                        .UTF_8)),
+                                                new java.io.PrintStream(
+                                                        java.io.OutputStream.nullOutputStream()),
+                                                new java.io.PrintStream(
+                                                        java.io.OutputStream.nullOutputStream()),
+                                                recording(unitCalls)))
+                        .as("%s with the settings %s is refused", command, settings)
+                        .isInstanceOfSatisfying(
+                                Failure.class,
+                                failure ->
+                                        org.assertj.core.api.Assertions.assertThat(
+                                                        failure.exitCode())
+                                                .as("the refusal is one of configuration")
+                                                .isEqualTo(Exit.CONFIG))
+                        .hasMessageContaining("default");
+            }
+            org.assertj.core.api.Assertions.assertThat(homeserver.requests())
+                    .as("no request reaches a homeserver before %s is refused", command)
+                    .isEmpty();
+        }
+        org.assertj.core.api.Assertions.assertThat(unitCalls)
+                .as("no homeserver is looked at or started before %s is refused", command)
+                .isEmpty();
+    }
+
+    /** Harm guarded: a person left in a room under the name can never be taken out again. */
+    @Test
+    void aPersonLeftInARoomOfTheDefaultProjectCanStillBeTakenOut() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(401, "{\"errcode\":\"M_UNKNOWN_TOKEN\",\"error\":\"unknown\"}");
+            final Map<String, String> env = new java.util.HashMap<>(centralAccount());
+            env.put(Config.HOMESERVER, homeserver.url());
+            exit("{}", env, "part", "--project", "default", "--person", "p");
+            org.assertj.core.api.Assertions.assertThat(homeserver.requests())
+                    .as("part on the account's own homeserver reaches it")
+                    .isNotEmpty();
+        }
+    }
+
+    /** Harm guarded: a room left over under the name can never be taken away again. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"clear --project default", "retire --project default --task t"})
+    void whatIsLeftOverOfTheDefaultProjectCanStillGo(final String command) throws Exception {
+        final List<String> args = List.of(command.split(" "));
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(401, "{\"errcode\":\"M_UNKNOWN_TOKEN\",\"error\":\"unknown\"}");
+            exit(central(homeserver.url()), centralAccount(), args.toArray(String[]::new));
+            org.assertj.core.api.Assertions.assertThat(homeserver.requests())
+                    .as("%s reaches the homeserver", command)
+                    .isNotEmpty();
+        }
+    }
+
     private int exit(final String settings, final Map<String, String> env, final String... args) {
         try {
             Lifecycle.run(

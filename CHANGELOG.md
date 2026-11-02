@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `setup`, `enroll`, `join` and `members` refuse the project `default` with 78, so a task of that project never joins a
+  room, whatever settings reach the transport.
 - A person's accounts on a central homeserver are named by their login (`--login`, `PORELO_MATRIX_LOGIN`), and
   `setup` answers `login`; `describe` lists `login` among `takes`. Logins have at most
   32 lower-case letters, digits and `-`, start with a letter, and exclude `porelo` and `porelo-` names.

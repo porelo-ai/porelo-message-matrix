@@ -82,6 +82,9 @@ administrator token and login tokens, and the gate's socket directory. The login
 - **The printed `secrets` from `setup` and `enroll` name `PORELO_MATRIX_CA_FILE`, `PORELO_MATRIX_TLS_VERIFY` and
   `PORELO_MATRIX_LOGIN`** (empty on the account's own homeserver), so an inherited value never outweighs what the
   project configured.
+- **The project `default` has no room:** `setup`, `enroll`, `join` and `members` with `--project default` are refused
+  (78) before any settings are read or any request is made, whatever the settings name. `retire`, `part` and `clear`
+  stay open, so a leftover can still go.
 - **Run again, each keeps what exists.** `part` twice is harmless: the second prints `{}`. `retire` twice
   is harmless, and so is `clear`: it says what it removed and what it could not, with why, exits 0,
   and the second time finds nothing. Porelo removes its own entries for the transport beside it.

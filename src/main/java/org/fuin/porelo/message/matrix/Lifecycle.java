@@ -46,6 +46,10 @@ final class Lifecycle {
     /** What a project's, a task's or a person's name may be, as part of a Matrix id. */
     private static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
 
+    private static final String DEFAULT_PROJECT = "default";
+
+    private static final Set<String> GIVES_A_ROOM = Set.of("setup", "enroll", "join", "members");
+
     private Lifecycle() {}
 
     private record Options(
@@ -86,6 +90,7 @@ final class Lifecycle {
             return;
         }
         final Options options = options(verb, args);
+        refuseARoomForTheDefaultProject(verb, options.project());
         final Settings settings = Settings.read(in).materialized(env);
         // As loud as the environment's switch: said on every start, so it never goes unnoticed.
         if (!settings.verifyTls()) {
@@ -137,6 +142,19 @@ final class Lifecycle {
 
     // --- setup
     // ------------------------------------------------------------------------------------------
+
+    /** {@code retire}, {@code part} and {@code clear} stay open, so a leftover can still go. */
+    private static void refuseARoomForTheDefaultProject(final String verb, final String project)
+            throws Failure {
+        if (DEFAULT_PROJECT.equals(project) && GIVES_A_ROOM.contains(verb)) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    verb
+                            + " refused: the project "
+                            + DEFAULT_PROJECT
+                            + " has no conversation, so it has no room and no account in one");
+        }
+    }
 
     /** The central room kept to the listed logins, by the login that made it. */
     private static ObjectNode members(
