@@ -43,6 +43,9 @@ host's helper, which already runs `expel` as the homeserver's account with the a
 - **A homeserver elsewhere has no administrator**, so its room stays with `setup --create-room` and `members`, which
   only the account that made the room can run. Another admin of the project cannot keep it; one who leaves keeps their
   place in it only until the maker's next `members`, and the maker's own login is never removed.
+- **Nothing here assumes a homeserver on the host.** The transport's package needs none. Where no gate is prepared, both
+  verbs are refused (77) and start nothing; they are not run for a project that names a homeserver elsewhere, even on a
+  host that has one of its own.
 - **What stays as it is:** `setup` without `--create-room` joins once `@porelo.<login>` is invited, and says "not
   admitted" until then; a person's `@porelo.<login>` invites its own relay and tasks; `expel`; the accounts' names.
 - **The administrator is a member of the room**, shown as "Porelo (administrator)", as in the account's own
@@ -71,7 +74,8 @@ host's helper, which already runs `expel` as the homeserver's account with the a
 - Measured the same way: after `drop-room` the conversation cannot be read by anybody, the persons' accounts still sign
   in, and another project's room is untouched.
 - Seen to fail: a client of any login, a project admin's too, makes or takes the alias through the gate; `keep-room`
-  without the administrator's token, without the gate, or on a room the administrator did not make changes anything;
+  without the administrator's token, without the gate, or on a room the administrator did not make changes anything or
+  starts a homeserver;
   a run takes the administrator or a listed login's account out; a token appears in the answer, a log or an error.
 
 ## To be checked
