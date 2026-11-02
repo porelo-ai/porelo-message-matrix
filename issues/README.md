@@ -17,6 +17,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 
 ## Backlog
 
@@ -24,7 +25,6 @@ sequence.
 |---|---|---|---|
 | <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
 | <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`) |
-| <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 | <a id="mx69"></a>[MX69](MX69-A-Lost-Message-Or-Copy-Fails-A-Test.md) | M | - | A silently dropped message, an unfilled sync gap, an unrecorded sender or a hollow restore fails a unit test |
 | <a id="mx70"></a>[MX70](MX70-The-Gates-Rules-Are-Held-To-Their-Edges.md) | S | - | Moving an edge of who belongs to a login, or of which redirect is the person's own client, fails a unit test |
 | <a id="mx71"></a>[MX71](MX71-The-Gates-Request-Parser-Is-Held-To-Its-Refusals.md) | S | - | A request that could read differently to the gate and the homeserver fails a unit test if it ever passes |
