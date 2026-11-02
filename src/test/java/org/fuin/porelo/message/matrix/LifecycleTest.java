@@ -10,6 +10,20 @@ import org.junit.jupiter.api.Test;
 /** Guards the token join's command shape before any credentials or network are needed. */
 class LifecycleTest {
 
+    /** Harm guarded: a display option conceals a mistaken lifecycle command. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {
+                "setup --project demo", "retire --project demo --task t",
+                "part --project demo --person alice", "clear --project demo"
+            })
+    void displayIsRefusedOnOtherLifecycleVerbs(final String command) {
+        final String[] args = (command + " --display Alice").split(" ");
+        org.assertj.core.api.Assertions.assertThat(reason("{}", Map.of(), args))
+                .as("display is refused by the command shape before configuration")
+                .startsWith(Exit.USAGE + " usage: " + args[0]);
+    }
+
     @Test
     void tokenAndDisplayReachConfigurationValidation() {
         assertThatThrownBy(

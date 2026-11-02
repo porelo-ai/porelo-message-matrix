@@ -1,6 +1,6 @@
 # MX73 — Every Trust Path Checks The Certificate
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one new test class over `Trust`, with certificates the build already makes or a fixed pair.
 
 **What must be true.** Each `checkServerTrusted` of the trust manager refuses a chain neither trust source knows, whichever overload is called, and a file with several CAs trusts all of them. Today only the path the HTTP client takes is held.
@@ -14,6 +14,13 @@
 - Measured: PIT kills the mutants of the three overloads and of the alias counter.
 - Seen to fail: each case.
 
-## To be checked
+## Checked
 
-- How `Trust`'s existing coverage is reached, as there is no test class of that name; a new case goes beside it if one holds it already.
+`TlsTest` holds the engine's overload against a real server, through the HTTP client, which takes no other. `TrustTest`
+holds all three by a source of trust that records how it was asked, and a file of two authorities and a stranger by real
+certificates. The engine's overload with a real certificate needs a handshake in progress, so `TlsTest` keeps that case.
+
+## Measured
+
+PIT on `Trust`: 6 killed, 21 timed out, both detected, including the three overloads and the alias counter. Left: line
+233, what `TrustingEveryone` names as issuers, with checking switched off.

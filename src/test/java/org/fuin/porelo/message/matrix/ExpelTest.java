@@ -18,6 +18,45 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ExpelTest {
 
+    /** Harm guarded: expel selects the gate socket instead of the local homeserver. */
+    @Test
+    void expelDoesNotUseTheGateWithoutItsConfigurationLine() throws Exception {
+        final var env =
+                Map.of("XDG_CONFIG_HOME", dir.toString(), Config.ADMIN_TOKEN, "fixture-token");
+        final Path conf = LocalHomeserver.directory(env).resolve("homeserver.conf");
+        Files.createDirectories(conf.getParent());
+        Files.writeString(conf, "PORELO_MATRIX_PORT=8123\n");
+        final List<String> calls = new java.util.ArrayList<>();
+        final Unit unit =
+                new KeepTest.StandIn() {
+                    @Override
+                    public boolean installed() {
+                        calls.add("installed");
+                        return false;
+                    }
+                };
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                Expel.run(
+                                        List.of("bob"),
+                                        env,
+                                        new PrintStream(PrintStream.nullOutputStream()),
+                                        unit))
+                .as("ordinary configuration follows the local unit route before any request")
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("local installation refusal")
+                                    .isEqualTo(Exit.CONFIG);
+                            assertThat(failure.getMessage())
+                                    .as(
+                                            "the local unit is missing, rather than gate runtime configuration")
+                                    .contains("is not installed for this account");
+                        });
+        assertThat(calls).as("expel consulted the local unit").containsExactly("installed");
+    }
+
     @TempDir private Path dir;
 
     /**

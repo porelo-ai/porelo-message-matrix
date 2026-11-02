@@ -1,6 +1,6 @@
 # MX69 — A Lost Message Or Copy Fails A Test
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** M - cases in four test classes, some against fakes that must first record more; no production code unless a test finds a defect.
 
 **What must be true.** Whoever breaks what keeps a message or a copy whole sees a unit test fail: a message silently dropped, a gap in a sync not filled, a sender not recorded, a restore that holds nothing or the wrong homeserver's data.
@@ -20,6 +20,24 @@ Red first as in the gate's refusals: each test seen to fail against its mutant.
 - Seen to fail: each new case.
 - A real defect found stops here: the fix follows the failing test.
 
-## To be checked
+## Measured
 
-- Which of these `KeepIT`, `PollIT`, `SendIT` and `DirectIT` already hold. An IT holds them only where the build runs it; a unit test is still wanted where it is cheap.
+PIT on the VM, unit tests only. Killed: `Send.transactionId`'s length, message and signature, `Poll.deliver`, the gap
+fetch, `Keep.backup`'s copy, `Keep.same`, and the restore's checks. PIT showed the message was no part of the id's test
+at first: another message of another length passed for it.
+
+Left, and why they stay:
+
+- `Poll` lines 184 to 198, 312, 333, 346: the wait for news and the count of what was handed; they decide how long a
+  poll waits, never what is delivered. `Poll` lines 81 to 85, 257: argument forms and `--direct`, held by `PollIT` and
+  `DirectIT`, as PIT runs no integration test. `Poll` line 523: a lock's return, released with its channel.
+- `Keep` lines 462, 479, 480: the pause while waiting for a lock. Line 474: as line 523. Line 570: one of two conditions
+  of a name; the other was seen red by hand.
+- `Send` lines 240, 272, 282: the exact byte at the event's limit, where the fit cuts one byte more or fewer. Lines 81,
+  87, 88, 146: argument forms held by `wrongArguments` at their other edges.
+- `Direct` line 64: one attempt more or fewer at writing `m.direct`.
+
+`KeepIT`, `PollIT`, `SendIT` and `DirectIT` hold the real homeserver's side; these tests hold what a build without them
+would miss.
+
+**No defect found.**

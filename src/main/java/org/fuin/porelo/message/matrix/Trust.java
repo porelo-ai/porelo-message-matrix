@@ -51,14 +51,14 @@ final class Trust {
         }
     }
 
-    private static X509ExtendedTrustManager platform() throws GeneralSecurityException {
+    static X509ExtendedTrustManager platform() throws GeneralSecurityException {
         final TrustManagerFactory factory =
                 TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         factory.init((KeyStore) null);
         return extended(factory);
     }
 
-    private static X509ExtendedTrustManager fromFile(final Path file)
+    static X509ExtendedTrustManager fromFile(final Path file)
             throws Failure, GeneralSecurityException {
         final Collection<? extends Certificate> certificates;
         try (InputStream in = Files.newInputStream(file)) {
@@ -111,7 +111,7 @@ final class Trust {
      * server's name against its certificate as well - so a CA file widens whom to trust, never how
      * carefully.
      */
-    private static final class Either extends X509ExtendedTrustManager {
+    static final class Either extends X509ExtendedTrustManager {
 
         private final X509ExtendedTrustManager first;
 

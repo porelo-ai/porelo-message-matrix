@@ -134,4 +134,34 @@ class AdminRoomTest {
                 .isInstanceOf(Failure.class)
                 .hasMessageContaining("listing the accounts");
     }
+
+    /** Harm guarded: a user id read from a room's members carries a command of its own. */
+    @ParameterizedTest(name = "case {index}")
+    @ValueSource(strings = {"@a b:x", "@a:x\n!admin users make-user-admin @a:x"})
+    void deactivatingSendsNoCommandForAnIdThatIsNotOneWord(final String id)
+            throws IOException, Failure {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"joined_rooms\":[\"!admins:x\"]}")
+                    .answer(200, "{\"alias\":\"#admins:x\"}");
+            final AdminRoom room =
+                    AdminRoom.of(
+                            new MatrixClient(
+                                    Config.from(
+                                            Map.of(
+                                                    Config.HOMESERVER,
+                                                    homeserver.url(),
+                                                    Config.ACCESS_TOKEN,
+                                                    "t"))),
+                            "@porelo:x");
+
+            assertThatThrownBy(() -> room.deactivate(id))
+                    .isInstanceOf(Failure.class)
+                    .hasMessageContaining("not one word");
+
+            assertThat(homeserver.requests())
+                    .as("no command sent")
+                    .noneMatch(request -> "PUT".equals(request.method()));
+        }
+    }
 }

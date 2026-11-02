@@ -15,17 +15,18 @@ sequence.
 | <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | - | On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 | <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`); on a homeserver elsewhere a person keeps the room by hand |
 | <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
+| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx69"></a>[MX69](MX69-A-Lost-Message-Or-Copy-Fails-A-Test.md) | M | - | A silently dropped message, an unfilled sync gap, an unrecorded sender or a hollow restore fails a unit test |
 | <a id="mx70"></a>[MX70](MX70-The-Gates-Rules-Are-Held-To-Their-Edges.md) | S | - | Moving an edge of who belongs to a login, or of which redirect is the person's own client, fails a unit test |
 | <a id="mx71"></a>[MX71](MX71-The-Gates-Request-Parser-Is-Held-To-Its-Refusals.md) | S | - | A request that could read differently to the gate and the homeserver fails a unit test if it ever passes |
 | <a id="mx72"></a>[MX72](MX72-A-Token-Is-Random-And-An-Admin-Command-Takes-One-Argument.md) | S | - | A homeserver token not random, an admin command's user id unchecked or a credential over its limit fails a unit test |
 | <a id="mx73"></a>[MX73](MX73-Every-Trust-Path-Checks-The-Certificate.md) | S | - | Each `checkServerTrusted` overload refuses an unknown chain, and a file with several CAs trusts them all, under test |
 | <a id="mx74"></a>[MX74](MX74-Small-Refusals-Are-Held-By-Tests.md) | S | - | The smaller refusals, each cheap to hold, fail a unit test if removed |
+
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
 
 ## Backlog
 
@@ -39,7 +40,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
 ## Idea

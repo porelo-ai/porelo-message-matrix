@@ -275,4 +275,28 @@ class SettingsTest {
                                     .contains("registration_token_file");
                         });
     }
+
+    /** Harm guarded: materialization drops the required CA path. */
+    @Test
+    void materializationPreservesAnAbsoluteCaPath() throws Exception {
+        final var ca = home.resolve("ca.pem");
+        final Settings result = settings(json("ca_file", ca.toString())).materialized(Map.of());
+        assertThat(result.caFile()).as("an absolute CA path needs no home expansion").isEqualTo(ca);
+    }
+
+    /** Harm guarded: a bare home prefix crashes CA materialization. */
+    @Test
+    void aBareHomePrefixIsNotACaFile() {
+        assertThatThrownBy(() -> settings(json("ca_file", "~")))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("invalid CA path is configuration")
+                                    .isEqualTo(Exit.CONFIG);
+                            assertThat(failure.getMessage())
+                                    .as("the unexpanded prefix is not an absolute file path")
+                                    .contains("ca_file", "absolute path");
+                        });
+    }
 }

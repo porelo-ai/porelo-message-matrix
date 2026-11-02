@@ -385,4 +385,171 @@ class PollTest {
         assertThat(filesIn(inbound)).as("only the person's words are handed over").isEqualTo(1);
         assertThat(stderr()).as("the task's words are named").contains("@t.bob:matrix.test");
     }
+
+    private static final String SYNC_ROOM = "!room:matrix.test";
+
+    private static String message(final String id, final String signature) {
+        return """
+                {"type":"m.room.message","event_id":"$%s","sender":"@alice:matrix.test",
+                 "origin_server_ts":1000,
+                 "content":{"msgtype":"m.text","%s":"%s","%s":"%s"}}
+                """
+                .formatted(id, Send.MESSAGE_FIELD, id, Send.SIGNATURE_FIELD, signature);
+    }
+
+    private static String sync(final String timeline) {
+        return """
+                {"next_batch":"s2","rooms":{"join":{"%s":{"timeline":%s}}}}
+                """
+                .formatted(SYNC_ROOM, timeline);
+    }
+
+    private String name(final String id) {
+        return Reference.of("$" + id, 1000) + ".json";
+    }
+
+    /** Harm guarded: a busy room's cut-short sync loses what it left out, or hands it unordered. */
+    @Test
+    void aCutShortTimelineFetchesWhatItMissedInOrder() throws Exception {
+        homeserver
+                .answer(
+                        200,
+                        "{\"chunk\":[%s,%s],\"end\":\"p2\"}"
+                                .formatted(message("c", "AQ=="), message("b", "AQ==")))
+                .answer(200, "{\"chunk\":[%s],\"end\":\"p3\"}".formatted(message("a", "AQ==")))
+                .answer(200, "{\"chunk\":[],\"end\":\"p3\"}");
+        final MatrixClient client =
+                new MatrixClient(
+                        Config.from(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        homeserver.url(),
+                                        Config.ACCESS_TOKEN,
+                                        TOKEN)));
+        final var timeline =
+                MatrixClient.JSON.readTree(
+                        "{\"limited\":true,\"prev_batch\":\"p1\",\"events\":[%s]}"
+                                .formatted(message("d", "AQ==")));
+
+        assertThat(Poll.timeline(client, SYNC_ROOM, timeline, "s1"))
+                .as("oldest first, the sync's own last")
+                .extracting(event -> event.path("event_id").asText())
+                .containsExactly("$a", "$b", "$c", "$d");
+        assertThat(homeserver.requests())
+                .as("paged from where each page ended, down to the last poll's position")
+                .extracting(FakeHomeserver.Request::query)
+                .satisfiesExactly(
+                        first -> assertThat(first).contains("from=p1").contains("to=s1"),
+                        second -> assertThat(second).contains("from=p2").contains("to=s1"),
+                        third -> assertThat(third).contains("from=p3"));
+    }
+
+    /** Harm guarded: a timeline not cut short pays for pages, or repeats what it holds. */
+    @Test
+    void aWholeTimelineFetchesNothing() throws Exception {
+        final MatrixClient client =
+                new MatrixClient(
+                        Config.from(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        homeserver.url(),
+                                        Config.ACCESS_TOKEN,
+                                        TOKEN)));
+        final var timeline =
+                MatrixClient.JSON.readTree(
+                        "{\"limited\":false,\"prev_batch\":\"p1\",\"events\":[%s]}"
+                                .formatted(message("d", "AQ==")));
+
+        assertThat(Poll.timeline(client, SYNC_ROOM, timeline, "s1")).hasSize(1);
+        assertThat(homeserver.requests()).as("no page asked for").isEmpty();
+    }
+
+    /** Harm guarded: a message reaches Porelo with no sender, or with a signature it never had. */
+    @Test
+    void aMessageIsWrittenWithItsSenderAndOnlyTheSignatureItCameWith() throws Exception {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, JOINED)
+                .answer(
+                        200,
+                        sync(
+                                "{\"events\":[%s,%s]}"
+                                        .formatted(
+                                                message("signed", "AQID"), message("bare", ""))));
+
+        assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
+
+        assertThat(stderr()).as("both are Porelo's, none skipped").doesNotContain("skipped");
+        assertThat(inbound.resolve(name("signed"))).as("the message").hasContent("signed");
+        assertThat(inbound.resolve(name("signed") + ".sender"))
+                .as("the homeserver's sender")
+                .hasContent("@alice:matrix.test");
+        assertThat(inbound.resolve(name("signed") + ".sig"))
+                .as("the signature, byte for byte")
+                .hasBinaryContent(new byte[] {1, 2, 3});
+        assertThat(inbound.resolve(name("bare"))).as("a message with none").hasContent("bare");
+        assertThat(inbound.resolve(name("bare") + ".sig")).as("no signature file").doesNotExist();
+    }
+
+    /**
+     * Harm guarded: a message delivered whose name means nothing, so its receipt cannot be sent.
+     */
+    @Test
+    void theReferenceIsRememberedBeforeTheMessageAppears() throws Exception {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, JOINED)
+                .answer(200, sync("{\"events\":[%s]}".formatted(message("late", "AQID"))));
+        final Path inTheWay = Files.createDirectories(inbound.resolve(name("late")));
+        Files.writeString(inTheWay.resolve("held"), "so the message cannot land");
+
+        assertThat(poll()).as("the message could not be written").isNotEqualTo(Exit.OK);
+
+        final String reference = name("late").replace(".json", "");
+        assertThat(Poll.stateDirectory(env()).resolve("refs").resolve(reference))
+                .as("what the name stands for")
+                .hasContent("$late");
+    }
+
+    /** Harm guarded: a position from an earlier database is taken, and all since it is lost. */
+    @Test
+    void aPositionOnlyInRoomsTheAccountLeftIsRefused() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env()));
+        final String key = Poll.key(Config.from(env()), "@bob:matrix.test");
+        Files.writeString(state.resolve(key + ".since"), "s1\n!gone:matrix.test\n");
+        homeserver.answer(200, WHOAMI).answer(200, JOINED);
+
+        assertThat(poll()).as(stderr()).isEqualTo(Exit.CONFIG);
+
+        assertThat(stderr()).as("says which file").contains(key + ".since");
+    }
+
+    /** Harm guarded: a position in a room still held is refused, and the poll stops for good. */
+    @Test
+    void aPositionInARoomStillHeldGoesOnAndKeepsTheRooms() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env()));
+        final String key = Poll.key(Config.from(env()), "@bob:matrix.test");
+        Files.writeString(
+                state.resolve(key + ".since"), "\ns1\n\n!room:matrix.test\n!gone:matrix.test\n");
+        homeserver.answer(200, WHOAMI).answer(200, JOINED).answer(200, "{\"next_batch\":\"s2\"}");
+
+        assertThat(poll()).as(stderr()).isEqualTo(Exit.OK);
+
+        assertThat(homeserver.requests().getLast().query()).as("from it").contains("since=s1");
+        assertThat(state.resolve(key + ".since"))
+                .as("the new position with the rooms it was taken in")
+                .hasContent("s2\n!room:matrix.test");
+    }
+
+    /** Harm guarded: another account's position is read, and that account's messages lost. */
+    @Test
+    void anotherAccountHasAPositionOfItsOwn() throws Failure {
+        final Config config = Config.from(env());
+
+        assertThat(Poll.key(config, "@bob:matrix.test"))
+                .as("the same account, the same file")
+                .isEqualTo(Poll.key(config, "@bob:matrix.test"))
+                .isNotEqualTo(Poll.key(config, "@carol:matrix.test"))
+                .isNotEmpty();
+    }
 }

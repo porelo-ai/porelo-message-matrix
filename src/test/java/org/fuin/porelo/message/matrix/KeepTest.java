@@ -188,6 +188,7 @@ class KeepTest {
         assertThat(unit.database).as("no database made").isFalse();
     }
 
+    /** Harm guarded: a backup overwrites an existing copy. */
     @Test
     @DisplayName(
             "backup refuses a directory that is not empty, and asks the homeserver for nothing")
@@ -199,7 +200,9 @@ class KeepTest {
         assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofSeconds(1)))
                 .isInstanceOfSatisfying(
                         Failure.class,
-                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
+                .hasMessageContaining("is not empty");
+        assertThat(into.resolve("left")).as("existing data is preserved").hasContent("something");
         assertThat(unit.signals).as("backups asked for").isZero();
     }
 
@@ -414,5 +417,300 @@ class KeepTest {
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
         assertNothingMade();
+    }
+
+    /** Harm guarded: a backup that says it is whole and holds no database to restore from. */
+    @Test
+    void aBackupHoldsTheHomeserversDatabaseAndItsSettings() throws Exception {
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        Files.createDirectories(conf().getParent());
+        Files.writeString(conf(), "PORELO_MATRIX_PORT=8008\n", StandardCharsets.UTF_8);
+        final StandIn answering =
+                new StandIn() {
+                    @Override
+                    public void signalBackup() throws Failure {
+                        try {
+                            final Path backups = Keep.backups(env);
+                            Files.createDirectories(backups.resolve("private/7"));
+                            Files.writeString(backups.resolve("private/7/CURRENT"), "database");
+                            Files.writeString(backups.resolve("meta/7"), "snapshot");
+                        } catch (final IOException failure) {
+                            throw new Failure(
+                                    Exit.CONFIG, "cannot make the test snapshot", failure);
+                        }
+                    }
+                };
+        answering.active = true;
+        final Path into = Files.createDirectory(dir.resolve("into"));
+
+        final var answer = Keep.backup(into, env, answering, Duration.ofSeconds(1));
+
+        assertThat(answer.path("backup").asLong()).as("the backup it names").isEqualTo(7);
+        assertThat(into.resolve("database/meta/7")).as("its mark").hasContent("snapshot");
+        assertThat(into.resolve("database/private/7/CURRENT"))
+                .as("the database")
+                .hasContent("database");
+        assertThat(into.resolve("homeserver.conf"))
+                .as("the settings")
+                .hasContent("PORELO_MATRIX_PORT=8008");
+    }
+
+    /** Harm guarded: another homeserver's data, whose name every account's id carries, is taken. */
+    @Test
+    void restoreRefusesAnotherServerName() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(
+                copy.resolve("homeserver.conf"),
+                "PORELO_MATRIX_PORT=8008\n" + LocalHomeserver.SERVER_NAME + "=there.example\n");
+        Files.createDirectories(conf().getParent());
+        Files.writeString(
+                conf(),
+                "PORELO_MATRIX_PORT=8008\n" + LocalHomeserver.SERVER_NAME + "=here.example\n");
+
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
+                .hasMessageContaining("server name")
+                .hasMessageContaining("there.example");
+        assertThat(unit.runs).as("runs of the homeserver's own").isZero();
+        assertNothingMade();
+    }
+
+    /**
+     * Harm guarded: settings the copy only links to, read from wherever the link points and written
+     * here as this account's; a link among the database would stop at its copying, this one not.
+     */
+    @Test
+    void restoreRefusesSettingsThatAreALink() throws Exception {
+        final Path copy = copy("8008");
+        final Path elsewhere =
+                Files.writeString(dir.resolve("elsewhere"), "PORELO_MATRIX_PORT=1\n");
+        Files.delete(copy.resolve("homeserver.conf"));
+        Files.createSymbolicLink(copy.resolve("homeserver.conf"), elsewhere);
+
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
+                .hasMessageContaining("neither a file nor a directory");
+        assertThat(conf()).as("no settings written").doesNotExist();
+        assertThat(unit.runs).as("runs of the homeserver's own").isZero();
+    }
+
+    /** Harm guarded: a failed restore leaves something behind, and nobody hears what. */
+    @Test
+    void whatAFailedRestoreCouldNotTakeAwayIsNamed() throws Exception {
+        final Path copy = copy("8008");
+        final Path stuck = Keep.backups(env).resolve("meta");
+        final StandIn failing =
+                new StandIn() {
+                    @Override
+                    public int runOnce(final List<String> args, final Map<String, String> secrets) {
+                        stuck.toFile().setWritable(false);
+                        return 1;
+                    }
+                };
+        try {
+            assertThatThrownBy(() -> Keep.restore(copy, env, failing))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
+                    .hasMessageContaining("left")
+                    .hasMessageContaining(Keep.backups(env).toString());
+        } finally {
+            stuck.toFile().setWritable(true);
+        }
+    }
+
+    /** A stand-in saying what was done to the homeserver, in order. */
+    private static class Recording extends StandIn {
+
+        final List<String> done = new java.util.ArrayList<>();
+
+        @Override
+        public void stop() {
+            done.add("stop");
+            super.stop();
+        }
+
+        @Override
+        public void start() {
+            done.add("start");
+            super.start();
+        }
+    }
+
+    /** Harm guarded: a password taken back from a run that failed leaves the homeserver down. */
+    @Test
+    void takingTheAdministratorBackStartsTheHomeserverAgainWhateverItsRunDoes() throws Exception {
+        final Recording failing =
+                new Recording() {
+                    @Override
+                    public int runOnce(final List<String> args, final Map<String, String> secrets) {
+                        done.add("run");
+                        throw new IllegalStateException("the run fell over");
+                    }
+                };
+        final MatrixClient nobody =
+                new MatrixClient(
+                        Config.from(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        "http://127.0.0.1:9",
+                                        Config.ACCESS_TOKEN,
+                                        "t")));
+
+        assertThatThrownBy(
+                        () ->
+                                Keep.retake(
+                                        nobody,
+                                        URI.create("http://127.0.0.1:9"),
+                                        env,
+                                        failing,
+                                        Duration.ofMillis(1)))
+                .hasMessageContaining("the run fell over");
+
+        assertThat(failing.done)
+                .as("stopped, run, started")
+                .containsExactly("stop", "run", "start");
+        assertThat(failing.active).as("running again").isTrue();
+    }
+
+    /** Harm guarded: a stale backup loses newer conversation data. */
+    @Test
+    void anUnchangedBackupIdDoesNotCountAsANewBackup() throws Exception {
+        final Path meta = Files.createDirectories(Keep.backups(env).resolve("meta"));
+        Files.writeString(meta.resolve("7"), "old snapshot");
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        unit.active = true;
+        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ZERO))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("a new snapshot can be retried")
+                                    .isEqualTo(Exit.TEMPORARY);
+                            assertThat(failure.getMessage())
+                                    .as("the unit did not publish a newer snapshot")
+                                    .contains("made no backup");
+                        });
+        assertThat(into).as("no stale copy can be mistaken for a fresh one").isEmptyDirectory();
+    }
+
+    /** Harm guarded: backup cancellation is ignored. */
+    @Test
+    void anInterruptedBackupWaitStopsAndRemovesItsPartialCopy() throws Exception {
+        Files.createDirectories(Keep.backups(env));
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        unit.active = true;
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofMillis(300)))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure -> {
+                                assertThat(failure.exitCode())
+                                        .as("interruption is retryable")
+                                        .isEqualTo(Exit.TEMPORARY);
+                                assertThat(failure.getMessage())
+                                        .as("cancellation stops the wait before its deadline")
+                                        .contains("interrupted while waiting");
+                            });
+            assertThat(Thread.currentThread().isInterrupted())
+                    .as("caller retains cancellation")
+                    .isTrue();
+            assertThat(into).as("no partial copy remains").isEmptyDirectory();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    /** Harm guarded: unrelated metadata crashes restoration. */
+    @Test
+    void restoreIgnoresNonNumericMetadataAndReportsTheRestoredId() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(copy.resolve("database/meta/not-a-backup"), "unrelated");
+        final var result = Keep.restore(copy, env, unit);
+        assertThat(result).as("restore returns the backup identity to its caller").isNotNull();
+        assertThat(result.path("restore").asLong())
+                .as("only numeric metadata identifies a backup")
+                .isEqualTo(3);
+        assertThat(Poll.stateDirectory(env).resolve(Keep.MARKER))
+                .as("next setup must retake the restored account")
+                .hasContent("3");
+    }
+
+    /** Harm guarded: an unreleasable poll lock blocks backups. */
+    @Test
+    void closingTheReturnedSharedLockAllowsAnExclusiveWriter() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env));
+        try (var channel = Keep.lockFile(state)) {
+            try (var held = Keep.shared(channel, state)) {
+                assertThat(held).as("the caller owns a releasable lock").isNotNull();
+                assertThat(held.isValid()).as("the returned lock is held").isTrue();
+            }
+            try (var writer = channel.tryLock()) {
+                assertThat(writer)
+                        .as("closing the poll lock releases the position file")
+                        .isNotNull();
+            }
+        }
+    }
+
+    /** Harm guarded: cancellation is ignored while a poll blocks a backup. */
+    @Test
+    void anInterruptedLockWaitStopsBeforeSignallingABackup() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env));
+        Files.createDirectories(Keep.backups(env));
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        unit.active = true;
+        try (var channel = Keep.lockFile(state);
+                var held = channel.lock()) {
+            Thread.currentThread().interrupt();
+            try {
+                assertThatThrownBy(
+                                () ->
+                                        Keep.backup(
+                                                into,
+                                                env,
+                                                unit,
+                                                Duration.ZERO,
+                                                Duration.ofMillis(300)))
+                        .isInstanceOfSatisfying(
+                                Failure.class,
+                                failure -> {
+                                    assertThat(failure.exitCode())
+                                            .as("lock wait can be retried")
+                                            .isEqualTo(Exit.TEMPORARY);
+                                    assertThat(failure.getMessage())
+                                            .as("cancellation rather than deadline exhaustion")
+                                            .contains("interrupted while waiting");
+                                });
+                assertThat(unit.signals).as("no backup starts after cancellation").isZero();
+            } finally {
+                Thread.interrupted();
+            }
+        }
+    }
+
+    /** Harm guarded: invalid restored references lose message identities. */
+    @Test
+    void restoreRefusesAFileNamedRefs() throws Exception {
+        final Path copy = copy("8008");
+        Files.writeString(copy.resolve("positions/refs"), "not a directory");
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+                .isInstanceOfSatisfying(
+                        Failure.class,
+                        failure -> {
+                            assertThat(failure.exitCode())
+                                    .as("invalid backup is configuration")
+                                    .isEqualTo(Exit.CONFIG);
+                            assertThat(failure.getMessage())
+                                    .as("references must be a directory")
+                                    .contains("neither a poll position nor the references");
+                        });
+        assertNothingMade();
+        assertThat(unit.runs).as("invalid references never reach the restore process").isZero();
     }
 }

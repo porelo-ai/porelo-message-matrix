@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import jdk.net.ExtendedSocketOptions;
 import org.jspecify.annotations.Nullable;
 
@@ -121,13 +122,25 @@ final class Gate {
      */
     void serve(final InputStream in, final OutputStream out, final @Nullable Closeable connection)
             throws IOException {
+        serve(in, out, connection, IDLE);
+    }
+
+    /** As with {@link #IDLE}, under a limit of the caller's. */
+    void serve(
+            final InputStream in,
+            final OutputStream out,
+            final @Nullable Closeable connection,
+            final java.time.Duration limit)
+            throws IOException {
         for (; ; ) {
             final GateRequest request;
-            final @Nullable Thread watch = connection == null ? null : idle(connection);
+            final AtomicBoolean idled = new AtomicBoolean();
+            final @Nullable Thread watch =
+                    connection == null ? null : idle(connection, limit, idled);
             try {
                 request = GateRequest.read(in);
             } catch (final IOException ex) {
-                if (watch != null && !watch.isAlive()) {
+                if (idled.get()) {
                     // Closed for idling: nobody is there to answer.
                     return;
                 }
@@ -175,16 +188,18 @@ final class Gate {
     /** How long a request may take to arrive whole, a client's pause between two included. */
     static final java.time.Duration IDLE = java.time.Duration.ofMinutes(2);
 
-    /** A thread that closes {@code connection} after {@link #IDLE}, unless interrupted first. */
-    private static Thread idle(final Closeable connection) {
+    /** A thread that closes {@code connection} after {@code limit}, unless interrupted first. */
+    private static Thread idle(
+            final Closeable connection, final java.time.Duration limit, final AtomicBoolean idled) {
         return Thread.ofVirtual()
                 .start(
                         () -> {
                             try {
-                                Thread.sleep(IDLE);
+                                Thread.sleep(limit);
                             } catch (final InterruptedException ex) {
                                 return;
                             }
+                            idled.set(true);
                             try {
                                 connection.close();
                             } catch (final IOException ex) {

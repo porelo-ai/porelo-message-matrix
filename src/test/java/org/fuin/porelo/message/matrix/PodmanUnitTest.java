@@ -26,6 +26,21 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** The run the unit's homeserver gets of its own, as podman is asked for it. */
 class PodmanUnitTest {
 
+    /** Harm guarded: an account-controlled launcher can replace the diagnostic command. */
+    @Test
+    void aPrivateButNonRootOwnedLauncherIsRefused() throws Exception {
+        final Path launcher = Files.writeString(dir.resolve("setsid"), "#!/bin/sh\nexit 0\n");
+        Files.setPosixFilePermissions(launcher, PosixFilePermissions.fromString("rwx------"));
+        assertThat((int) Files.getAttribute(launcher, "unix:uid"))
+                .as("fixture isolates non-root ownership")
+                .isNotZero();
+        assertThatThrownBy(() -> PodmanUnit.diagnosticCommand(List.of("/bin/true"), launcher))
+                .as("owner-only mode cannot make an account-owned launcher trusted")
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("must be root-owned and protected")
+                .hasMessageEndingWith(launcher.toString());
+    }
+
     private static final String IMAGE = "ghcr.io/example/tuwunel@sha256:" + "0".repeat(64);
 
     @TempDir private Path dir;

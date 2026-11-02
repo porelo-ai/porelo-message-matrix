@@ -16,6 +16,26 @@ import org.junit.jupiter.api.io.TempDir;
 
 class HomeserverTokenTest {
 
+    /** Harm guarded: a predictable registration token permits unauthorized account creation. */
+    @Test
+    void independentlyCreatedTokensAreDistinctAndNonzero() throws Exception {
+        final Path other = home.resolve("other");
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as("first token creation")
+                .isEqualTo(Exit.OK);
+        assertThat(run(Map.of("HOME", other.toString())))
+                .as("independent token creation")
+                .isEqualTo(Exit.OK);
+        final String first = Files.readString(token());
+        final String second =
+                Files.readString(other.resolve(".config/porelo/matrix/tokens/registration-token"));
+        final String zeros =
+                java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
+        assertThat(first).as("the first token contains generated entropy").isNotEqualTo(zeros);
+        assertThat(second).as("the second token contains generated entropy").isNotEqualTo(zeros);
+        assertThat(second).as("separate installations do not share a token").isNotEqualTo(first);
+    }
+
     @TempDir private Path home;
 
     private final ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
@@ -161,5 +181,46 @@ class HomeserverTokenTest {
     @DisplayName("Without HOME or XDG_CONFIG_HOME there is nowhere to put it: 78")
     void nowhereToPutIt() {
         assertThat(run(Map.of())).isEqualTo(Exit.CONFIG);
+    }
+
+    /** Harm guarded: missing or public mount directories expose credentials. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void preparesPrivateMountDirectoriesBeforeStart(final boolean existing) throws Exception {
+        final Map<String, String> env =
+                Map.of(
+                        "HOME",
+                        home.toString(),
+                        "XDG_RUNTIME_DIR",
+                        home.resolve("runtime").toString());
+        final Path backups = Keep.backups(env);
+        final Path runtime = GateFiles.runtime(env);
+        if (existing) {
+            for (final Path path : java.util.List.of(backups, runtime)) {
+                Files.createDirectories(path);
+                Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwxrwxrwx"));
+            }
+        }
+        assertThat(run(env)).as(errBytes.toString(StandardCharsets.UTF_8)).isEqualTo(Exit.OK);
+        for (final Path path : java.util.List.of(backups, runtime)) {
+            assertThat(path).as("the unit can mount %s", path).isDirectory();
+            assertThat(Files.getPosixFilePermissions(path))
+                    .as("only the owner can enter %s", path)
+                    .isEqualTo(PosixFilePermissions.fromString("rwx------"));
+        }
+    }
+
+    /** Harm guarded: a public configuration directory exposes private credentials. */
+    @Test
+    void tightensAnExistingConfigurationDirectoryBeforeWritingTheEnvironment() throws Exception {
+        final Path config = home.resolve(".config/porelo/matrix");
+        Files.createDirectories(config);
+        Files.setPosixFilePermissions(config, PosixFilePermissions.fromString("rwxrwxrwx"));
+        assertThat(run(Map.of("HOME", home.toString())))
+                .as(errBytes.toString(StandardCharsets.UTF_8))
+                .isEqualTo(Exit.OK);
+        assertThat(Files.getPosixFilePermissions(config))
+                .as("configuration directory is owner-only")
+                .isEqualTo(PosixFilePermissions.fromString("rwx------"));
     }
 }

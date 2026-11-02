@@ -92,4 +92,52 @@ class DirectTest {
                     .satisfies(r -> assertThat(r.rawPath()).endsWith("/leave"));
         }
     }
+
+    /** Harm guarded: an encrypted chat joined and never answered, its person left waiting. */
+    @ParameterizedTest
+    @ValueSource(strings = {"first", "last"})
+    void anEncryptedInvitationIsLeftWithItsReasonWhereverTheEventStands(final String where)
+            throws IOException, Failure {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, "{}");
+            final MatrixClient client =
+                    new MatrixClient(
+                            Config.from(
+                                    Map.of(
+                                            Config.HOMESERVER,
+                                            homeserver.url(),
+                                            Config.ACCESS_TOKEN,
+                                            "t")));
+            final String encryption =
+                    "{\"type\":\"m.room.encryption\",\"state_key\":\"\",\"sender\":\"@p:x\","
+                            + "\"content\":{\"algorithm\":\"m.megolm.v1.aes-sha2\"}}";
+            final String member =
+                    "{\"type\":\"m.room.member\",\"state_key\":\"@t:x\",\"sender\":\"@p:x\","
+                            + "\"content\":{\"membership\":\"invite\",\"is_direct\":true}}";
+            final String name =
+                    "{\"type\":\"m.room.name\",\"state_key\":\"\",\"sender\":\"@p:x\","
+                            + "\"content\":{\"name\":\"chat\"}}";
+            final String events =
+                    "first".equals(where)
+                            ? encryption + "," + member + "," + name
+                            : name + "," + member + "," + encryption;
+            final JsonNode invites =
+                    MatrixClient.JSON.readTree(
+                            "{\"!d:x\":{\"invite_state\":{\"events\":[" + events + "]}}}");
+
+            final List<String> declined = Direct.answerInvitations(client, "@t:x", null, invites);
+
+            assertThat(declined)
+                    .as("what was declined")
+                    .singleElement()
+                    .asString()
+                    .contains("@p:x");
+            final FakeHomeserver.Request leave = homeserver.requests().getFirst();
+            assertThat(leave.rawPath()).as("left").endsWith("/leave");
+            assertThat(MatrixClient.JSON.readTree(leave.body()).path("reason").asText())
+                    .as("the reason the person's client shows")
+                    .isEqualTo(Direct.ENCRYPTED);
+            assertThat(homeserver.requests()).as("nothing asked first").hasSize(1);
+        }
+    }
 }

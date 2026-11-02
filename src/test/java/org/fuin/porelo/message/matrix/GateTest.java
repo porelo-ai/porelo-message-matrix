@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1146,5 +1149,178 @@ class GateTest {
                 .as("only the first is answered")
                 .contains("Connection: close")
                 .containsOnlyOnce("HTTP/1.1 401");
+    }
+
+    private static final String WHOLE =
+            "POST /_matrix/client/v3/register HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Content-Length: 20\r\n\r\n{\"username\":\"alice\"}";
+
+    /** Both ends of a connection, with the gate serving one in a thread of its own. */
+    private final class Served implements AutoCloseable {
+
+        final Socket client;
+
+        final java.util.concurrent.atomic.AtomicReference<@Nullable Throwable> failed =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        private final Socket side;
+
+        private final Thread serving;
+
+        Served(final java.time.Duration limit) throws IOException {
+            this(limit, "", new java.util.concurrent.CountDownLatch(0));
+        }
+
+        /**
+         * @param first what the client has said before the gate starts reading, so that the limit
+         *     cannot run out before it is said
+         * @param hold what the closing of the connection waits for after the socket is closed, so
+         *     that the watch is still alive while the gate sees the close
+         */
+        Served(
+                final java.time.Duration limit,
+                final String first,
+                final java.util.concurrent.CountDownLatch hold)
+                throws IOException {
+            try (ServerSocket listening =
+                    new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+                client =
+                        new Socket(
+                                java.net.InetAddress.getLoopbackAddress(),
+                                listening.getLocalPort());
+                side = listening.accept();
+            }
+            client.setSoTimeout(15_000);
+            say(first);
+            serving =
+                    Thread.ofVirtual()
+                            .start(
+                                    () -> {
+                                        try {
+                                            gate.serve(
+                                                    side.getInputStream(),
+                                                    side.getOutputStream(),
+                                                    () -> {
+                                                        side.close();
+                                                        await(hold);
+                                                    },
+                                                    limit);
+                                        } catch (final IOException | RuntimeException ex) {
+                                            failed.set(ex);
+                                        }
+                                    });
+        }
+
+        private static void await(final java.util.concurrent.CountDownLatch hold) {
+            try {
+                hold.await(15, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (final InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        void say(final String wire) throws IOException {
+            client.getOutputStream().write(wire.getBytes(StandardCharsets.UTF_8));
+            client.getOutputStream().flush();
+        }
+
+        /** One whole answer: its head, and the body that head says follows. */
+        String answer() throws IOException {
+            final var in = served();
+            final var head = new StringBuilder();
+            while (head.indexOf("\r\n\r\n") < 0) {
+                final int b = in.read();
+                if (b < 0) {
+                    throw new java.io.EOFException("the connection ended after: " + head);
+                }
+                head.append((char) b);
+            }
+            final var length =
+                    java.util.regex.Pattern.compile("(?i)content-length: *([0-9]+)").matcher(head);
+            if (length.find()) {
+                in.readNBytes(Integer.parseInt(length.group(1)));
+            }
+            return head.toString();
+        }
+
+        private java.io.InputStream served() throws IOException {
+            return client.getInputStream();
+        }
+
+        boolean ended() throws InterruptedException {
+            return serving.join(java.time.Duration.ofSeconds(15));
+        }
+
+        @Override
+        public void close() throws IOException {
+            client.close();
+            try {
+                if (!ended()) {
+                    throw new IOException("the gate is still serving a client that left");
+                }
+            } catch (final InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted", ex);
+            } finally {
+                side.close();
+            }
+            final Throwable failure = failed.get();
+            if (failure != null) {
+                throw new IOException("the gate failed while serving", failure);
+            }
+        }
+    }
+
+    /** Harm guarded: a client stopping halfway holds a gate process for as long as it likes. */
+    @Test
+    void aClientStoppingHalfwayLosesItsConnectionAndIsAnsweredNothing() throws Exception {
+        try (Served served =
+                new Served(
+                        java.time.Duration.ofMillis(200),
+                        "POST /_matrix/client/v3/register HTTP/1.1\r\nHost: loc",
+                        new java.util.concurrent.CountDownLatch(0))) {
+            assertThat(served.client.getInputStream().read())
+                    .as("the connection ends, with no answer")
+                    .isEqualTo(-1);
+            assertThat(served.ended()).as("the gate's process is free").isTrue();
+            assertThat(served.failed.get()).as("nothing thrown").isNull();
+        }
+        assertThat(log.toString(StandardCharsets.UTF_8))
+                .as("a client gone is no refusal")
+                .isEmpty();
+    }
+
+    /**
+     * Harm guarded: the watch fires on a request that arrived whole, and a client pausing between
+     * two loses its connection though neither took long.
+     */
+    @Test
+    void aClientWhoseRequestsEachArriveInTimeKeepsItsConnection() throws Exception {
+        final java.time.Duration limit = java.time.Duration.ofMillis(6_000);
+        try (Served served = new Served(limit)) {
+            for (int i = 0; i < 2; i++) {
+                Thread.sleep(3_500);
+                served.say(WHOLE);
+                assertThat(served.answer())
+                        .as("request %d's answer", i)
+                        .contains("HTTP/1.1 401")
+                        .doesNotContain("Connection: close");
+            }
+        }
+    }
+
+    /** Harm guarded: closing for idling reads as a bad request: an answer and a line for nobody. */
+    @Test
+    void closingForIdlingIsNeverAnsweredOrLogged() throws Exception {
+        final var hold = new java.util.concurrent.CountDownLatch(1);
+        try (Served served =
+                new Served(java.time.Duration.ofMillis(1), "POST / HTTP/1.1\r\nHost: loc", hold)) {
+            assertThat(served.client.getInputStream().read()).as("no answer").isEqualTo(-1);
+            assertThat(served.ended()).as("the gate's process is free").isTrue();
+            assertThat(served.failed.get()).as("nothing thrown").isNull();
+        } finally {
+            hold.countDown();
+        }
+        assertThat(log.toString(StandardCharsets.UTF_8)).as("no line").isEmpty();
     }
 }

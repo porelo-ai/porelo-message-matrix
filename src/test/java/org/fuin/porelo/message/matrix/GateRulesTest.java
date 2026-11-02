@@ -4,9 +4,92 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class GateRulesTest {
+
+    /** Harm guarded: a valid forwarded client at the highest TCP port cannot receive its login. */
+    @Test
+    void allowsTheHighestTcpPortForTheForwardedClient() {
+        assertThat(
+                        GateRules.redirectAllowed(
+                                "http://walk.localhost:65535/callback", "walk.localhost:65535"))
+                .as("65535 is a usable TCP port on the same forwarded authority")
+                .isTrue();
+    }
+
+    /** Harm guarded: malformed Matrix identities are mistaken for accounts owned by a login. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("localparts")
+    void extractsOnlyWellFormedLocalparts(String account, String expected) {
+        assertThat(GateRules.localpart(account)).as("localpart of %s", account).isEqualTo(expected);
+    }
+
+    private static Stream<Arguments> localparts() {
+        return Stream.of(
+                Arguments.of("@a:s", "a"),
+                Arguments.of("@:s", ""),
+                Arguments.of("@a:", ""),
+                Arguments.of("@a:s t", ""),
+                Arguments.of("@a:s@t", ""));
+    }
+
+    /** Harm guarded: malformed or overlong accounts gain another login's authority. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("ownershipEdges")
+    void ownershipEnforcesLoginAndLengthBoundaries(
+            String reason, String account, String login, boolean expected) {
+        assertThat(GateRules.belongs(account, login)).as(reason).isEqualTo(expected);
+    }
+
+    private static Stream<Arguments> ownershipEdges() {
+        return Stream.of(
+                Arguments.of(
+                        "invalid login cannot own an exact matching account",
+                        "Alice",
+                        "Alice",
+                        false),
+                Arguments.of(
+                        "160 character localpart is usable",
+                        "x".repeat(154) + ".alice",
+                        "alice",
+                        true),
+                Arguments.of(
+                        "161 character localpart is refused",
+                        "x".repeat(155) + ".alice",
+                        "alice",
+                        false));
+    }
+
+    /** Harm guarded: unsafe redirect parsing hands a login token to an unintended destination. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("redirectRefusals")
+    void refusesRedirectsAtTheRemainingSafetyEdges(String reason, String url, String host) {
+        assertThat(GateRules.redirectAllowed(url, host)).as(reason).isFalse();
+    }
+
+    private static Stream<Arguments> redirectRefusals() {
+        final String host = "walk.localhost:8448";
+        final String base = "http://" + host + "/";
+        return Stream.of(
+                Arguments.of("invalid URI", "http://[", host),
+                Arguments.of("raw non-ASCII character", base + "é", host),
+                Arguments.of("raw DEL character", base + "\u007f", host),
+                Arguments.of("encoded carriage return", base + "%0d", host),
+                Arguments.of("encoded line feed", base + "%0A", host),
+                Arguments.of("existing login token on HTTP client", base + "?loginToken=old", host),
+                Arguments.of("encoded login token key", base + "?%6coginToken=old", host),
+                Arguments.of("ambiguous query", base + "?x=1&x=2", host),
+                Arguments.of(
+                        "port exceeds TCP range",
+                        "http://walk.localhost:65536/",
+                        "walk.localhost:65536"),
+                Arguments.of("non-loopback HTTP authority", "http://example.org/", "example.org"));
+    }
 
     /** Harm guarded: a person uses a different login's accounts or the administrator. */
     @Test

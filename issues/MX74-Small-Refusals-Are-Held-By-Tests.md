@@ -1,6 +1,6 @@
 # MX74 — Small Refusals Are Held By Tests
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - single cases in test classes that exist.
 
 **What must be true.** The smaller refusals, each cheap to hold, fail a unit test if removed.
@@ -19,3 +19,12 @@
 - Measured: PIT kills the mutants of these checks.
 - Seen to fail: each case.
 - Dropped rather than forced: a case whose test would need root or a second account is named here and left out.
+
+## Measured
+
+PIT killed the checks named here, with these left out:
+
+- **Dropped:** a launcher group-writable alone needs a root-owned fixture. `PodmanUnit`, 83 mutants without coverage, runs
+  against a real podman in the integration tests.
+- **No longer there:** a token file's warnings went with `registration_token_file`.
+- **Held already:** `clear`'s forms in `LocalHomeserverTest`, an option with no value and an id too long in `SendTest`.

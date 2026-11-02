@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -173,6 +174,35 @@ class KeepRoomTest {
         }
     }
 
+    /** Harm guarded: someone who cannot be taken out keeps the helper in a loop for good. */
+    @Test
+    void whoStaysInAfterTheLastRoundIsATemporaryFailure() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final MatrixClient admin =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "token", null, true));
+            final Map<String, String> members = new LinkedHashMap<>();
+            members.put("@porelo:example.org", "join");
+            members.put("@bob:example.org", "join");
+            homeserver.answer(200, membership(members).toString());
+            for (int round = 0; round < 5; round++) {
+                homeserver.answer(200, "{}").answer(200, membership(members).toString());
+            }
+
+            assertThatThrownBy(
+                            () ->
+                                    KeepRoom.keepTo(
+                                            admin,
+                                            "!r",
+                                            "#porelo-p:example.org",
+                                            "example.org",
+                                            List.of()))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure -> assertThat(failure.exitCode()).isEqualTo(Exit.TEMPORARY))
+                    .hasMessageContaining("after 5 rounds");
+        }
+    }
+
     private static com.fasterxml.jackson.databind.JsonNode membership(
             final Map<String, String> members) {
         final var answer = MatrixClient.JSON.createObjectNode();
@@ -184,5 +214,21 @@ class KeepRoomTest {
                                 .putObject("content")
                                 .put("membership", membership));
         return answer;
+    }
+
+    /** Harm guarded: a valid membership list cannot reconcile. */
+    @Test
+    void exactlyFiveHundredPersonsReachTheCredentialCheck() throws Exception {
+        gate();
+        final String persons =
+                java.util.stream.IntStream.rangeClosed(1, 500)
+                        .mapToObj(i -> "host" + i)
+                        .collect(java.util.stream.Collectors.joining(","));
+        assertThat(run("{\"secrets\":{}}", "keep-room", "--project", "demo", "--persons", persons))
+                .as("valid maximum-size list reaches the missing-token check")
+                .isEqualTo(Exit.CONFIG);
+        assertThat(error())
+                .as("the list was accepted before credential validation")
+                .contains("administrator's token");
     }
 }

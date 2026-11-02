@@ -13,6 +13,15 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class LoginTest {
 
+    /** Harm guarded: a malformed account is accepted as a person and receives a direct message. */
+    @ParameterizedTest
+    @ValueSource(strings = {"@.alice:x", "@:alice:x"})
+    void aLeadingSeparatorIsNoPerson(final String id) {
+        assertThat(Login.person(id, "x"))
+                .as("a leading separator is not a person's account: %s", id)
+                .isFalse();
+    }
+
     @ParameterizedTest
     @ValueSource(
             strings = {

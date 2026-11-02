@@ -639,4 +639,76 @@ class SendTest {
                     .doesNotContain(TOKEN);
         }
     }
+
+    private static byte[] bytes(final String text) {
+        return text.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Harm guarded: another message under the same id is dropped by the homeserver as a retry. */
+    @Test
+    void aTransactionIsThePairAndNothingElse() {
+        final String id = Send.transactionId(bytes("message"), bytes("signature"));
+
+        assertThat(Send.transactionId(bytes("message"), bytes("signature")))
+                .as("the same pair")
+                .isEqualTo(id);
+        assertThat(Send.transactionId(bytes("massage"), bytes("signature")))
+                .as("another message of the same length")
+                .isNotEqualTo(id);
+        assertThat(Send.transactionId(bytes("message"), bytes("other")))
+                .as("another signature")
+                .isNotEqualTo(id);
+        assertThat(Send.transactionId(bytes("ab"), bytes("c")))
+                .as("where the message ends counts")
+                .isNotEqualTo(Send.transactionId(bytes("a"), bytes("bc")));
+    }
+
+    /** Harm guarded: a long line to a person is refused by the homeserver, and the message lost. */
+    @Test
+    void aDirectMessageWithALongLineStillFits() throws IOException {
+        homeserver
+                .answer(200, "{\"user_id\":\"@t.alice:matrix.test\"}")
+                .answer(200, "{\"@bob:matrix.test\":[\"!d:matrix.test\"]}")
+                .answer(200, "{\"membership\":\"join\"}")
+                .answer(200, "{\"event_id\":\"$e\"}");
+        final Path full =
+                Files.writeString(dir.resolve("full"), "\u0001".repeat(Describe.MAX_BYTES));
+        final Path line = Files.writeString(dir.resolve("line"), "line ".repeat(20_000));
+
+        final int exit =
+                send(
+                        Map.of(
+                                Config.HOMESERVER,
+                                homeserver.url(),
+                                Config.ACCESS_TOKEN,
+                                TOKEN,
+                                Config.LOGIN,
+                                "alice"),
+                        full.toString(),
+                        signature.toString(),
+                        "--to",
+                        "@bob:matrix.test",
+                        "--shown",
+                        line.toString());
+
+        assertThat(exit).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        final byte[] sent = homeserver.requests().getLast().body().getBytes(StandardCharsets.UTF_8);
+        assertThat(sent).as("the event").hasSizeLessThanOrEqualTo(Send.CONTENT_BYTES);
+        assertThat(MatrixClient.JSON.readTree(sent).path("body").asText())
+                .as("the line, cut")
+                .startsWith("line line")
+                .contains("(cut; ");
+    }
+
+    /** Harm guarded: a room id the homeserver can hold is refused, or one it cannot is sent. */
+    @ParameterizedTest(name = "{0} bytes")
+    @CsvSource({"255, 0", "256, 64"})
+    void aRoomIdIsTakenUpToItsLimit(final int bytes, final int exit) {
+        homeserver.answer(200, "{\"event_id\":\"$abc\"}");
+        final String id = "!" + "a".repeat(bytes - 1);
+
+        assertThat(send(message.toString(), signature.toString(), "--to", id))
+                .as("%d bytes: %s", bytes, stderr())
+                .isEqualTo(exit);
+    }
 }

@@ -125,6 +125,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A connection the gate closes for idling no longer reads as a bad request, with an answer to nobody and an
+  exception.
 - A person's provisioning account invited into the room before it registered joins at its first `setup`,
   not only at the second. A central `setup` not yet admitted answers `address` and `room`, so Porelo names the account
   a person lets in and the room.
