@@ -22,7 +22,7 @@ the XDG default in the account's home directory.
 | Server name, part of every account id; fixed once the database exists | `PORELO_MATRIX_SERVER_NAME` in the same file | `localhost` |
 | Registration token, made on first start, readable by the account alone | `$XDG_CONFIG_HOME/porelo/matrix/tokens/registration-token`; the unit mounts the directory `tokens` | - |
 | Database | the podman volume `porelo-matrix-homeserver` | - |
-| Backups, up to 48, made on `SIGUSR2`; the account's alone, since they hold every token and password hash | `$XDG_STATE_HOME/porelo/matrix/backups` | - |
+| Backups, up to 96, made on `SIGUSR2`, two for each `backup`; the account's alone, since they hold every token and password hash | `$XDG_STATE_HOME/porelo/matrix/backups` | - |
 | Container | `matrix-homeserver`, acted on only by the id in `$XDG_RUNTIME_DIR/porelo-matrix-homeserver.cid` | - |
 | Environment file the unit hands podman, written before every start: empty, or in gate mode the homeserver's private socket | `tls.env` beside `homeserver.conf` | - |
 

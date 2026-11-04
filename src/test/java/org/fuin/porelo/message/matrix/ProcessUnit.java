@@ -211,7 +211,7 @@ final class ProcessUnit implements Unit, AutoCloseable {
         settings.put("TUWUNEL_PORT", Integer.toString(port));
         settings.put("TUWUNEL_DATABASE_PATH", data.toString());
         settings.put("TUWUNEL_DATABASE_BACKUP_PATH", Keep.backups(env).toString());
-        settings.put("TUWUNEL_DATABASE_BACKUPS_TO_KEEP", "48");
+        settings.put("TUWUNEL_DATABASE_BACKUPS_TO_KEEP", "96");
         settings.put("TUWUNEL_ALLOW_FEDERATION", "false");
         if (serving) {
             settings.put("TUWUNEL_ALLOW_REGISTRATION", "true");

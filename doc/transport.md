@@ -201,11 +201,12 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
 
 | Command | What it does | What it prints |
 |---|---|---|
-| `backup <dir>` | Into an empty `<dir>`: the poll positions, then an online backup the running homeserver makes (asked by `SIGUSR2`), its backup directory as it stands, and `homeserver.conf`. A second `backup` waits for the first | `{"backup": <id>}` |
+| `backup <dir>` | Into an empty `<dir>`: under its locks, an online backup the running homeserver makes (asked by `SIGUSR2`) to let an earlier one finish, the poll positions, a second such backup, its backup directory up to that one, and `homeserver.conf`. A second `backup` waits for the first | `{"backup": <id>}` |
 | `restore <dir>` | Before the first `setup`, with the unit stopped: puts a copy back - `homeserver.conf`, the backups, the poll positions - and has the homeserver restore the newest backup in a run of its own. Where the homeserver has a database already, it restores nothing and leaves it as it is | `{"restore": <id>}`, or `{"restore": "present"}` |
 
-- **`backup`:** 0 done; 75 when the homeserver is not running or no backup appears within 60 s; 78 without the
-  installed unit, or when `<dir>` is missing or not empty. A `backup` that fails leaves `<dir>` empty again.
+- **`backup`:** 0 done; 75 when the homeserver is not running, a lock stays held for its budget, or the two backups do not
+  appear within 60 s; 78 without the installed unit, or when `<dir>` is missing or not empty, also when another `backup` filled
+  it in the meantime, which is left as it is. Otherwise a `backup` that fails after finding `<dir>` empty under its locks leaves it empty again.
 - **`restore`:** 0 restored or present; 78 when the unit runs without its database, when `<dir>` holds no whole
   backup, a link, or anything but positions among the positions, when this account's `homeserver.conf` names another port or server name, or when backups or
   poll positions of another database are here. A restore that fails takes away what it made.

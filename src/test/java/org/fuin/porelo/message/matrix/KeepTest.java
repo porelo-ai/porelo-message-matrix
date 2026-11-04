@@ -13,6 +13,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -233,18 +237,7 @@ class KeepTest {
         Files.createDirectories(state.resolve("refs"));
         Files.writeString(state.resolve("refs/event"), "reference");
         Files.createDirectories(Keep.backups(env).resolve("meta"));
-        final StandIn answering =
-                new StandIn() {
-                    @Override
-                    public void signalBackup() throws Failure {
-                        try {
-                            Files.writeString(Keep.backups(env).resolve("meta/1"), "snapshot");
-                        } catch (final IOException failure) {
-                            throw new Failure(
-                                    Exit.CONFIG, "cannot make the test snapshot", failure);
-                        }
-                    }
-                };
+        final StandIn answering = new Snapshotting(0);
         answering.active = true;
         final Path into = Files.createDirectory(dir.resolve("into"));
 
@@ -425,21 +418,7 @@ class KeepTest {
         Files.createDirectories(Keep.backups(env).resolve("meta"));
         Files.createDirectories(conf().getParent());
         Files.writeString(conf(), "PORELO_MATRIX_PORT=8008\n", StandardCharsets.UTF_8);
-        final StandIn answering =
-                new StandIn() {
-                    @Override
-                    public void signalBackup() throws Failure {
-                        try {
-                            final Path backups = Keep.backups(env);
-                            Files.createDirectories(backups.resolve("private/7"));
-                            Files.writeString(backups.resolve("private/7/CURRENT"), "database");
-                            Files.writeString(backups.resolve("meta/7"), "snapshot");
-                        } catch (final IOException failure) {
-                            throw new Failure(
-                                    Exit.CONFIG, "cannot make the test snapshot", failure);
-                        }
-                    }
-                };
+        final StandIn answering = new Snapshotting(5);
         answering.active = true;
         final Path into = Files.createDirectory(dir.resolve("into"));
 
@@ -539,6 +518,141 @@ class KeepTest {
             done.add("start");
             super.start();
         }
+    }
+
+    /** As the homeserver does: each signal's snapshot in turn, its mark written last. */
+    private class Snapshotting extends StandIn {
+
+        private long last;
+
+        Snapshotting(final long last) {
+            this.last = last;
+            active = true;
+        }
+
+        @Override
+        public void signalBackup() throws Failure {
+            signals++;
+            last++;
+            try {
+                final Path backups = Keep.backups(env);
+                Files.createDirectories(backups.resolve("private/" + last));
+                Files.writeString(backups.resolve("private/" + last + "/CURRENT"), "database");
+                Files.writeString(backups.resolve("meta/" + last), "snapshot");
+            } catch (final IOException failure) {
+                throw new Failure(Exit.CONFIG, "cannot make the test snapshot", failure);
+            }
+        }
+    }
+
+    /**
+     * Harm guarded: a dead backup's snapshot, older than the positions, is taken for this one, so
+     * the restored relay never hands over what came between them.
+     */
+    @Test
+    void aSnapshotADeadBackupAskedForIsNotTakenForThisOne() throws Exception {
+        final Path state = Files.createDirectories(Poll.stateDirectory(env));
+        final Path position = state.resolve("abc.since");
+        Files.writeString(position, "before the dead backup's snapshot finished\n");
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        final Path meta = Files.createDirectories(Keep.backups(env).resolve("meta"));
+        // Each snapshot takes a moment; the dead backup's, number 6, finishes after the first
+        // signal.
+        final String moved = "moved on since the dead backup's snapshot began\n";
+        final StandIn late;
+        try (var timer = Executors.newSingleThreadScheduledExecutor()) {
+            late =
+                    new StandIn() {
+                        private long last = 5;
+
+                        @Override
+                        public void signalBackup() {
+                            signals++;
+                            final long snapshot = ++last;
+                            timer.schedule(
+                                    () -> {
+                                        Files.writeString(position, moved);
+                                        return Files.writeString(
+                                                meta.resolve(Long.toString(snapshot)), "snapshot");
+                                    },
+                                    100,
+                                    TimeUnit.MILLISECONDS);
+                        }
+                    };
+            late.active = true;
+
+            final var answer = Keep.backup(into, env, late, Duration.ofSeconds(5));
+
+            assertThat(answer.path("backup").asLong())
+                    .as("a snapshot asked for under this backup's locks, not number 6")
+                    .isEqualTo(7);
+        }
+        assertThat(late.signals).as("one to drain, one of its own").isEqualTo(2);
+        assertThat(into.resolve("positions/abc.since"))
+                .as("the positions, copied once the earlier snapshot is done")
+                .hasContent(moved.strip());
+    }
+
+    /**
+     * Harm guarded: a snapshot that finished during the copy has its mark there and not all its
+     * files, and a restore takes the newest mark.
+     */
+    @Test
+    void aMarkNewerThanTheOneReportedDoesNotStayInTheCopy() throws Exception {
+        final Path meta = Files.createDirectories(dir.resolve("backups/meta"));
+        Files.writeString(meta.resolve("7"), "reported");
+        Files.writeString(meta.resolve("8"), "finished during the copy");
+        Files.writeString(meta.resolve("6"), "older");
+        final Path copy = dir.resolve("copy");
+        Files.createDirectories(copy);
+
+        Keep.copySnapshot(dir.resolve("backups"), copy, 7);
+
+        assertThat(copy.resolve("meta/8")).as("a restore cannot take it").doesNotExist();
+        assertThat(copy.resolve("meta/7")).as("what was reported").exists();
+        assertThat(copy.resolve("meta/6")).as("an older one is whole").exists();
+    }
+
+    /** Harm guarded: a second backup empties the copy the first one reported as made. */
+    @Test
+    void aSecondBackupIntoTheSameDirectoryLeavesTheFirstOnesCopyWhole() throws Exception {
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        final CountDownLatch checkedEmpty = new CountDownLatch(1);
+        final CountDownLatch firstDone = new CountDownLatch(1);
+        final Snapshotting second =
+                new Snapshotting(100) {
+                    @Override
+                    public boolean active() {
+                        checkedEmpty.countDown();
+                        try {
+                            firstDone.await();
+                        } catch (final InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return true;
+                    }
+                };
+        final CompletableFuture<Failure> refused =
+                CompletableFuture.supplyAsync(
+                        () -> {
+                            try {
+                                Keep.backup(into, env, second, Duration.ofSeconds(5));
+                                return null;
+                            } catch (final Failure failure) {
+                                return failure;
+                            }
+                        });
+        checkedEmpty.await();
+
+        Keep.backup(into, env, new Snapshotting(5), Duration.ofSeconds(5));
+        firstDone.countDown();
+
+        assertThat(refused.get(30, TimeUnit.SECONDS))
+                .as("the second is refused, as a directory no longer empty")
+                .isNotNull()
+                .hasMessageContaining("not empty");
+        assertThat(into.resolve("database/meta/7")).as("the first one's copy stays").exists();
     }
 
     /** Harm guarded: a password taken back from a run that failed leaves the homeserver down. */

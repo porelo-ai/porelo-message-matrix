@@ -141,43 +141,94 @@ final class Keep {
         }
         final Path state = Poll.stateDirectory(env);
         final long id;
-        boolean done = false;
         try {
             Files.createDirectories(state);
             // New polls yield before the positions lock, so overlapping polls cannot starve us.
             try (FileChannel wanted = lockFile(state, WANTED);
-                    FileLock intent = exclusive(wanted, started, lockWait)) {
-                try (FileChannel channel = lockFile(state);
-                        FileLock held = exclusive(channel, started, lockWait)) {
-                    // The positions first: taken before the backup, none points past what it holds.
-                    copyPositions(state, dir.resolve(POSITIONS));
-                    final long before = newest(backups.resolve("meta")).orElse(0);
-                    unit.signalBackup();
-                    id = awaitBackup(backups.resolve("meta"), before, wait);
-                    // Still held: a later backup thins the old ones, and would remove files being
-                    // copied.
-                    copyTree(backups, dir.resolve(DATABASE));
+                    FileLock intent = exclusive(wanted, started, lockWait);
+                    FileChannel channel = lockFile(state);
+                    FileLock held = exclusive(channel, started, lockWait)) {
+                // Another backup may have filled it while this one waited for the locks.
+                if (!empty(dir)) {
+                    throw new Failure(
+                            Exit.CONFIG, dir + " is not empty: a copy goes into an empty one");
                 }
-                final Path conf = LocalHomeserver.directory(env).resolve(CONF);
-                if (Files.isRegularFile(conf)) {
-                    Files.copy(conf, dir.resolve(CONF));
-                }
+                id = fill(dir, env, unit, wait, backups, state);
             }
-            done = true;
         } catch (final IOException ex) {
             throw new Failure(Exit.CONFIG, "cannot copy into " + dir + ": " + ex.getMessage(), ex);
+        }
+        return MatrixClient.JSON.createObjectNode().put("backup", id);
+    }
+
+    /**
+     * Fills a target found empty, with both locks held to the end: emptied after they are released,
+     * it could be another backup's by then.
+     */
+    private static long fill(
+            final Path dir,
+            final Map<String, String> env,
+            final Unit unit,
+            final Duration wait,
+            final Path backups,
+            final Path state)
+            throws Failure, IOException {
+        boolean done = false;
+        try {
+            final Path meta = backups.resolve("meta");
+            // From here: the wait for the locks has a budget of its own.
+            final Instant deadline = Instant.now().plus(wait);
+            // What a backup that died asked for may still be running, and is older than the
+            // positions: under these locks no poll moves them, so what follows holds all they name.
+            snapshot(unit, meta, deadline, wait);
+            // The positions first: taken before the backup, none points past what it holds.
+            copyPositions(state, dir.resolve(POSITIONS));
+            final long id = snapshot(unit, meta, deadline, wait);
+            // Still held: a later backup thins the old ones, and would remove files being copied.
+            copySnapshot(backups, dir.resolve(DATABASE), id);
+            final Path conf = LocalHomeserver.directory(env).resolve(CONF);
+            if (Files.isRegularFile(conf)) {
+                Files.copy(conf, dir.resolve(CONF));
+            }
+            done = true;
+            return id;
         } finally {
             if (!done) {
                 // Found empty: a half copy left in it could be taken for a whole one.
                 emptyAgain(dir);
             }
         }
-        return MatrixClient.JSON.createObjectNode().put("backup", id);
     }
 
-    private static long awaitBackup(final Path meta, final long before, final Duration wait)
+    /** A snapshot finished during the copy has its mark there, and perhaps not all its files. */
+    static void copySnapshot(final Path backups, final Path into, final long id)
+            throws IOException {
+        copyTree(backups, into);
+        try (Stream<Path> files = Files.list(into.resolve("meta"))) {
+            for (final Path file : files.toList()) {
+                final String name = file.getFileName().toString();
+                if (name.matches("[0-9]{1,18}") && Long.parseLong(name) > id) {
+                    Files.delete(file);
+                }
+            }
+        }
+    }
+
+    /**
+     * Signals once and waits for a snapshot newer than any so far. The homeserver makes snapshots
+     * in signal order, so the one that appears may be an earlier signal's.
+     */
+    private static long snapshot(
+            final Unit unit, final Path meta, final Instant deadline, final Duration wait)
             throws Failure, IOException {
-        final Instant deadline = Instant.now().plus(wait);
+        final long before = newest(meta).orElse(0);
+        unit.signalBackup();
+        return awaitBackup(meta, before, deadline, wait);
+    }
+
+    private static long awaitBackup(
+            final Path meta, final long before, final Instant deadline, final Duration wait)
+            throws Failure, IOException {
         while (true) {
             final OptionalLong newest = newest(meta);
             if (newest.isPresent() && newest.getAsLong() > before) {

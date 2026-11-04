@@ -6,6 +6,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 |---|---|
 | [Identity by the host's login, registration by the gate](#identity-by-the-hosts-login-registration-by-the-gate) | A Unix-socket gate binds every client request to an admitted host login; only the gate provisions accounts. |
 | [A socket says nothing of what is behind it](#a-socket-says-nothing-of-what-is-behind-it) | The registration challenge tells a gate from a tunnel, and a token goes over a socket only to a listener of the running account. |
+| [A backup drains what came before it](#a-backup-drains-what-came-before-it) | `backup` signals twice under its locks and copies the second snapshot, covering one earlier backup that died, not two. |
 | [The homeserver is Tuwunel](#the-homeserver-is-tuwunel) | Built and tested against Tuwunel, pinned by digest; Conduit is the measured alternative. |
 | [A message is a text event: a line for a person, the message and its signature beside it](#a-message-is-a-text-event-a-line-for-a-person-the-message-and-its-signature-beside-it) | One `m.text` event: the line for a person as its body, the message and its signature in fields of their own. |
 | [A person's words reach the tasks; whom they are meant for is what Matrix states](#a-persons-words-reach-the-tasks-whom-they-are-meant-for-is-what-matrix-states) | A person's text in the room and in a direct chat reaches the tasks; mentions and replies say whom it is meant for. |
@@ -338,6 +339,20 @@ transport does not check that directory, so a `unix:` path a project names elsew
 protection.
 
 **What would change the answer:** a socket for this transport outside a person's own directory.
+
+## A backup drains what came before it
+
+**Decided:** under its locks, where no poll moves a position, `backup` signals and waits for a new snapshot, copies the
+positions, signals again, and copies the snapshot that appears. The homeserver makes snapshots in signal order and names none
+by its signal. So the second one is at worst the first signal's, asked for under the same locks, and holds all the
+positions point to.
+
+**Accepted risk:** two snapshots asked for before this backup and still unfinished when it starts would have the second of them
+taken for this one, and a restore from it would lose what a poll took between. One backup that gave up during its second wait
+leaves two, so it takes a snapshot running past the 60 s bound, then a poll, then the next backup while both still run. On a
+database of about 1 MB a snapshot takes about 10 ms; how long one takes at the size a project reaches is not measured.
+
+**What would change the answer:** the homeserver naming the signal a snapshot answers.
 
 ## No administrator on a central homeserver
 

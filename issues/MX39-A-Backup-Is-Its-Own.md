@@ -1,6 +1,6 @@
 # MX39 — A Backup Is Its Own
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one class, `Keep`, and its tests; no contract another repository reads.
 
 **What must be true.** A copy `backup <dir>` reports as made holds the homeserver's database and the poll positions
@@ -37,11 +37,14 @@ a directory another backup filled.
 
 ## Plan
 
-- **A backup drains before it copies.** Holding both locks, it signals once and waits for a new snapshot: since the
-  homeserver makes snapshots in signal order, every snapshot asked for before, a dead backup's too, is done once
-  this one is. Only then does it copy the positions, signal again, and take the next snapshot as its own.
-- **The target is checked again under the lock.** A target that is no longer empty is refused with 78 and left as
-  it is; on a failure a backup removes only the files it copied, never the directory's earlier content.
+- **A backup drains before it copies.** Holding both locks, where no poll moves a position, it signals once and waits for
+  a new snapshot, copies the positions, signals again, and takes the next snapshot as its own. The homeserver makes snapshots
+  in signal order, so with one earlier snapshot still running that is its first signal's, asked for under the same locks.
+- **A mark newer than the one reported is dropped from the copy:** a snapshot that finishes during the copy has its mark
+  there and perhaps not all its files, and a restore takes the newest.
+- **The target is checked again under the locks, and emptied only under them.** A target that is no longer empty is
+  refused with 78 and left as it is. That the emptying is under the locks has no test: it differs only if a run stops between
+  releasing them and emptying, which no test can make happen without a seam put there for it.
 - **`TUWUNEL_DATABASE_BACKUPS_TO_KEEP` goes from 48 to 96** in the unit, since each backup leaves two snapshots: so
   48 hours of hourly backups stay. RocksDB's backups share their unchanged files, so the extra snapshots cost little.
 - **Red first:** `KeepTest`, a fake unit whose snapshots complete in signal order and an earlier signal's snapshot
@@ -51,10 +54,5 @@ a directory another backup filled.
 
 ## Acceptance
 
-- A backup takes as its completion only the snapshot its own signal started, seen to fail with a late earlier one.
+- A backup does not take a snapshot asked for before its locks as its completion, seen to fail with a late earlier one.
 - A second `backup` into a directory the first one is filling leaves the first one's copy whole, seen to fail today.
-
-## To be checked
-
-- That snapshots stay in signal order with a database large enough that one takes seconds, measured on a test VM
-  while the build is checked.

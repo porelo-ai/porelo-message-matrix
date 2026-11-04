@@ -96,10 +96,14 @@ class KeepWriterPreferenceTest {
     private Unit answeringUnit() {
         final KeepTest.StandIn unit =
                 new KeepTest.StandIn() {
+                    private int snapshots;
+
                     @Override
                     public void signalBackup() throws Failure {
                         try {
-                            Files.writeString(Keep.backups(env).resolve("meta/1"), "snapshot");
+                            snapshots++;
+                            Files.writeString(
+                                    Keep.backups(env).resolve("meta/" + snapshots), "snapshot");
                         } catch (final IOException failure) {
                             throw new Failure(
                                     Exit.CONFIG, "cannot make the test snapshot", failure);
@@ -211,6 +215,48 @@ class KeepWriterPreferenceTest {
         }
     }
 
+    /**
+     * Harm guarded: a long wait for the locks leaves the homeserver no time, and no copy is made.
+     */
+    @Test
+    void theWaitForTheLocksDoesNotCountAgainstTheSnapshots() throws Exception {
+        final Process poll = poller("hold");
+        awaitHold(poll);
+        try (var timer = Executors.newSingleThreadScheduledExecutor()) {
+            timer.schedule(
+                    () -> {
+                        poll.getOutputStream().close();
+                        return null;
+                    },
+                    800,
+                    TimeUnit.MILLISECONDS);
+            // A snapshot that takes a moment, so only a wait still open sees it arrive.
+            final KeepTest.StandIn slow =
+                    new KeepTest.StandIn() {
+                        private int snapshots;
+
+                        @Override
+                        public void signalBackup() {
+                            final int snapshot = ++snapshots;
+                            timer.schedule(
+                                    () ->
+                                            Files.writeString(
+                                                    Keep.backups(env).resolve("meta/" + snapshot),
+                                                    "snapshot"),
+                                    50,
+                                    TimeUnit.MILLISECONDS);
+                        }
+                    };
+            slow.active = true;
+
+            final var answer = Keep.backup(into, env, slow, Duration.ofMillis(400), LOCK_BUDGET);
+
+            assertThat(answer.path("backup").asLong())
+                    .as("both snapshots, after a lock wait longer than their own")
+                    .isEqualTo(2);
+        }
+    }
+
     /** Harm guarded: overlapping poll loops must not prevent all backups of the conversation. */
     @Test
     void aBackupFinishesWithinTheLongestPollHoldPlusTwoSeconds() throws Exception {
@@ -231,7 +277,7 @@ class KeepWriterPreferenceTest {
         assertThat(Duration.ofNanos(System.nanoTime() - started))
                 .as("the longest running poll holds for at most three seconds")
                 .isLessThan(LOCK_BUDGET);
-        assertThat(into.resolve("database/meta/1"))
+        assertThat(into.resolve("database/meta/2"))
                 .as("the backup completed while all three poll loops still run")
                 .hasContent("snapshot");
         assertThat(into.resolve("positions/abc.since"))
