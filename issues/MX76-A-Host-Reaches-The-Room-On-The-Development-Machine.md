@@ -1,6 +1,7 @@
 # MX76 — A Host Reaches The Room On The Development Machine
 
-**Status:** Idea.
+**Status:** Implementing.
+**Size:** M - a script with its tests, the registration's challenge read, and the documents.
 
 **What must be true.** While agents move into tasks, a task on a rented host talks in the project's room on the
 development machine's homeserver, over one `ssh -R` the development machine opens to the host, to one socket only.
@@ -46,6 +47,28 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
   `per_day`.
 - **What it is not:** no second way into the homeserver for anything but the transport on the host, and no homeserver on
   the host for this project until the last agent has moved.
+
+## Plan
+
+- **The script, `build/lay-certificates.sh`, on the development machine:** it takes the login, the host, the project and
+  the certificate files a person signed. It checks each one with `ssh-keygen -L` before anything leaves: an Ed25519 user
+  certificate whose signature holds, no critical option, one principal `task:<project>:<name>`, not expired. One bad file
+  stops all of them. It signs nothing and reads no private key.
+- **On the host,** over one `ssh`, it writes `{"certificate":"<line>"}` as `<fingerprint>.json` into Porelo's
+  `task-certificates` under the account's state directory, with the fingerprint's `+` and `/` as `-` and `_`. It then asks
+  `porelo task certificate` whether Porelo finds that line. It refuses a record Porelo wrote itself, and leftovers of a run
+  that died.
+- **Telling a gate from the tunnel:** the homeserver's challenge says it. `Accounts.register` answers the dummy stage
+  where it is offered, and with no token where only the token stage is offered it stops with 78 naming the token. A
+  `unix:` or `*.localhost` homeserver takes a token where one was lent and asks none beforehand. No socket's path becomes
+  a contract.
+- **Red first:** `AccountsTest` for the challenge, `LayCertificatesTest` with the real `ssh-keygen` and stand-ins for `ssh`
+  and `porelo`.
+
+## Open questions
+
+- Porelo lends a token only to an https homeserver, so nothing reaches a `unix:` one. Which way a token reaches the
+  transport over the tunnel is undecided, and until it is, `setup` and `enroll` stop with 78 there.
 
 ## To be checked
 
