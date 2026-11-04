@@ -17,12 +17,13 @@ forge's build is green, and it is reached in the project's room under this repos
   after its nickname.
 - **The way back:** as the project's procedure for an agent's move lays out; the task's open work fetched into the local
   checkout first.
-- **The room during the move:** porelo-project's signed `project.yml` names
-  `homeserver: https://matrix.example.org:<port>` with the room, the CA as `ca_certificate` and
-  `registration_token_file`, naming the token's file in the account's configuration folder. The machine the room starts on resolves the name to
-  loopback and keeps its own homeserver's path, and the host resolves it to that machine's VPN address. After the last
-  move the project goes back to `{}`, with a new room on the host's own homeserver; that machine's room and its
-  homeserver data for the project are cleared then with `clear --project porelo` and `clear`.
+- **The room during the move:** the development machine opens `ssh -R` to the host, to one socket only, and
+  porelo-project's signed `project.yml` names that socket as `homeserver: unix:<path>` with the room; the registration
+  token is lent from the person's vault. The homeserver stays on the development machine until the last agent has
+  moved, since the host is rented for a few hours at a time and work there goes on without it. This path is not built
+  yet: [MX76](README.md#mx76). After the last move the project goes back to `{}`, with a new room on the host's own
+  homeserver; that machine's room and its homeserver data for the project are cleared then with
+  `clear --project porelo` and `clear`.
 
 ## To be checked
 
@@ -31,7 +32,6 @@ forge's build is green, and it is reached in the project's room under this repos
 - Which of the integration tests need podman itself (the packages' install legs, the unit's own start) and where
   they run instead: the forge's machines by kind, or the local VM until then.
 - That the agent working on the homeserver is never the one that restarts the homeserver its own room runs on during
-  the move: [MX42](README.md#mx42)'s published homeserver on the first machine carries the room until the last agent has
-  moved.
+  the move: the development machine's homeserver carries the room until the last agent has moved.
 - What of `.AGENTS.md`'s part for this repository moves into the task's settings, and what stays only here.
-- How a moved agent's task takes the local agents' lines: as a person's words, and whether the filter holds them.
+- How a moved agent's task takes the local agents' lines: open in [MX76](README.md#mx76).
