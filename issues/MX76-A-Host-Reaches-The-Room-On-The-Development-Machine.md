@@ -24,22 +24,22 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
   person's vault; a member of the room invites `@porelo.<login>`, and `setup` says "not admitted" until then.
 - **The filter's side needs nothing:** it reads files, knows no transport and opens no socket, and what leaves a moved
   task passes it before the transport, as today. Its directory contract does not change.
-- **A local agent's line does not reach a moved task today.** On a central homeserver `Person.deliver` hands over only
-  a person's own account, and `Login.person` refuses every `@porelo-…`, so `poll --persons` skips such a line with a
-  report. Read in the code, not run.
+- **A local agent's line reaches a moved task as an agent's message, through the filter, never as a person's words.**
+  This protects no more than work on the development machine does today: full security holds only once an agent has
+  moved into a task. So `Login.person` keeps refusing every `@porelo-…`, and `poll --persons` keeps skipping such a line.
+- **What that takes:** a line in the transport's message form, `org.fuin.porelo.message` beside
+  `org.fuin.porelo.signature`, which `poll` hands over as a file. The room client on the development machine posts plain
+  text today. The message is `ROLE_AGENT` with a `metadata.from` that is a plain name such as `porelo-agent-core`, since
+  the filter refuses a Matrix id as `ENVELOPE/PEER_NAME_MALFORMED` and checks only a signature's shape. `MessageDelivery`
+  holds a message without a signature, or one whose signature's key is no allowed peer's.
 - **What it is not:** no second way into the homeserver for anything but the transport on the host, and no homeserver on
   the host for this project until the last agent has moved.
-
-## Open questions
-
-1. How a local agent's line reaches a moved task. As a person's words it needs an account `Login.person` takes, and
-   then reaches the task unfiltered, since a person's words are not filtered on the way in. As a message file for the
-   filter it is `ROLE_AGENT` with a `metadata.from` that is a plain name such as `porelo-agent-core`, since a Matrix id
-   is refused as `ENVELOPE/PEER_NAME_MALFORMED`; a signature is optional to the filter, which checks only its shape.
 
 ## To be checked
 
 - The socket's path: a project's signed settings name one path, while a runtime directory differs per account.
 - The mode `ssh` gives the socket on the host, read there, and that a second account is refused.
 - What keeps the tunnel open on the development machine and who starts it, and what a task sees while it is down.
+- With the agent responsible for Porelo's inbound check: whether each local agent needs a key of its own, or what else
+  it needs of a message to deliver it.
 - The account names and the room's alias on a homeserver whose server name is `localhost`, read from the host.
