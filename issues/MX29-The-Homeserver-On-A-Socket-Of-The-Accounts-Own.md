@@ -14,16 +14,13 @@ such window: the filesystem decides who may connect, at every connection.
 
 ## The parts
 
-- **This repository:** the unit gives Tuwunel a unix socket instead of a loopback port, and since Java's
-  `HttpClient` reaches no unix socket, the transport needs a relay of its own; `PORELO_MATRIX_HOMESERVER` and
-  `setup`'s `reaches` name the socket.
-- **porelo:** `HelperEnvironment`, which passes `PORELO_MATRIX_HOMESERVER` to the transport; `TaskConversations`
-  in `app-messaging`, which reads `reaches` to keep an offline project on loopback; and the `MessagesJoined`
-  answer, which names the homeserver's loopback port.
-- **porelo-frontend:** its *Join* forwards that port over ssh to the person's computer, so a Matrix client there
-  reaches `localhost:<port>`; it would forward the socket to a local port of its own choosing and show that port.
-
-## To be checked
-
-- How the socket relates to the listener published for another machine on the VPN, which stays TCP and which a
-  socket under `$XDG_RUNTIME_DIR` does not replace.
+- **This repository:** the account's own homeserver takes the way a host's already has behind its gate. There the unit
+  gives Tuwunel a unix socket under `$XDG_RUNTIME_DIR`, the transport reaches it with `SocketWire`, and
+  `PORELO_MATRIX_HOMESERVER` (`unix:…`) and `setup`'s `reaches` name it. On the account's own homeserver
+  `LocalHomeserver` still starts a loopback port and `Listener` still checks its owner.
+- **porelo:** `TaskConversations` in `app-messaging` reads `reaches` to keep an offline project on loopback, and its
+  `loopback` counts only `127.0.0.1`, `::1` and `localhost`, so a socket's path must count as this machine. Porelo
+  passes on unchanged the login `join` answers, with `loopback` and `port`.
+- **porelo-frontend:** its *Join* reads that login as `MessagesJoined` and forwards the port over ssh to the person's
+  computer, so a Matrix client there reaches `localhost:<port>`; it would forward the socket to a local port of its own
+  choosing and show that port.

@@ -16,8 +16,9 @@ a project file, would put such a task in a room.
 
 ## Plan
 
-- `Lifecycle.options`: `--project default` refused with 78, before any settings are read or any request is made, for
-  `setup`, `enroll`, `join` and `members`. `retire`, `part` and `clear` stay allowed, so what is left over can go.
+- `Lifecycle.refuseARoomForTheDefaultProject`: `--project default` refused with 78, before any settings are read or any
+  request is made, for `setup`, `enroll` and `join`. `retire`, `part` and `clear` stay allowed, so what is left over can
+  go. `KeepRoom` refuses `keep-room` the same way and leaves `drop-room` allowed.
 - `doc/transport.md`: the rule in the verbs' table.
 - Red first: `LifecycleTest`: each refused verb with `--project default` ends 78 and starts no homeserver. Today `setup`
   goes on to start one.

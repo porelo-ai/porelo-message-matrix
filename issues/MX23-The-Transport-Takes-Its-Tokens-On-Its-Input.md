@@ -33,7 +33,8 @@ Read in the code: every verb reaches its secrets through the `env` map `Main.run
 lifecycle verbs' `env.get`), and the lifecycle verbs and `settings` read their settings with `Settings.read(in)`.
 So one new class, `Input`, resolves both in `Main.run` before the verb runs:
 
-- For the lifecycle verbs, `settings`, `check`, `send`, `poll`, `read`, `receipt` and `rename`, it reads standard
+- For the lifecycle verbs, `settings`, `check`, `send`, `poll`, `read`, `receipt`, `rename`, `expel`, `keep-room` and
+  `drop-room`, it reads standard
   input to its end, at most 1 MiB. An object with `settings` or `secrets` is the new way, any other key beside
   them refused: the verb gets `settings` (`{}` when absent) as its settings, and with `secrets` an environment
   with every `PORELO_MATRIX_*` key removed and the input's `secrets` laid over it. Anything else is the old way and passes through unchanged: the bare
@@ -41,7 +42,7 @@ So one new class, `Input`, resolves both in `Main.run` before the verb runs:
 - A secret's key that does not start with `PORELO_MATRIX_`, or a value that is not a string, is refused (78), so
   the input never sets `PATH`, `HOME` or the like.
 - The warning for `PORELO_MATRIX_TLS_VERIFY=off` moves after the resolution, so it reads the input's value.
-- `describe`, `room`, `homeserver-token`, `publish`, `backup` and `restore` read no input, as today: `room` is run
+- `describe`, `room`, `homeserver-token`, `gate`, `backup` and `restore` read no input: `room` is run
   by a person and refuses tokens in its environment, and the others get no secret.
 
 - A terminal on stdin is not read, so a person running a verb by hand is not kept waiting.

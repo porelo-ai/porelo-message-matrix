@@ -1,7 +1,7 @@
 # MX51 — Long Verbs Say How Far They Are
 
 **Status:** Backlog.
-**Size:** S - stderr lines in `LocalHomeserver.awaitUp`, `Keep` and `Publish`, with their tests; stdout's contract is
+**Size:** S - stderr lines in `LocalHomeserver.awaitUp` and `Keep`, with their tests; stdout's contract is
 unchanged.
 
 **What must be true.** A person who runs a command that waits on the homeserver sees what it waits for and how long
@@ -10,12 +10,11 @@ it has waited. A silent minute no longer looks like a hang.
 ## Plan
 
 Long CLI processes do not run without a status. The lines reach a person only once porelo shows a transport's
-stderr while the verb runs; until then only when the transport runs directly. The waits are `LocalHomeserver.awaitUp` (up to `START_TIMEOUT`, 180 s, after a start or restart: `setup`,
-`publish`, `restore`), `Keep` (`backup`/`restore`: stopping, copying, starting) and `Publish` (the certificate, then
-the restart).
+stderr while the verb runs; until then only when the transport runs directly. The waits are `LocalHomeserver.awaitUp` (up to `START_TIMEOUT`, 180 s, after a start or
+restart: `setup`, and `setup` after a restore) and `Keep` (`backup`: the lock, the snapshot, copying; `restore`: the
+one-off run; `setup` after a restore: stopping, the one-off run, starting).
 
-- Each writes one stderr line when a phase starts, then one every 10 s while it waits: `waiting for the homeserver on
-  127.0.0.1:8009 (20 s of 180)`. The last line before a timeout says what was waited for. Lines hold no secret: they
+- Each writes one stderr line when a phase starts, then one every 10 s while it waits: `waiting for the homeserver on 127.0.0.1:8008 (20 s of 180)`. The last line before a timeout says what was waited for. Lines hold no secret: they
   go through the same filter as the homeserver's last-error line.
 - stdout stays the one JSON answer. porelo shows a transport's stderr on a failure only; whether it shows these lines
   as they come is porelo's (To be checked).

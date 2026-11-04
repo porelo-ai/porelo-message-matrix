@@ -9,7 +9,7 @@
 
 `GateTest`, with its existing fake backend. What each case holds, none of it held today:
 
-- `aliasRefusal`: a `PUT` of `directory/room/#porelo-<project>:<server>` by someone who is no project admin is 403 and nothing is forwarded, as is a `PUT` not starting with `#`, an invalid project name and an unreadable admin list. Only a `GET` of the same path passes the check by.
+- `aliasRefusal`: a `PUT` of `directory/room/#porelo-<project>:<server>` by any client, a project admin's too, is 403 and nothing is forwarded, as is a `PUT` not starting with `#` and a reserved alias under a name no project could have. Only a `GET` of the same path passes the check by.
 - `login`: an `identifier` naming the caller beside a `user` naming another is 403; an `identifier` of a type other than `m.id.user` is 403; a body that is no JSON is 400; none reaches the homeserver.
 - `login` by token: the homeserver refusing the administrator's login is answered as it came, with no session.
 - `register`: a full name on another server is `M_INVALID_USERNAME`; an empty or non-text password and an `auth` other than `m.login.dummy` are `M_BAD_JSON`; a taken name is `M_USER_IN_USE`; a failed creation is answered and no login follows; a success is a session the gate built, not the homeserver's answer.
@@ -39,6 +39,3 @@ PIT on `Gate` alone, unit tests only: 208 mutants, 194 killed, 6 survived, 8 not
   [MX75](README.md#mx75). The negated check alone can be told apart without waiting, by a malformed request on a
   connection, but its only effect is a closed connection in place of a 400, so it guards no harm.
 - `run`, its three mutants: the real inherited socket, which only `GateIT` reaches, and PIT does not run it.
-
-`GateRules.aliasAllowed` checks the project's name as well as `aliasRefusal`: removing either check alone leaves the
-refusal in place, and a test fails only when both go.

@@ -47,8 +47,7 @@ On a test VM, against the pinned Tuwunel:
 
 ## The design
 
-- **The account's own homeserver only:** the central homeserver runs with a machine account
-  that has no homeserver-administrator rights in a person-created room and keeps its own lifecycle and ownership
+- **The account's own homeserver only:** the central homeserver runs with a person's account, `@porelo.<login>`, that has no homeserver-administrator rights in a person-created room and keeps its own lifecycle and ownership
   boundaries; this design applies to the account's own local homeserver.
 - **Anchored, collision-free namespace per project:** the application service's exclusive user namespace holds only
   that project's task accounts, never a person or the administrator, with an anchored, escaped regex and a
@@ -97,9 +96,7 @@ On a test VM, against the pinned Tuwunel:
 ## Harm
 
 - **Where the token lives:** `setup` returns the application service's token among its secrets, and the admin room
-  redacts the registration command and reply that carry it; Porelo keeps it in its vault under the project and hands
-  it to the transport on each run (in its environment today, on its input once [MX23](README.md#mx23) is built),
-  never in a file, a command line, a log line, or an unredacted room event. Lifecycle verbs still use the
+  redacts the registration command and reply that carry it; Porelo keeps it in its vault under the project and hands it to the transport on its input on each run, never in a file, a command line, a log line, or an unredacted room event. Lifecycle verbs still use the
   administrator's token and `join` logs in as the person to join, so the namespace confinement is specifically that
   of the application service's token.
 - **What a leak of the service token could do:** act as every task account of that one project — read the room and
@@ -154,8 +151,7 @@ On a test VM, against the pinned Tuwunel:
    `membersElsewhere` protects accounts *invited* into another project, which a joined-room listing misses, while
    counting the task's own lobby blocks retirement. `membersElsewhere` must exclude the project's lobby and keep
    protecting both joined and invited members.
-10. **Central homeservers cannot run this lifecycle (`Lifecycle.java`):** on a central homeserver the transport uses
-    a machine account without homeserver-administrator rights in a person-created room and cannot register services
+10. **Central homeservers cannot run this lifecycle (`Lifecycle.java`):** on a central homeserver the transport uses a person's account, `@porelo.<login>`, without homeserver-administrator rights in a person-created room and cannot register services
     or delete rooms via `!admin`. The central homeserver must keep its own lifecycle and ownership boundaries.
 11. **Reading as a task strips that task from `to` (`Person.java`):** `Person.deliver` removes `self` from
     recipients, so mentioning only the reading task produces an empty `to`, and historical messages can still

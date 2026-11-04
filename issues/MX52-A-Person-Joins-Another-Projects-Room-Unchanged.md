@@ -15,13 +15,12 @@ Seen in an operator's walk: `porelo talk join sluice-dry carol` answered `'carol
 without `--reset` only when `part` took it out of this room and it is in no other project's room.
 
 - In `join`, an existing account that is a member of another project's room on this homeserver (`membersElsewhere`)
-  and not of this one: the administrator invites it into this project's room (`invite`, as `admit` invites before a
-  join). No password is set and no session is touched.
+  and not of this one: the administrator invites it into this project's room (`invite`, as `joinRoom` does before a join). No password is set and no session is touched.
 - The answer for that case is `{"login":{"homeserver":…,"user":"@N:server","room":"#porelo-P:server"},"invited":true}`
   with no password, and `shown` says to accept the invitation in the person's client. With `--token`, it stays refused
   (77): a token needs a login, which needs the password.
 - An account in no project's room, or one that left by itself, is refused as today; `--reset` behaves as today.
-- Red first: `LocalHomeserverIT` joins a person to project A, then to project B without `--reset`. Today that is 77;
+- Red first: `LifecycleIT` joins a person to project A, then to project B without `--reset`. Today that is 77;
   expected 0, `invited`, the person invited into B's room and still a member of A's, and their login still valid.
 
 ## Acceptance
