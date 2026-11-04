@@ -35,11 +35,17 @@ sequence.
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
+## Analyzed
+
+| # | Size | Blocked by | Open questions | What it covers |
+|---|---|---|---|---|
+| <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | 0 | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes |
+
 ## Accepted
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
+| <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
 ## Idea
 

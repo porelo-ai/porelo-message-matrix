@@ -1,10 +1,10 @@
 # MX38 — A Room Shows No Helper
 
 **Status:** Accepted.
-**Size:** XL - every lifecycle verb, both polls, a registration and a migration; splits into the parts below.
+**Size:** XL - every lifecycle verb, both polls, a registration, a migration and the host's own way; splits into the parts below.
 
-**What must be true.** A person in the project's room sees only the people and the tasks among its members, never
-Porelo's administrator or a relay; tasks are enrolled and retired, people joined, and the room read for Porelo as
+**What must be true.** A person in the project's room, on the account's own homeserver and on a host behind its gate,
+sees only the people and the tasks among its members, never Porelo's administrator or a relay; tasks are enrolled and retired, people joined, and the room read for Porelo as
 today. Until then the helpers carry display names a person reads.
 
 ## Why
@@ -13,6 +13,8 @@ today. Until then the helpers carry display names a person reads.
   and invites every account) and `porelo-relay-<project>` (the account `poll --persons` reads the room with); neither
   helper is a participant a person talks with. Only their display names say what they are, and a line naming only
   them is marked `helpers` so that it wakes no task.
+- On a host it is the same to a person, and more of them: `keep-room` makes the room as the administrator, who stays a
+  member because a kick needs its power, and each login's Porelo has a relay of its own, `@porelo-relay-<P>.<login>`.
 
 ## Measured
 
@@ -47,8 +49,9 @@ On a test VM, against the pinned Tuwunel:
 
 ## The design
 
-- **The account's own homeserver only:** the central homeserver runs with a person's account, `@porelo.<login>`, that has no homeserver-administrator rights in a person-created room and keeps its own lifecycle and ownership
-  boundaries; this design applies to the account's own local homeserver.
+- **Where it holds:** the design below is the account's own homeserver's; *On a host* says what differs behind a gate. A
+  homeserver elsewhere runs with a person's account, `@porelo.<login>`, that has no homeserver-administrator rights in a
+  person-created room, and keeps its own lifecycle and ownership boundaries.
 - **Anchored, collision-free namespace per project:** the application service's exclusive user namespace holds only
   that project's task accounts, never a person or the administrator, with an anchored, escaped regex and a
   collision-free project encoding (as `enroll` and `retire` keep projects apart today) so two projects' names never
@@ -92,6 +95,24 @@ On a test VM, against the pinned Tuwunel:
   `setup` makes the lobby, sets the restricted rule, and has the relay and the administrator leave only once a task
   in the project's new namespace is in the lobby and the room as a reader; old task accounts outside the namespace
   keep their direct chats until their task is enrolled again.
+
+## On a host
+
+Read in the code, not measured on a host; everything measured above ran on the account's own homeserver's shape.
+
+- **Nobody's Porelo makes the room there:** the host's helper does, with `keep-room`, as the homeserver's account with
+  the gate's administrator token, reaching it through its private socket. So the registration, the lobby and the room's
+  making move into the helper's verbs, not `setup`, and the service's token stays with the host: it is never lent to a
+  person's Porelo, since a project has many.
+- **The gate binds each client's request to that login's accounts,** so a token acting as any task of the project must
+  not pass through it. A person's Porelo reads the room with a token of one of that login's own tasks, and needs no
+  service token at all; with no task of that login running it has nothing to deliver to.
+- **Keeping the room to its list needs a power that is no member:** `keep-room` kicks today as the administrator, the
+  room's creator in room version 12. Without it, the helper's service acts as a creator or as a task who may kick. A room
+  with no task yet must still take the persons the host names, which is what the design's first open question asks too.
+- **The task accounts carry the login, not the project** (`@<T>.<login>`), so a namespace per project cannot be read from
+  today's names on a host.
+- **What is there already stays:** `drop-room`, `expel`, and the gate's refusal of every reserved alias to a client.
 
 ## Harm
 
@@ -152,7 +173,8 @@ On a test VM, against the pinned Tuwunel:
    counting the task's own lobby blocks retirement. `membersElsewhere` must exclude the project's lobby and keep
    protecting both joined and invited members.
 10. **Central homeservers cannot run this lifecycle (`Lifecycle.java`):** on a central homeserver the transport uses a person's account, `@porelo.<login>`, without homeserver-administrator rights in a person-created room and cannot register services
-    or delete rooms via `!admin`. The central homeserver must keep its own lifecycle and ownership boundaries.
+    or delete rooms via `!admin`. A homeserver elsewhere must keep its own lifecycle and ownership boundaries; a host's
+    helper holds the administrator's token, so a host is not such a case.
 11. **Reading as a task strips that task from `to` (`Person.java`):** `Person.deliver` removes `self` from
     recipients, so mentioning only the reading task produces an empty `to`, and historical messages can still
     mention or reply to departed helpers. `Person.deliver` must not strip a task reader from `to` and must handle
@@ -171,6 +193,10 @@ On a test VM, against the pinned Tuwunel:
 15. **An unused callback URL queues outbound pushes on the homeserver:** a registration without a null endpoint
     accumulates queued push events (nine in the probe). The registration must set `url: null` and verify that no
     push queue grows across traffic and restarts.
+16. **A reading task's own messages would reach nobody (`Poll.java`):** `poll --persons` skips every event its reader
+    sent, before asking whether it is a Porelo message. With a relay that loses nothing, as it only answers people; with a
+    task reading, that task's signed messages would not reach the project's other tasks. Only its plain answers may be
+    skipped.
 
 Found to hold:
 
@@ -184,22 +210,23 @@ Found to hold:
 
 ## How it splits
 
-Each part becomes its own issue when this one is taken up:
+[MX77](README.md#mx77), the room's poll with a position of its own, goes first and is an issue already. Each part below
+becomes its own issue when this one is taken up:
 
-1. **Part 1 — The room's poll reads only the project room, with its own position** (M): independent of the rest,
-   worth having on its own; the room poll bound to the room, its position and lock apart from `--direct`, stable
-   across the account it reads as.
-2. **Part 2 — A project's application service** (L): registration with an exact namespace and a separate sender, task
+1. **Part 1 — A project's application service** (L): registration with an exact namespace and a separate sender, task
    accounts' prefix with the project, redacted registration, `url: null`, token rotation and revocation, backup and
    restore.
-3. **Part 3 — The lobby and a room no helper is in** (L): the lobby's power levels, the restricted room made at the
+2. **Part 2 — The lobby and a room no helper is in** (L): the lobby's power levels, the restricted room made at the
    first `enroll`, the creator's power and the room's recovery, the alias as `conversation`, `send` and `poll`
    resolving it, `join`'s order.
-4. **Part 4 — Lifecycle and migration without helpers** (L): `enroll`, `join`, `retire`, `clear` through the service,
-   `membersElsewhere` with invitations, the migration of existing rooms, the central homeserver left as it is; then
-   the relay goes.
+3. **Part 3 — Lifecycle and migration without helpers** (L): `enroll`, `join`, `retire`, `clear` through the service,
+   `membersElsewhere` with invitations, the migration of existing rooms, a homeserver elsewhere left as it is; then the
+   relay goes.
+4. **Part 4 — The room on a host shows no helper** (L): *On a host*, measured there first; the helper's `keep-room` and
+   `drop-room` through the service, the gate's rules for it, a person's Porelo reading as its own task, existing rooms.
 
-Order: 1, then 2, 3, 4. Build estimate for all: 960 min, a guess.
+Order: 1, 2, 3, 4. The earlier guess for all, 960 min, had the poll's part and not the host's; it is made anew when this
+is taken up.
 
 ## Open questions
 
@@ -219,9 +246,9 @@ Order: 1, then 2, 3, 4. Build estimate for all: 960 min, a guess.
   sustained traffic and restart.
 - How a client shows the room's version-12 creator once that task's account is deactivated, and whether the
   application service can still act as that creator localpart to manage or replace the room after `retire`.
-- Whether the room poll's independent `/sync` cursor and lock hold across both polling orders (`--persons` and
-  `--direct`), concurrent polls, reader retirement, and backlogs exceeding one page.
 - How `!admin appservices` unregisters or rotates a registration on `clear` and `restore`, and that redacting the
   registration command and reply leaves no secret in served admin-room events or logs.
 - How `membersElsewhere` reads invited as well as joined memberships across projects once the administrator is no
   longer a member of every project room.
+- On a host: whether the gate lets a task join by a restricted rule and how the helper's service token passes it, what a
+  person's client shows there, and how a namespace can hold one project's tasks when their names carry only the login.

@@ -31,7 +31,19 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
   `org.fuin.porelo.signature`, which `poll` hands over as a file. The room client on the development machine posts plain
   text today. The message is `ROLE_AGENT` with a `metadata.from` that is a plain name such as `porelo-agent-core`, since
   the filter refuses a Matrix id as `ENVELOPE/PEER_NAME_MALFORMED` and checks only a signature's shape. `MessageDelivery`
-  holds a message without a signature, or one whose signature's key is no allowed peer's.
+  holds a message without a signature, or one whose key traces to no certificate.
+- **Each local agent has a key of its own and a certificate on it.** `MessageDelivery` wants, in order: a `<message>.sig`
+  beside the message by an Ed25519 key, in the namespace of the message intake, over the message's bytes; a certificate
+  the receiver finds by that key's fingerprint, with one principal, `task:<project>:<name>`; its signer among the
+  project's certifiers, so a person's key signs it; `metadata.from` that `<name>`, the whole principal, or absent; then
+  the inbound filter in blocking mode, with no filter installed the message being held.
+- **A small script lays the certificate into the moved task's account when a host comes up.** The receiver looks in its
+  account's own record, one JSON file per fingerprint, of which it needs only the `certificate` field, and that line
+  proves itself by its own signature. So Porelo does not change, and no code of this stays in it after the move.
+- **The person's signature stays a deliberate step:** the script lays what a person signed and signs nothing itself.
+- **Local agents have names no task has,** so no real task shares a peer name with one, and they stay listed as external:
+  a peer the project does not list or lists as external passes the filter, while one listed otherwise would count against
+  `per_day`.
 - **What it is not:** no second way into the homeserver for anything but the transport on the host, and no homeserver on
   the host for this project until the last agent has moved.
 
@@ -40,6 +52,6 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
 - The socket's path: a project's signed settings name one path, while a runtime directory differs per account.
 - The mode `ssh` gives the socket on the host, read there, and that a second account is refused.
 - What keeps the tunnel open on the development machine and who starts it, and what a task sees while it is down.
-- With the agent responsible for Porelo's inbound check: whether each local agent needs a key of its own, or what else
-  it needs of a message to deliver it.
+- Where the script lives, the record's directory in the moved task's account and its file's name, and what renews a
+  certificate on a host that lasts past its validity: the issuer caps it at a week, the receiver checks it at arrival.
 - The account names and the room's alias on a homeserver whose server name is `localhost`, read from the host.
