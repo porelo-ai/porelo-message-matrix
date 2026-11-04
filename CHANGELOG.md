@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- A homeserver on a `unix:` socket or a `*.localhost` name no longer counts as a host's gate by its address: the
+  homeserver's registration challenge tells. Where it asks only for a token and none was lent, `setup` and `enroll` stop
+  with 78 naming `PORELO_MATRIX_REGISTRATION_TOKEN`; a token goes over a socket only to a listener of the running account,
+  and a gate that offers the dummy stage never receives one. A socket's listener of the wrong account answers 78, not 75.
 - A homeserver elsewhere's registration token reaches the transport only among the secrets on its input: `describe`
   asks Porelo to lend `PORELO_MATRIX_REGISTRATION_TOKEN` to `setup` and `enroll`, and the setting
   `registration_token_file` is refused like any unknown one.

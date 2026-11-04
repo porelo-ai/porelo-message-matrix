@@ -1425,10 +1425,10 @@ final class Lifecycle {
      * A homeserver elsewhere's registration token: lent from the person's vault among the secrets
      * on the input, for the verbs {@code describe} names.
      */
-    private static String elsewhereToken(final Settings settings, final Map<String, String> env)
+    static String elsewhereToken(final Settings settings, final Map<String, String> env)
             throws Failure {
-        return settings.hosted()
-                ? ""
+        return settings.tokenOptional()
+                ? env.getOrDefault(Config.REGISTRATION_TOKEN, "").strip()
                 : required(
                         env,
                         Config.REGISTRATION_TOKEN,

@@ -1,6 +1,6 @@
 # MX76 — A Host Reaches The Room On The Development Machine
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** M - a script with its tests, the registration's challenge read, and the documents.
 
 **What must be true.** While agents move into tasks, a task on a rented host talks in the project's room on the
@@ -19,8 +19,8 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
   port, which speaks plain HTTP on a tunnel that encrypts. It is opened anew for each new host.
 - **The host's side is mostly there:** the transport takes `homeserver: unix:<path>` and answers 75 while the socket is
   unreachable; the host's SSH policy lets a person bind a remote socket and refuses every remote TCP listener.
-- **What stands in the way:** `Settings.hosted` takes every `unix:` homeserver for a host's gate and asks no registration
-  token, while the development machine's homeserver registers only with one. The two must be told apart.
+- **A gate and the tunnel are told apart by the homeserver's challenge,** since a socket's path says neither; see
+  `doc/decisions.md`. A token goes over a socket only to a listener of the running account.
 - **Accounts as on a central homeserver:** `@porelo.<login>`, its relay and its tasks, with the token lent from the
   person's vault; a member of the room invites `@porelo.<login>`, and `setup` says "not admitted" until then.
 - **The filter's side needs nothing:** it reads files, knows no transport and opens no socket, and what leaves a moved
@@ -57,24 +57,26 @@ moved. The way there over the VPN is gone, with its published homeserver, certif
 - **On the host,** over one `ssh`, it writes `{"certificate":"<line>"}` as `<fingerprint>.json` into Porelo's
   `task-certificates` under the account's state directory, with the fingerprint's `+` and `/` as `-` and `_`. It then asks
   `porelo task certificate` whether Porelo finds that line. It refuses a record Porelo wrote itself, and leftovers of a run
-  that died.
+  that died. Renewing is signing again and running it again.
 - **Telling a gate from the tunnel:** the homeserver's challenge says it. `Accounts.register` answers the dummy stage
   where it is offered, and with no token where only the token stage is offered it stops with 78 naming the token. A
   `unix:` or `*.localhost` homeserver takes a token where one was lent and asks none beforehand. No socket's path becomes
-  a contract.
-- **Red first:** `AccountsTest` for the challenge, `LayCertificatesTest` with the real `ssh-keygen` and stand-ins for `ssh`
+  a contract. Before the token stage goes over a socket, `SocketWire` compares the connection's peer with the running
+  account.
+- **Red first:** `AccountsTest` for the challenge, `RegisterOverASocketTest` for the listener, `LayCertificatesTest` with the real `ssh-keygen` and stand-ins for `ssh`
   and `porelo`.
-
-## Open questions
-
-- Porelo lends a token only to an https homeserver, so nothing reaches a `unix:` one. Which way a token reaches the
-  transport over the tunnel is undecided, and until it is, `setup` and `enroll` stop with 78 there.
 
 ## To be checked
 
-- The socket's path: a project's signed settings name one path, while a runtime directory differs per account.
-- The mode `ssh` gives the socket on the host, read there, and that a second account is refused.
-- What keeps the tunnel open on the development machine and who starts it, and what a task sees while it is down.
-- Where the script lives, the record's directory in the moved task's account and its file's name, and what renews a
-  certificate on a host that lasts past its validity: the issuer caps it at a week, the receiver checks it at arrival.
+Only a host can show these; the script's tests and a run on a local VM cannot.
+
+- That `/run/porelo-host/people/<login>/room.sock` binds under the host's own SSH policy, its mode and peer there, and
+  that a second account is refused. On a local VM's sshd, a socket in `/tmp` is the login's, mode 0600, its peer the login.
+- That a task's `porelod` on a host reads the record in the same state directory a plain `ssh` login writes it to, which
+  `porelo task certificate` confirmed on a local VM only.
+- That `porelo` on a host's non-login `PATH` is the version that has `task certificate`; the script stops by name if not.
+- `setup`, `enroll`, `poll` and `send` through the real tunnel, with the token lent under the socket's entry.
 - The account names and the room's alias on a homeserver whose server name is `localhost`, read from the host.
+- A project's signed settings name one socket path, and the tunnel's path has a login in it, so a second person on the
+  same project needs another way; this holds for one person's move.
+- What starts the tunnel on the development machine: `room-tunnel.sh` keeps it open once started, and nothing starts it.

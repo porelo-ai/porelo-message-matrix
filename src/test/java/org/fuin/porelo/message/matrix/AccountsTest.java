@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.util.HashSet;
@@ -57,12 +58,104 @@ class AccountsTest {
     }
 
     /**
+     * Harm guarded: a homeserver that registers only with a token, reached over a socket, is taken
+     * for a gate, and the person learns nothing of what is missing.
+     */
+    @Test
+    void aSocketsHomeserverAskingATokenNoneWasLentForStopsNamingIt() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.registration_token\"]}],"
+                            + "\"session\":\"challenge\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            assertThatThrownBy(() -> Accounts.register(client, "porelo.bob", "password", ""))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure ->
+                                    assertThat(failure.exitCode())
+                                            .as("a setting, not a refusal to retry")
+                                            .isEqualTo(Exit.CONFIG))
+                    .hasMessageContaining(Config.REGISTRATION_TOKEN);
+            assertThat(homeserver.requests())
+                    .as("no second request guesses a stage it was not offered")
+                    .hasSize(1);
+        }
+    }
+
+    /** Harm guarded: a token lent for another homeserver goes to a gate that never asked for it. */
+    @Test
+    void aTokenStaysHomeWhereTheHomeserverOffersTheDummyStage() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.dummy\"]}],\"session\":\"porelo-gate\"}");
+            homeserver.answer(
+                    200,
+                    "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            Accounts.register(client, "porelo.bob", "derived-password", "a-lent-token");
+            assertThat(homeserver.requests().getLast().body())
+                    .as("the token is not sent")
+                    .doesNotContain("a-lent-token");
+        }
+    }
+
+    /**
+     * Harm guarded: a stage that must come after the token reads as an offer of the dummy stage
+     * alone, so a homeserver that needs the token is answered without it.
+     */
+    @Test
+    void aDummyStageAfterTheTokenDoesNotReplaceTheToken() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.registration_token\",\"m.login.dummy\"]}],"
+                            + "\"session\":\"s\"}");
+            homeserver.answer(
+                    200,
+                    "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            Accounts.register(client, "porelo.bob", "derived-password", "a-lent-token");
+            assertThat(homeserver.requests().getLast().body())
+                    .as("the token answers the first stage")
+                    .contains("a-lent-token");
+        }
+    }
+
+    /** Harm guarded: a token goes to a homeserver whose challenge never asked for one. */
+    @Test
+    void aTokenStaysHomeWhereTheChallengeDoesNotAskForIt() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401, "{\"flows\":[{\"stages\":[\"m.login.sso\"]}],\"session\":\"s\"}");
+            final MatrixClient client =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "", null, true));
+            assertThatThrownBy(
+                            () ->
+                                    Accounts.register(
+                                            client, "porelo.bob", "password", "a-lent-token"))
+                    .isInstanceOf(Failure.class);
+            assertThat(homeserver.requests())
+                    .as("the token never left")
+                    .hasSize(1)
+                    .noneMatch(request -> request.body().contains("a-lent-token"));
+        }
+    }
+
+    /**
      * Harm guarded: the central server's token challenge is bypassed after registration changes.
      */
     @Test
     void registrationElsewhereStillCompletesTheTokenStage() throws Exception {
         try (FakeHomeserver homeserver = new FakeHomeserver()) {
-            homeserver.answer(401, "{\"session\":\"challenge\"}");
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.registration_token\"]}],"
+                            + "\"session\":\"challenge\"}");
             homeserver.answer(
                     200,
                     "{\"user_id\":\"@porelo.bob:example.org\",\"access_token\":\"new-session\"}");

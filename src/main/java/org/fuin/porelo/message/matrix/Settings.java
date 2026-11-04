@@ -35,15 +35,12 @@ record Settings(
             "the project's settings name 'ca_certificate', which went with the published"
                     + " homeserver; use ca_file";
 
-    /** A host's gate supplies the registration token itself. */
-    boolean hosted() {
-        return hosted(homeserver);
-    }
-
     /**
-     * A host's homeserver behind its gate: reached on a Unix socket or as a {@code *.localhost}.
+     * Whether registering may need no token: a host's gate needs none, and is reached on a Unix
+     * socket or as a {@code *.localhost}, as a tunnel to a homeserver that does need one is too. So
+     * none is asked beforehand, and the homeserver's challenge tells them apart.
      */
-    static boolean hosted(final @Nullable URI homeserver) {
+    boolean tokenOptional() {
         return homeserver != null
                 && ("unix".equals(homeserver.getScheme())
                         || (homeserver.getHost() != null

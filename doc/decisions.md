@@ -5,6 +5,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | Subject | What holds |
 |---|---|
 | [Identity by the host's login, registration by the gate](#identity-by-the-hosts-login-registration-by-the-gate) | A Unix-socket gate binds every client request to an admitted host login; only the gate provisions accounts. |
+| [A socket says nothing of what is behind it](#a-socket-says-nothing-of-what-is-behind-it) | The registration challenge tells a gate from a tunnel, and a token goes over a socket only to a listener of the running account. |
 | [The homeserver is Tuwunel](#the-homeserver-is-tuwunel) | Built and tested against Tuwunel, pinned by digest; Conduit is the measured alternative. |
 | [A message is a text event: a line for a person, the message and its signature beside it](#a-message-is-a-text-event-a-line-for-a-person-the-message-and-its-signature-beside-it) | One `m.text` event: the line for a person as its body, the message and its signature in fields of their own. |
 | [A person's words reach the tasks; whom they are meant for is what Matrix states](#a-persons-words-reach-the-tasks-whom-they-are-meant-for-is-what-matrix-states) | A person's text in the room and in a direct chat reaches the tasks; mentions and replies say whom it is meant for. |
@@ -320,6 +321,23 @@ database.
 
 **What would change the answer:** Tuwunel setting a password from a file or standard input, which would then
 replace the environment; Porelo's vault coming with the copy, which would make the taking back unneeded.
+
+## A socket says nothing of what is behind it
+
+**Decided:** a `unix:` homeserver may be a host's gate or a tunnel to a homeserver that registers only with a token, so no
+address decides. The homeserver's challenge does: the dummy stage is answered without a token, and a token stage with no
+token lent stops with 78. Before a token goes over a socket, the connection's `SO_PEERCRED` must name the running account.
+
+**Why:** a path as the test would make the gate's socket a contract of this repository and could not be tested off a
+host. The peer is checked on the connection that carries the token, so nothing can change between check and send.
+
+**Accepted risk:** the check covers the token alone. A task's access token, and the derived password in `setup`'s and
+`enroll`'s first request, go over a socket with no check of its listener, as a gate's peer is not the running account. On
+a host a person's socket lies in a directory of mode 0700 of their own, so only they and root can bind there. A task's
+transport does not check that directory, so a `unix:` path a project names elsewhere has only its own directory's
+protection.
+
+**What would change the answer:** a socket for this transport outside a person's own directory.
 
 ## No administrator on a central homeserver
 

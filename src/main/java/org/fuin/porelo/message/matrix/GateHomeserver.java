@@ -23,10 +23,7 @@ final class GateHomeserver implements Gate.Backend {
     }
 
     MatrixClient client(final String token) throws Failure, IOException {
-        final var owner =
-                java.nio.file.FileSystems.getDefault()
-                        .getUserPrincipalLookupService()
-                        .lookupPrincipalByName(System.getProperty("user.name"));
+        final var owner = MatrixClient.runningAccount();
         return new MatrixClient(
                 new Config(
                         URI.create("unix:" + GateFiles.socket(env).toUri().getRawPath()),
@@ -62,10 +59,7 @@ final class GateHomeserver implements Gate.Backend {
         final SocketChannel upstream = SocketChannel.open(StandardProtocolFamily.UNIX);
         try {
             upstream.connect(UnixDomainSocketAddress.of(GateFiles.socket(env)));
-            final var owner =
-                    java.nio.file.FileSystems.getDefault()
-                            .getUserPrincipalLookupService()
-                            .lookupPrincipalByName(System.getProperty("user.name"));
+            final var owner = MatrixClient.runningAccount();
             if (!upstream.getOption(ExtendedSocketOptions.SO_PEERCRED).user().equals(owner)) {
                 throw new IOException("Unix listener is not owned by the homeserver account");
             }

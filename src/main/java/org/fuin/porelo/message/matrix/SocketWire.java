@@ -40,6 +40,15 @@ final class SocketWire implements Wire {
         this(path, connectTimeout, null);
     }
 
+    /** Whoever listens on the socket is not the account expected: waiting cures nothing. */
+    static final class ForeignListener extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        ForeignListener(final String message) {
+            super(message);
+        }
+    }
+
     SocketWire(
             final Path path, final Duration connectTimeout, final @Nullable UserPrincipal owner) {
         this.path = path;
@@ -66,7 +75,7 @@ final class SocketWire implements Wire {
             }
             if (owner != null
                     && !socket.getOption(ExtendedSocketOptions.SO_PEERCRED).user().equals(owner)) {
-                throw new IOException("Unix listener is not owned by the homeserver account");
+                throw new ForeignListener("Unix listener is not owned by " + owner.getName());
             }
             write(socket, key, ByteBuffer.wrap(head(request, body.length)), deadline);
             write(socket, key, ByteBuffer.wrap(body), deadline);

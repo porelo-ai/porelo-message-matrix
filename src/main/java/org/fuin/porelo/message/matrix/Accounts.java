@@ -18,6 +18,10 @@ final class Accounts {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final String DUMMY_STAGE = "m.login.dummy";
+
+    private static final String TOKEN_STAGE = "m.login.registration_token";
+
     /** An account's id and its token. */
     record Session(String userId, String accessToken) {
 
@@ -103,6 +107,18 @@ final class Accounts {
             final String password,
             final String registrationToken)
             throws Failure {
+        return register(
+                anybody, localpart, password, registrationToken, MatrixClient::runningAccount);
+    }
+
+    /** As above, with who must be listening on a socket before the token goes to it. */
+    static Session register(
+            final MatrixClient anybody,
+            final String localpart,
+            final String password,
+            final String registrationToken,
+            final MatrixClient.ListenerOwner tokenListener)
+            throws Failure {
         final ObjectNode request =
                 MatrixClient.JSON
                         .createObjectNode()
@@ -117,20 +133,57 @@ final class Accounts {
         if (first.status() != 401 || !first.body().path("session").isTextual()) {
             throw refused("registering " + localpart, first);
         }
-        // A host's gate asks only for the dummy stage: who registers is the caller's login.
         final ObjectNode auth =
                 request.putObject("auth").put("session", first.body().path("session").asText());
-        if (registrationToken.isEmpty()) {
-            auth.put("type", "m.login.dummy");
+        // A host's gate asks only for the dummy stage: who registers is the caller's login. A
+        // socket says nothing about what is behind it, so the challenge decides.
+        final MatrixClient answering;
+        if (offersDummyAlone(first)) {
+            auth.put("type", DUMMY_STAGE);
+            answering = anybody;
+        } else if (!registrationToken.isEmpty() && offers(first, TOKEN_STAGE)) {
+            auth.put("type", TOKEN_STAGE).put("token", registrationToken);
+            answering = anybody.listenedToBy(tokenListener);
+        } else if (!registrationToken.isEmpty()) {
+            throw refused("registering " + localpart + ", whose challenge asks no token", first);
+        } else if (offers(first, TOKEN_STAGE)) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the homeserver registers only with a token, and "
+                            + Config.REGISTRATION_TOKEN
+                            + " was not lent for it");
         } else {
-            auth.put("type", "m.login.registration_token").put("token", registrationToken);
+            auth.put("type", DUMMY_STAGE);
+            answering = anybody;
         }
         final MatrixClient.Answer second =
-                anybody.exchange("POST", "/_matrix/client/v3/register", request);
+                answering.exchange("POST", "/_matrix/client/v3/register", request);
         if (second.status() != 200) {
             throw refused("registering " + localpart, second);
         }
         return session(second);
+    }
+
+    private static boolean offers(final MatrixClient.Answer challenge, final String stage) {
+        return challenge
+                .body()
+                .path("flows")
+                .valueStream()
+                .flatMap(flow -> flow.path("stages").valueStream())
+                .anyMatch(offered -> stage.equals(offered.asText()));
+    }
+
+    /**
+     * A flow's stages are all to be done in turn, so only a flow of this one stage asks no more.
+     */
+    private static boolean offersDummyAlone(final MatrixClient.Answer challenge) {
+        return challenge
+                .body()
+                .path("flows")
+                .valueStream()
+                .map(flow -> flow.path("stages"))
+                .anyMatch(
+                        stages -> stages.size() == 1 && DUMMY_STAGE.equals(stages.get(0).asText()));
     }
 
     static Session login(final MatrixClient anybody, final String localpart, final String password)

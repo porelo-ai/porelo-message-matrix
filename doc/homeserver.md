@@ -77,8 +77,8 @@ and provisions only their own accounts: `@porelo.<login>`, `@porelo-relay-<proje
 
 A login starts with a lower-case letter, contains only lower-case letters, digits and `-`, and is at
 most 32 characters. It has no dot and is neither `porelo` nor a name beginning with `porelo-`; invalid logins
-are refused with 78. On a host's gate (`unix:` or `*.localhost`) registration needs no client-held token; on an external
-homeserver it needs `PORELO_MATRIX_REGISTRATION_TOKEN` among the secrets on its input.
+are refused with 78. On a `unix:` or `*.localhost` homeserver the challenge decides whether a token is needed; a host's
+gate needs none. On an external homeserver registration needs `PORELO_MATRIX_REGISTRATION_TOKEN` among the secrets on its input.
 
 The host's helper runs `porelo-message-transport-matrix expel <login>` as the homeserver's account, with its
 administrator token among the secrets on stdin: behind the gate, the token in `gate/admin-token`. Like the gate's
@@ -112,6 +112,28 @@ A project whose settings named `homeserver` without `room` is refused (78) by `s
 `room` is set. Once `room` is set and a person invites `@porelo.<login>` into it, Porelo makes the login's new
 accounts (`@porelo.<login>`, `@porelo-relay-<project>.<login>`, `@<task>.<login>`); the old accounts stay
 on the homeserver until a person removes them.
+
+## A host reaching the room on the development machine
+
+While agents move into tasks, a project's room stays on the development machine's homeserver, and a task on a rented
+host reaches it over one `ssh -R` to one socket, as `porelo-host`'s `build/room-tunnel.sh` opens it. The project's settings
+name that socket as `homeserver: unix:<path>`, and the transport answers 75 while the tunnel is down.
+
+- **Registering takes the homeserver's token**, lent from the person's vault under the entry derived from the socket's
+  path. It goes only to a listener of the running account, which is who holds a remote forward's end on the host.
+- **A local agent's line reaches a moved task as an agent's message**, signed by the agent's own key. The receiver looks
+  for that key's certificate in its own account, so a person signs each agent's key as `task:<project>:<name>`, and the
+  development machine lays the signed certificates on each new host:
+
+      build/lay-certificates.sh <login on the host> <host> <project> <certificate file>...
+
+- **The script signs nothing and takes no private key.** It checks each file before anything leaves: an Ed25519 user
+  certificate whose signature holds, with no critical option, one principal of that project, not expired. One bad file
+  lays none. On the host it writes `{"certificate":"<line>"}` into `$XDG_STATE_HOME/porelo/task-certificates`, named by
+  the key's fingerprint, asks `porelo task certificate` whether it finds it, and fails naming what it left if not. It
+  refuses to replace a record Porelo wrote, and refuses to start over what a dead run left.
+- **A certificate is renewed by signing it again and running the script again.** Nothing renews one by itself; a message
+  whose certificate has expired is held on arrival.
 
 ## The host's homeserver behind its gate
 

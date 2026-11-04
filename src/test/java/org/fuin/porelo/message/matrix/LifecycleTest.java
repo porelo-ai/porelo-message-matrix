@@ -1,8 +1,10 @@
 package org.fuin.porelo.message.matrix;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.InputStream;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -354,6 +356,24 @@ class LifecycleTest {
                                 "bob"))
                 .as("an external homeserver still requires its registration token")
                 .startsWith(Exit.CONFIG + " " + Config.REGISTRATION_TOKEN + " is not set");
+    }
+
+    /**
+     * Harm guarded: a token lent for a homeserver behind a tunnel is dropped, so registering there
+     * can never succeed.
+     */
+    @Test
+    void aTokenLentForASocketIsKept() throws Failure {
+        final Settings settings =
+                new Settings(URI.create("unix:/run/room.sock"), null, true, "#p:example.org");
+        assertThat(
+                        Lifecycle.elsewhereToken(
+                                settings, Map.of(Config.REGISTRATION_TOKEN, "lent-token")))
+                .as("what was lent goes on")
+                .isEqualTo("lent-token");
+        assertThat(Lifecycle.elsewhereToken(settings, Map.of()))
+                .as("a gate needs none, and only its challenge can tell")
+                .isEmpty();
     }
 
     private Map<String, String> centralAccount() {

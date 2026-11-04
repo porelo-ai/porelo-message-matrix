@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx76"></a>[MX76](MX76-A-Host-Reaches-The-Room-On-The-Development-Machine.md) | M | - | A task on a rented host talks in the room on the development machine's homeserver, over one `ssh -R` to one socket only, while agents move |
 | <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 | <a id="mx66"></a>[MX66](MX66-The-Default-Project-Has-No-Room.md) | S | - | The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared |
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
@@ -26,7 +27,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx76"></a>[MX76](MX76-A-Host-Reaches-The-Room-On-The-Development-Machine.md) | M | - | A task on a rented host talks in the room on the development machine's homeserver, over one `ssh -R` to one socket only, while agents move |
 
 ## Backlog
 

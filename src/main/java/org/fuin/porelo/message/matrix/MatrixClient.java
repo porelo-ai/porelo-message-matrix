@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.time.Duration;
@@ -105,6 +106,33 @@ final class MatrixClient {
                 new Config(config.homeserver(), accessToken, config.caFile(), config.verifyTls()),
                 tables,
                 socketOwner);
+    }
+
+    /** Answers who a socket's listener must be before something it must not read goes out. */
+    @FunctionalInterface
+    interface ListenerOwner {
+        UserPrincipal name() throws Failure;
+    }
+
+    /** The account this program runs as, which is who holds a tunnel's end on its own host. */
+    static UserPrincipal runningAccount() throws Failure {
+        try {
+            return FileSystems.getDefault()
+                    .getUserPrincipalLookupService()
+                    .lookupPrincipalByName(System.getProperty("user.name"));
+        } catch (final IOException ex) {
+            throw new Failure(Exit.CONFIG, "this account cannot be named: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * This client, refusing a socket's listener that is not {@code owner}'s, checked on the
+     * connection that carries the request; a client over TCP is itself.
+     */
+    MatrixClient listenedToBy(final ListenerOwner owner) throws Failure {
+        return "unix".equals(config.homeserver().getScheme())
+                ? new MatrixClient(config, tables, owner.name())
+                : this;
     }
 
     /**
@@ -232,6 +260,11 @@ final class MatrixClient {
             // Not a moment's trouble: a certificate this machine does not trust stays untrusted,
             // and whoever
             // presents it may not be the homeserver. Retrying would only send the token again.
+            throw new Failure(
+                    Exit.CONFIG,
+                    "homeserver " + config.homeserver() + " is not trusted: " + ex.getMessage(),
+                    ex);
+        } catch (final SocketWire.ForeignListener ex) {
             throw new Failure(
                     Exit.CONFIG,
                     "homeserver " + config.homeserver() + " is not trusted: " + ex.getMessage(),

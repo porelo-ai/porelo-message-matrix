@@ -1,14 +1,21 @@
 package org.fuin.porelo.message.matrix;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.StandardProtocolFamily;
 import java.net.URI;
+import java.net.UnixDomainSocketAddress;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -193,6 +200,116 @@ class CentralIT {
                                 .build(),
                         HttpResponse.BodyHandlers.discarding())
                 .statusCode();
+    }
+
+    /**
+     * Harm guarded: each part holds alone and a person's move still fails: a task on a host cannot
+     * register, or its account never reaches the room, over the socket a tunnel gives it.
+     */
+    @Test
+    void setupAndEnrollWorkOverASocketTunnelWithALentToken() throws Exception {
+        final Path socket = dir.resolve("room.sock");
+        try (ServerSocketChannel tunnel = tunnel(socket)) {
+            settings = "{\"homeserver\":\"unix:" + socket + "\",\"room\":\"" + room + "\"}";
+            final String token = tuwunel.registrationToken();
+            final Map<String, String> env =
+                    Map.of("XDG_STATE_HOME", dir.resolve("state").toString());
+            final String[] setup = {"setup", "--project", PROJECT, "--login", MACHINE_ONE};
+
+            final Transport.Result refused = Transport.runWithInput(env, onInput(Map.of()), setup);
+            assertThat(refused.exit()).as("nothing lent: %s", refused.err()).isEqualTo(78);
+            assertThat(refused.err())
+                    .as("the refusal names it")
+                    .contains(Config.REGISTRATION_TOKEN);
+
+            final Map<String, String> lent = Map.of(Config.REGISTRATION_TOKEN, token);
+            final Transport.Result first = Transport.runWithInput(env, onInput(lent), setup);
+            assertThat(first.exit()).as("setup: %s", first.err()).isZero();
+            final Map<String, String> account = new HashMap<>(lent);
+            MatrixClient.JSON
+                    .readTree(first.out())
+                    .path("account")
+                    .properties()
+                    .forEach(e -> account.put(e.getKey(), e.getValue().asText()));
+            invite(person, room, "@porelo." + MACHINE_ONE + ":" + Tuwunel.SERVER_NAME);
+            final Transport.Result admitted = Transport.runWithInput(env, onInput(account), setup);
+            assertThat(admitted.exit()).as("setup again: %s", admitted.err()).isZero();
+
+            final Transport.Result enrolled =
+                    Transport.runWithInput(
+                            env,
+                            onInput(account),
+                            "enroll",
+                            "--project",
+                            PROJECT,
+                            "--task",
+                            "worker",
+                            "--login",
+                            MACHINE_ONE);
+            assertThat(enrolled.exit()).as("enroll: %s", enrolled.err()).isZero();
+            assertThat(MatrixClient.JSON.readTree(enrolled.out()).path("address").asText())
+                    .as("the task's account was registered over the socket")
+                    .startsWith("@worker." + MACHINE_ONE + ":");
+        }
+    }
+
+    /**
+     * Stands in for {@code ssh -R}: each connection to a socket of this account goes to the port.
+     */
+    private ServerSocketChannel tunnel(final Path socket) throws IOException {
+        final ServerSocketChannel server = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+        server.bind(UnixDomainSocketAddress.of(socket));
+        final URI target = URI.create(tuwunel.url());
+        Thread.ofVirtual()
+                .start(
+                        () -> {
+                            try {
+                                while (true) {
+                                    final SocketChannel near = server.accept();
+                                    final SocketChannel far =
+                                            SocketChannel.open(
+                                                    new InetSocketAddress(
+                                                            target.getHost(), target.getPort()));
+                                    Thread.ofVirtual().start(() -> carry(near, far));
+                                    Thread.ofVirtual().start(() -> carry(far, near));
+                                }
+                            } catch (final IOException ex) {
+                                assertThat(server.isOpen())
+                                        .as("closed by the test's end")
+                                        .isFalse();
+                            }
+                        });
+        return server;
+    }
+
+    private static void carry(final SocketChannel from, final SocketChannel to) {
+        try (from;
+                to) {
+            final ByteBuffer buffer = ByteBuffer.allocate(16_384);
+            while (from.read(buffer) >= 0) {
+                buffer.flip();
+                while (buffer.hasRemaining()) {
+                    to.write(buffer);
+                }
+                buffer.clear();
+            }
+        } catch (final IOException ex) {
+            // One side closing ends the other's copy too, as a tunnel does.
+            return;
+        }
+    }
+
+    /**
+     * Harm guarded: the challenge of a real homeserver that registers only with a token does not
+     * read as the fixtures say, so a tunnel to it is taken for a gate.
+     */
+    @Test
+    void aRealHomeserverAsksTheTokenOfWhoeverHasNone() throws Exception {
+        final MatrixClient nobody =
+                new MatrixClient(new Config(URI.create(tuwunel.url()), "", null, true));
+        assertThatThrownBy(() -> Accounts.register(nobody, "porelo.nobody", "a-password", ""))
+                .as("its challenge names the token stage alone")
+                .hasMessageContaining(Config.REGISTRATION_TOKEN);
     }
 
     /**
