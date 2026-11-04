@@ -12,7 +12,6 @@ sequence.
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
-| <a id="mx45"></a>[MX45](MX45-A-Project-Admin-Brings-The-Room-Onto-A-Central-Homeserver.md) | M | - | On a central homeserver the project admin's Porelo makes the project's room (`setup --create-room`) and keeps it to the signed developer list (`members`) |
 | <a id="mx65"></a>[MX65](MX65-The-Host-Keeps-A-Projects-Room.md) | M | - | Behind the gate, the host's helper makes a project's room and keeps it to the persons the host names (`keep-room`), as the administrator, so no person's Porelo is needed and no client can make or take the room; taking a project off a host deletes its room there (`drop-room`); on a homeserver elsewhere a person keeps the room by hand |
 | <a id="mx67"></a>[MX67](MX67-The-Registration-Token-Comes-Only-With-The-Secrets.md) | S | - | A homeserver elsewhere's registration token reaches the transport only among the secrets on its input; the setting `registration_token_file` goes |
 | <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
@@ -101,5 +100,6 @@ sequence.
 
 | # | Title | Why |
 |---|---|---|
+| <a id="mx45"></a>[MX45](README.md#mx45) | A Project Admin Brings The Room Onto A Central Homeserver | Replaced by [MX65](README.md#mx65): the host's helper makes and keeps the room with `keep-room` and `drop-room`, and `setup --create-room` is gone |
 | <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
 | <a id="mx53"></a>[MX53](README.md#mx53) | A Person Added Again Keeps Their Name | Replaced by the one-key design; a purged login is never made again on a host, so a person comes back under a new login ([MX57](README.md#mx57)) |
