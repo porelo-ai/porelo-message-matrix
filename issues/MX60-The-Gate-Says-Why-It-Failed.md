@@ -1,6 +1,7 @@
 # MX60 — The Gate Says Why It Failed
 
-**Status:** Idea.
+**Status:** Backlog; analyzed and built inside the Porelo task of this repository's trial move.
+**Size:** S - `Gate.java`'s refusal line and the causes it names, with `GateTest` cases; nothing another repository reads.
 
 **What must be true.** When the host's gate answers 502, or refuses a sign-in or a registration because it cannot act
 as the administrator, its log line on the host names the cause: the administrator's token is missing, unreadable, or
