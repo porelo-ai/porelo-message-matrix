@@ -40,6 +40,7 @@ sequence.
 
 | # | Size | Blocked by | Open questions | What it covers |
 |---|---|---|---|---|
+| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | 1 | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | 0 | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes |
 
 ## Accepted
@@ -52,11 +53,11 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | - | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 | <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | - | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
-| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | - | - | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name |
 
 ## Estimated
 
