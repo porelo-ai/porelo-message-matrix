@@ -26,12 +26,12 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 | <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
