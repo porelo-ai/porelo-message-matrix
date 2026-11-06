@@ -55,14 +55,17 @@ setup and its local registry settings, and the project's procedure for an agent'
      the image's first build by Porelo.
   2. *The switch:* the coordinator's `project.yml` commit gives the repository the host's forge as upstream; this issue
      is set Implementing on `main` before it, so the forge receives that state.
-  3. *The start:* `porelo task start --repository porelo-message-matrix --agent claude` on the host, attended, its
+  3. *The room first:* the operator's steps 1 to 6 of [MX81](README.md#mx81) (Do/See): the tunnel, the project's
+     `homeserver: unix:` and `room`, the lent token, the invitation, the certificates. Without them the task reports
+     into the host's room, which the coordinator does not reach.
+  4. *The start:* `porelo task start --repository porelo-message-matrix --agent claude` on the host, attended, its
      terminal opened by the operator.
-  4. *Inside the task:* the agent reads its context, fetches the skills, makes the change the trial carries, runs the
+  5. *Inside the task:* the agent reads its context, fetches the skills, makes the change the trial carries, runs the
      documents tests and the full suite in the task, and pushes. The gate opens the pull request; the agent reads the
      Build and the *Shared rules check* through the `forgejo` reader, both green, answers the reading, and sets
      Review.
-  5. *The check:* the move's check for this repository, red before the start, green after.
-  6. *The way back:* what the forge holds of the task's work is fetched into the checkout here, the coordinator switches
+  6. *The check:* the move's check for this repository, red before the start, green after.
+  7. *The way back:* what the forge holds of the task's work is fetched into the checkout here, the coordinator switches
      the upstream back, and the session here resumes.
 - **The change the trial carries is real work the Build reads**, since a push of documents, issues or `porelo.yml`
   alone starts no Build on the forge: proposed, [MX60](README.md#mx60), the host's gate naming in its log why it

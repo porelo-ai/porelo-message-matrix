@@ -414,6 +414,57 @@ class LifecycleTest {
     }
 
     /**
+     * Harm guarded: a task started on a host while the tunnel to the room is down, or while its
+     * account cannot open the socket, is made anyway and reports into no room; a 75 naming the
+     * socket and the cause lets the start stop and say why.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "setup through a socket whose tunnel is down, or that the account cannot open, ends 75 naming it")
+    void setupThroughASocketNotReachedIsTemporary(
+            @org.junit.jupiter.api.io.TempDir final java.nio.file.Path dir) throws Exception {
+        final java.nio.file.Path down = dir.resolve("down.sock");
+        final java.nio.file.Path closed = dir.resolve("closed.sock");
+        final Map<String, String> env =
+                Map.of(
+                        "XDG_STATE_HOME",
+                        dir.resolve("state").toString(),
+                        "PORELO_MATRIX_LOGIN",
+                        "hosta",
+                        Config.REGISTRATION_TOKEN,
+                        "lent-token");
+        try (java.nio.channels.ServerSocketChannel listener =
+                java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
+            listener.bind(java.net.UnixDomainSocketAddress.of(closed));
+            java.nio.file.Files.setPosixFilePermissions(closed, java.util.Set.of());
+
+            final List<String> causes = new java.util.ArrayList<>();
+            for (final java.nio.file.Path socket : List.of(down, closed)) {
+                final String reason =
+                        reason(
+                                central("unix:" + socket),
+                                env,
+                                "setup",
+                                "--project",
+                                "demo",
+                                "--login",
+                                "hosta");
+                assertThat(reason)
+                        .as(
+                                "%s: a socket not reached is temporary, and named",
+                                socket.getFileName())
+                        .startsWith(Exit.TEMPORARY + " ")
+                        .contains("unix:" + socket + " not reachable: ");
+                causes.add(reason.substring(reason.indexOf("not reachable: ")));
+            }
+            // The system's own words, in its language: a missing tunnel and a missing grant differ.
+            assertThat(causes.getLast())
+                    .as("a socket the account cannot open names another cause than a missing one")
+                    .isNotEqualTo(causes.getFirst());
+        }
+    }
+
+    /**
      * Harm guarded: a homeserver briefly away is reported as a token that is not valid, so the
      * person looks for a fault in the setup that is not there, and nothing is tried again.
      */

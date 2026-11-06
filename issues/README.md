@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx81"></a>[MX81](MX81-A-Coordinator-Off-The-Host-Reaches-The-Tasks-Room.md) | S | - | A task on a host reports in the room of a coordinator on the development machine from its first step, over [MX76](README.md#mx76)'s tunnel set up before the start; without the tunnel the start stops instead of reporting into a room nobody reads |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 | <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
@@ -30,7 +31,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx81"></a>[MX81](MX81-A-Coordinator-Off-The-Host-Reaches-The-Tasks-Room.md) | S | - | A task on a host reports in the room of a coordinator on the development machine from its first step, over [MX76](README.md#mx76)'s tunnel set up before the start; without the tunnel the start stops instead of reporting into a room nobody reads |
 
 ## Backlog
 

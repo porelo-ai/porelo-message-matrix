@@ -1,6 +1,6 @@
 # MX81 — A Coordinator Off The Host Reaches The Task's Room
 
-**Status:** Implementing; accepted by the operator, 2026-11-06. Bug, found by the operator on 2026-11-06 in a rehearsal of the move.
+**Status:** Review; accepted by the operator, 2026-11-06. Bug, found by the operator on 2026-11-06 in a rehearsal of the move.
 **Size:** S - the start's steps, their check on a host, and the documents; [MX76](README.md#mx76)'s code is there.
 
 **What must be true.** A task started on a host for a project whose agents report to a coordinator on the development
@@ -23,10 +23,14 @@ start.
 
 - **The start of a moved project follows [MX76](README.md#mx76)'s way** (doc/homeserver.md, "A host reaching the room on the development
   machine"). The operator's steps below are written into the move's runbook, [MX43](README.md#mx43)'s steps, before the task starts.
-- **This repository's part:** check that `setup` through the tunnel answers 75 while the tunnel is down, and 78 naming
-  the token while none is lent. Then the operator's start stops instead of making a task that cannot report. If the
-  start in porelo goes on regardless, that is filed in porelo.
-- **Red first:** none in code. The steps' check is the run on the host, with [MX76](README.md#mx76)'s To be checked points.
+- **This repository's part:** `setup` through the tunnel's socket answers 75 while the tunnel is down, and also when
+  the account cannot open the socket (the rehearsal's case). It names the socket and the system's cause, which differs
+  between the two. `LifecycleTest#setupThroughASocketNotReachedIsTemporary` holds that. With no token lent it answers
+  78 naming the token, as `CentralIT#setupAndEnrollWorkOverASocketTunnelWithALentToken` holds since
+  [MX76](README.md#mx76). So the start can stop, and say why, instead of making a task that cannot report.
+- **The steps are in [MX43](README.md#mx43)'s plan,** as its step 3, before the start.
+- **Red first:** none; the behavior was there, so the new test holds it. Seen to fail when the failure is 78 instead of
+  75, and when the cause is dropped from the message.
 
 ## The operator's steps for the next pass (Do / See)
 
