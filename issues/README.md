@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 | <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
 | <a id="mx76"></a>[MX76](MX76-A-Host-Reaches-The-Room-On-The-Development-Machine.md) | M | - | A task on a rented host talks in the room on the development machine's homeserver, over one `ssh -R` to one socket only, while agents move |
@@ -27,7 +28,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 
 ## Backlog
 

@@ -1,14 +1,14 @@
 # What this repository's whole local build needs: the image a Porelo task on this repository is built from,
 # for `./mvnw -s settings.xml -Pnative,dist verify`, the shared checks and `-Pdocuments test`.
-# A draft: no Porelo reads this file yet. Tools only, never a rule.
+# Porelo reads it when it builds a task's image. Tools only, never a rule.
 #
 # The pins are those the Build takes: the Ubuntu image and the GraalVM from porelo-machines' own pins
 # (machines.properties). A move there is not followed here by itself.
 # No container starts inside a task's container, so the integration tests run the homeserver's own binary here,
 # copied from the image homeserver/Dockerfile pins, by the same digest (TaskImageTest holds them one).
 image:
-    base_image: "docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
-    snippet: |
+    from: "docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
+    run: |
         # From Ubuntu: the C toolchain and zlib's headers for native-image, rpm for the .rpm and its checks,
         # systemd for the systemd-socket-activate the gate's integration tests start it with.
         RUN apt-get update \

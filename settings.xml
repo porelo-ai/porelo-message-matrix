@@ -8,7 +8,7 @@
 
     <servers>
 
-        <!-- The id the central-publishing-maven-plugin looks for, set in org.fuin:pom's
+        <!-- The id the central-publishing-maven-plugin looks for, set in porelo-parent's
              central-sonatype-release profile. Values come from the environment; nothing
              secret is in this file. -->
 
@@ -18,13 +18,37 @@
             <password>${env.OSS_SONATYPE_TOKEN}</password>
         </server>
 
+        <!-- Resolving from the forge, with a token that can only read, since the organisation there is private and
+             this repository deploys nothing there; where none is needed it is a placeholder, sent only when a server
+             asks. -->
+
+        <server>
+            <id>porelo-forge-snapshots</id>
+            <username>porelo-publisher</username>
+            <password>${env.PORELO_PACKAGES_READ_TOKEN}</password>
+        </server>
+
     </servers>
 
     <profiles>
 
+        <!-- Snapshots come from Sonatype, and on a forge from its registry too: the newest wins. Only the groups listed
+             in .mvn/rrf/ are asked of Sonatype, so a private name stays here. The profile needs the switch in
+             .mvn/maven.config and that file, since the filter asks everything of a repository with no file. -->
+
         <profile>
 
-            <id>standard</id>
+            <id>central</id>
+
+            <activation>
+                <property>
+                    <name>aether.remoteRepositoryFilter.groupId</name>
+                    <value>true</value>
+                </property>
+                <file>
+                    <exists>${maven.multiModuleProjectDirectory}/.mvn/rrf/groupId-central.sonatype.snapshots.txt</exists>
+                </file>
+            </activation>
 
             <repositories>
 
@@ -62,10 +86,52 @@
 
         </profile>
 
-    </profiles>
+        <profile>
 
-    <activeProfiles>
-        <activeProfile>standard</activeProfile>
-    </activeProfiles>
+            <id>forge</id>
+
+            <activation>
+                <property>
+                    <name>env.MAVEN_SNAPSHOTS_URL</name>
+                </property>
+            </activation>
+
+            <repositories>
+
+                <repository>
+                    <id>porelo-forge-snapshots</id>
+                    <name>The forge's snapshot repository</name>
+                    <url>${env.MAVEN_SNAPSHOTS_URL}</url>
+                    <releases>
+                        <enabled>false</enabled>
+                    </releases>
+                    <snapshots>
+                        <updatePolicy>always</updatePolicy>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </repository>
+
+            </repositories>
+
+            <pluginRepositories>
+
+                <pluginRepository>
+                    <id>porelo-forge-snapshots</id>
+                    <name>The forge's snapshot repository</name>
+                    <url>${env.MAVEN_SNAPSHOTS_URL}</url>
+                    <releases>
+                        <enabled>false</enabled>
+                    </releases>
+                    <snapshots>
+                        <updatePolicy>always</updatePolicy>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </pluginRepository>
+
+            </pluginRepositories>
+
+        </profile>
+
+    </profiles>
 
 </settings>

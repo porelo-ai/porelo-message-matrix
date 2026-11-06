@@ -18,6 +18,8 @@ permissions: {}
 jobs:
     delete:
         name: Runs up to ${{ inputs.before }}
+        # It calls GitHub's API, so it runs only where PORELO_PUBLISH is true, which is GitHub; on a forge it is skipped.
+        if: vars.PORELO_PUBLISH == 'true'
         # The only permission this needs, and it is the one that lets it delete.
         permissions:
             actions: write

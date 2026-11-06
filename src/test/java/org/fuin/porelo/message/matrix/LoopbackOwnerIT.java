@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
 class LoopbackOwnerIT {
 
     private static final Pattern BASE =
-            Pattern.compile("(?m)^\\s*base_image:\\s*\"([^\"]+@sha256:[0-9a-f]+)\"\\s*$");
+            Pattern.compile("(?m)^\\s*from:\\s*\"([^\"]+@sha256:[0-9a-f]+)\"\\s*$");
 
     private static final String TOKEN = "syt_must_never_reach_another_account";
 
@@ -109,7 +109,8 @@ class LoopbackOwnerIT {
         final Matcher m =
                 BASE.matcher(Files.readString(Path.of("porelo.yml"), StandardCharsets.UTF_8));
         if (!m.find()) {
-            throw new IllegalStateException("porelo.yml names no base_image by its digest");
+            throw new IllegalStateException(
+                    "porelo.yml names no image to build from by its digest");
         }
         return m.group(1);
     }

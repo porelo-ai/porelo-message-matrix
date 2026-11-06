@@ -14,6 +14,11 @@ on:
 permissions:
     contents: read
 
+# The same file runs on GitHub and on the host's forge; what differs between them is only the values of variables and
+# secrets present on both. The snapshot repository Maven reads (settings.xml), and with it the token that reads it.
+env:
+    MAVEN_SNAPSHOTS_URL: ${{ vars.MAVEN_SNAPSHOTS_URL }}
+
 concurrency:
     group: shared-rules-${{ github.ref }}
     cancel-in-progress: true
@@ -30,6 +35,16 @@ jobs:
                   persist-credentials: false
                   fetch-depth: 0
 
+            # A forge with no registry or no token for it would quietly read Sonatype's snapshots alone.
+            - name: A forge names its registry and its token
+              env:
+                  SERVER_URL: ${{ github.server_url }}
+                  PORELO_PACKAGES_READ_TOKEN: ${{ secrets.PORELO_PACKAGES_READ_TOKEN }}
+              run: |
+                  [ "$SERVER_URL" != 'https://github.com' ] || exit 0
+                  [ -n "$MAVEN_SNAPSHOTS_URL" ] || { echo "::error::vars.MAVEN_SNAPSHOTS_URL is empty on $SERVER_URL"; exit 1; }
+                  [ -n "$PORELO_PACKAGES_READ_TOKEN" ] || { echo "::error::secrets.PORELO_PACKAGES_READ_TOKEN is empty on $SERVER_URL"; exit 1; }
+
             - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: |
@@ -40,37 +55,48 @@ jobs:
 
             # As in the build: the runner's own Java only runs the tools, which install the pinned GraalVM.
             - name: Resolve the build's tools
+              env:
+                  PORELO_PACKAGES_READ_TOKEN: ${{ secrets.PORELO_PACKAGES_READ_TOKEN }}
               run: |
                   test -n "${JAVA_HOME_25_X64:-}" || { echo "the runner has no Java 25 (JAVA_HOME_25_X64)"; exit 1; }
                   JAVA_HOME="$JAVA_HOME_25_X64" ./mvnw -B -ntp -q -U -s settings.xml -Pci-tools dependency:build-classpath \
                       -Dmdep.outputFile="$RUNNER_TEMP/ci-tools.classpath"
 
             - name: Install the pinned GraalVM
-              run: >-
-                  "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-                  org.fuin.porelo.machines.Main jdk --github
+              run: |
+                  "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.machines.Main jdk --github
 
             - name: Refuse a shared rules block whose hash does not fit its text
-              run: >-
-                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-                  org.fuin.porelo.release.Main check-shared AGENTS.md .editorconfig
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main check-shared AGENTS.md .editorconfig
 
             - name: Refuse a link to an issue's file and an issue number in any file
-              run: >-
-                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-                  org.fuin.porelo.release.Main check-citations .
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main check-citations .
 
             - name: Refuse a page missing from the site's navigation or a link out of doc
-              run: >-
-                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-                  org.fuin.porelo.release.Main check-doc-site doc mkdocs.yml
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main check-doc-site doc mkdocs.yml
 
             - name: Refuse a module without a README.md, or one that does not link its submodules
-              run: >-
-                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")"
-                  org.fuin.porelo.release.Main check-readmes .
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main check-readmes .
+
+            # Snapshots read on a forge from its registry and from Sonatype, only this project's group asked of
+            # Sonatype; a filter that lost its switch or its file would ask Sonatype for every name.
+            - name: Refuse a snapshot filter that lets a private name out
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main check-snapshot-filter .
 
             - name: The tests that read a document
+              env:
+                  PORELO_PACKAGES_READ_TOKEN: ${{ secrets.PORELO_PACKAGES_READ_TOKEN }}
               run: ./mvnw -B -ntp -s settings.xml -Pdocuments test
 
             # A pull request's own commits held to the shared rule on commit messages. One from outside - from another
