@@ -212,8 +212,11 @@ class PodmanUnitTest {
     static Stream<Arguments> realCauses() {
         return Stream.of(
                         "Error: I/O error: Resource temporarily unavailable (os error 11)",
-                        "Error: I/O error: Failed to create RocksDB directory: `Os { code: 2, kind: NotFound, message: \"No such file or directory\" }`.",
-                        "Error: There was a problem with your configuration file: data did not match any variant of untagged enum Either for key \"PORT\" in `TUWUNEL_` environment variable(s)")
+                        "Error: I/O error: Failed to create RocksDB directory: `Os { code: 2, kind:"
+                                + " NotFound, message: \"No such file or directory\" }`.",
+                        "Error: There was a problem with your configuration file: data did not"
+                                + " match any variant of untagged enum Either for key \"PORT\" in"
+                                + " `TUWUNEL_` environment variable(s)")
                 .flatMap(
                         message ->
                                 Stream.of(
@@ -434,7 +437,11 @@ class PodmanUnitTest {
             } else if ("cause".equals(args[0])) {
                 try {
                     LocalHomeserver.awaitUp(
-                            URI.create("http://127.0.0.1:1"), Duration.ZERO, System.getenv(), unit);
+                            URI.create("http://127.0.0.1:1"),
+                            Duration.ZERO,
+                            System.getenv(),
+                            unit,
+                            System.err);
                     throw new AssertionError("the zero-duration start must time out");
                 } catch (final Failure failure) {
                     Main.reportFailure("setup", failure, System.err);
@@ -472,7 +479,8 @@ class PodmanUnitTest {
 
     @Test
     @DisplayName(
-            "a secret for the run is named on podman's command line, never given there, and the run's output stays out of the journal")
+            "a secret for the run is named on podman's command line, never given there, and the"
+                    + " run's output stays out of the journal")
     void aSecretIsNeverOnTheCommandLine() {
         final List<String> command =
                 PodmanUnit.command(

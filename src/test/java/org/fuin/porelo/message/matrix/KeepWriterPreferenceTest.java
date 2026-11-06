@@ -116,7 +116,7 @@ class KeepWriterPreferenceTest {
 
     private int backupExit(final Duration budget) throws Failure {
         try {
-            Keep.backup(into, env, answeringUnit(), Duration.ofSeconds(1), budget);
+            Keep.backup(into, env, answeringUnit(), Duration.ofSeconds(1), budget, System.err);
             return Exit.OK;
         } catch (final Failure failure) {
             if (failure.exitCode() != Exit.TEMPORARY) {
@@ -210,7 +210,8 @@ class KeepWriterPreferenceTest {
                     .isEqualTo(Exit.TEMPORARY);
             assertThat(elapsed)
                     .as(
-                            "both lock waits must fit one 800 ms budget with 200 ms scheduling tolerance")
+                            "both lock waits must fit one 800 ms budget with 200 ms scheduling"
+                                    + " tolerance")
                     .isBetween(Duration.ofMillis(800), Duration.ofMillis(1000));
         }
     }
@@ -249,7 +250,8 @@ class KeepWriterPreferenceTest {
                     };
             slow.active = true;
 
-            final var answer = Keep.backup(into, env, slow, Duration.ofMillis(400), LOCK_BUDGET);
+            final var answer =
+                    Keep.backup(into, env, slow, Duration.ofMillis(400), LOCK_BUDGET, System.err);
 
             assertThat(answer.path("backup").asLong())
                     .as("both snapshots, after a lock wait longer than their own")
@@ -268,7 +270,7 @@ class KeepWriterPreferenceTest {
         int exit = Exit.OK;
         String reason = "";
         try {
-            Keep.backup(into, env, answeringUnit(), Duration.ofSeconds(1), LOCK_BUDGET);
+            Keep.backup(into, env, answeringUnit(), Duration.ofSeconds(1), LOCK_BUDGET, System.err);
         } catch (final Failure failure) {
             exit = failure.exitCode();
             reason = failure.getMessage();

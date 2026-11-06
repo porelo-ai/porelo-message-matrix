@@ -151,7 +151,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "setup makes the provisioning account, the project's room and its relay, and says what it reaches")
+            "setup makes the provisioning account, the project's room and its relay, and says what"
+                    + " it reaches")
     void setupMakesTheConversation() throws Exception {
         final JsonNode answer = run(firstRun(), "setup", "--project", PROJECT);
 
@@ -220,7 +221,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "clear --project deactivates every account in the room and deletes the room; run again it finds nothing, and setup makes it anew")
+            "clear --project deactivates every account in the room and deletes the room; run again"
+                    + " it finds nothing, and setup makes it anew")
     void clearTakesTheConversationAway() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
@@ -289,7 +291,8 @@ class LifecycleIT {
      */
     @Test
     @DisplayName(
-            "clear --project leaves active a member who is in another project's room too, and says so in kept")
+            "clear --project leaves active a member who is in another project's room too, and says"
+                    + " so in kept")
     void clearKeepsAMemberOfAnotherProject() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
@@ -342,7 +345,8 @@ class LifecycleIT {
      */
     @Test
     @DisplayName(
-            "enroll and retire through another project refuse a task account that is in a project's room, and change nothing")
+            "enroll and retire through another project refuse a task account that is in a project's"
+                    + " room, and change nothing")
     void anotherProjectsTaskIsLeftAlone() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", "a");
         final Map<String, String> kept =
@@ -419,7 +423,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A room somebody else made under the project's alias is refused by setup and enroll with 78, and clear leaves it and its people alone")
+            "A room somebody else made under the project's alias is refused by setup and enroll"
+                    + " with 78, and clear leaves it and its people alone")
     void foreignAliasIsRefused() throws Exception {
         final JsonNode first = run(firstRun(), "setup", "--project", "other");
         final Map<String, String> kept =
@@ -465,7 +470,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "Porelo's own room, opened to anyone since, is refused by enroll with 78, naming what is wrong")
+            "Porelo's own room, opened to anyone since, is refused by enroll with 78, naming what"
+                    + " is wrong")
     void openedRoomIsRefused() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
@@ -503,7 +509,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A password reset leaves the password in no event of the admin room: command and reply are redacted")
+            "A password reset leaves the password in no event of the admin room: command and reply"
+                    + " are redacted")
     void resetPasswordIsNotKept() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
@@ -555,7 +562,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "clear --project without the secrets of a setup says that nothing was made, and exits 0")
+            "clear --project without the secrets of a setup says that nothing was made, and exits"
+                    + " 0")
     void clearWithoutSetup() throws Exception {
         final JsonNode cleared = run(Map.of(), "clear", "--project", PROJECT);
 
@@ -570,7 +578,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "setup refuses with 78 a homeserver whose provisioning account exists while Porelo holds no token for it")
+            "setup refuses with 78 a homeserver whose provisioning account exists while Porelo"
+                    + " holds no token for it")
     void lostAccountIsRefused() throws Exception {
         run(firstRun(), "setup", "--project", PROJECT);
 
@@ -582,7 +591,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A homeserver reset since setup is said as that, with 78, by setup and by the verbs after it")
+            "A homeserver reset since setup is said as that, with 78, by setup and by the verbs"
+                    + " after it")
     void resetHomeserverIsSaid() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
@@ -591,7 +601,7 @@ class LifecycleIT {
         unit.stop();
         unit.removeDatabase();
         unit.start();
-        LocalHomeserver.awaitUp(URI.create(url()));
+        LocalHomeserver.awaitUp(URI.create(url()), System.err);
 
         for (final String[] args :
                 new String[][] {
@@ -607,7 +617,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A provisioning token the homeserver refuses while @porelo exists is not taken for a reset")
+            "A provisioning token the homeserver refuses while @porelo exists is not taken for a"
+                    + " reset")
     void wrongTokenIsNotAReset() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> wrong = with(firstRun(), setup.path("secrets"));
@@ -635,7 +646,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "Enrolled tasks talk through the project's room: send, poll by the relay, read, receipt")
+            "Enrolled tasks talk through the project's room: send, poll by the relay, read,"
+                    + " receipt")
     void enrolledTasksTalk() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> lifecycle =
@@ -842,7 +854,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A task is shown by the nickname enroll --display gives it, by its name without one, and renamed by enrolling again")
+            "A task is shown by the nickname enroll --display gives it, by its name without one,"
+                    + " and renamed by enrolling again")
     void nickname() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> lifecycle =
@@ -1055,7 +1068,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "A person joins once, with a login shown once; a second join needs --reset, which gives a new password")
+            "A person joins once, with a login shown once; a second join needs --reset, which gives"
+                    + " a new password")
     void join() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> lifecycle =
@@ -1360,7 +1374,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "Settings the transport does not know, or a relative CA file, are refused with 78 before anything is made")
+            "Settings the transport does not know, or a relative CA file, are refused with 78"
+                    + " before anything is made")
     void badSettings() {
         settings = "{\"federation\":true}";
         assertThat(attempt(firstRun(), "setup", "--project", PROJECT).exit())
@@ -1373,7 +1388,8 @@ class LifecycleIT {
 
     @Test
     @DisplayName(
-            "Arguments not in the lifecycle's shape are 64, and so is a person named like the machinery")
+            "Arguments not in the lifecycle's shape are 64, and so is a person named like the"
+                    + " machinery")
     void badArguments() {
         assertThat(attempt(firstRun(), "setup").exit()).isEqualTo(Exit.USAGE);
         assertThat(attempt(firstRun(), "enroll", "--project", PROJECT).exit())

@@ -64,7 +64,8 @@ final class Keep {
             final List<String> args,
             final Map<String, String> env,
             final Unit unit,
-            final PrintStream out)
+            final PrintStream out,
+            final PrintStream err)
             throws Failure {
         if (args.size() != 1
                 || args.getFirst().isBlank()
@@ -74,8 +75,8 @@ final class Keep {
         final Path dir = Path.of(args.getFirst());
         final ObjectNode answer =
                 "backup".equals(verb)
-                        ? backup(dir, env, unit, BACKUP_WAIT)
-                        : restore(dir, env, unit);
+                        ? backup(dir, env, unit, BACKUP_WAIT, LOCK_WAIT, err)
+                        : restore(dir, env, unit, err);
         try {
             out.println(MatrixClient.JSON.writeValueAsString(answer));
         } catch (final JacksonException ex) {
@@ -102,9 +103,13 @@ final class Keep {
     // ------------------------------------------------------------------------------------------
 
     static ObjectNode backup(
-            final Path dir, final Map<String, String> env, final Unit unit, final Duration wait)
+            final Path dir,
+            final Map<String, String> env,
+            final Unit unit,
+            final Duration wait,
+            final PrintStream err)
             throws Failure {
-        return backup(dir, env, unit, wait, LOCK_WAIT);
+        return backup(dir, env, unit, wait, LOCK_WAIT, err);
     }
 
     /** A backup with one bounded budget for acquiring its locks. */
@@ -113,7 +118,21 @@ final class Keep {
             final Map<String, String> env,
             final Unit unit,
             final Duration wait,
-            final Duration lockWait)
+            final Duration lockWait,
+            final PrintStream err)
+            throws Failure {
+        try (Progress progress = new Progress(err)) {
+            return backup(dir, env, unit, wait, lockWait, progress);
+        }
+    }
+
+    private static ObjectNode backup(
+            final Path dir,
+            final Map<String, String> env,
+            final Unit unit,
+            final Duration wait,
+            final Duration lockWait,
+            final Progress progress)
             throws Failure {
         final long started = System.nanoTime();
         if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) {
@@ -141,19 +160,22 @@ final class Keep {
         }
         final Path state = Poll.stateDirectory(env);
         final long id;
+        final Duration remaining = lockWait.minusNanos(System.nanoTime() - started);
+        progress.phase(
+                "waiting for the backup locks", remaining.isNegative() ? Duration.ZERO : remaining);
         try {
             Files.createDirectories(state);
             // New polls yield before the positions lock, so overlapping polls cannot starve us.
             try (FileChannel wanted = lockFile(state, WANTED);
-                    FileLock intent = exclusive(wanted, started, lockWait);
+                    FileLock intent = exclusive(wanted, started, lockWait, progress);
                     FileChannel channel = lockFile(state);
-                    FileLock held = exclusive(channel, started, lockWait)) {
+                    FileLock held = exclusive(channel, started, lockWait, progress)) {
                 // Another backup may have filled it while this one waited for the locks.
                 if (!empty(dir)) {
                     throw new Failure(
                             Exit.CONFIG, dir + " is not empty: a copy goes into an empty one");
                 }
-                id = fill(dir, env, unit, wait, backups, state);
+                id = fill(dir, env, unit, wait, backups, state, progress);
             }
         } catch (final IOException ex) {
             throw new Failure(Exit.CONFIG, "cannot copy into " + dir + ": " + ex.getMessage(), ex);
@@ -171,7 +193,8 @@ final class Keep {
             final Unit unit,
             final Duration wait,
             final Path backups,
-            final Path state)
+            final Path state,
+            final Progress progress)
             throws Failure, IOException {
         boolean done = false;
         try {
@@ -180,11 +203,13 @@ final class Keep {
             final Instant deadline = Instant.now().plus(wait);
             // What a backup that died asked for may still be running, and is older than the
             // positions: under these locks no poll moves them, so what follows holds all they name.
-            snapshot(unit, meta, deadline, wait);
+            snapshot(unit, meta, deadline, wait, progress);
             // The positions first: taken before the backup, none points past what it holds.
+            progress.phase("copying the poll positions");
             copyPositions(state, dir.resolve(POSITIONS));
-            final long id = snapshot(unit, meta, deadline, wait);
+            final long id = snapshot(unit, meta, deadline, wait, progress);
             // Still held: a later backup thins the old ones, and would remove files being copied.
+            progress.phase("copying the homeserver backup");
             copySnapshot(backups, dir.resolve(DATABASE), id);
             final Path conf = LocalHomeserver.directory(env).resolve(CONF);
             if (Files.isRegularFile(conf)) {
@@ -219,15 +244,27 @@ final class Keep {
      * in signal order, so the one that appears may be an earlier signal's.
      */
     private static long snapshot(
-            final Unit unit, final Path meta, final Instant deadline, final Duration wait)
+            final Unit unit,
+            final Path meta,
+            final Instant deadline,
+            final Duration wait,
+            final Progress progress)
             throws Failure, IOException {
         final long before = newest(meta).orElse(0);
+        final Duration remaining = Duration.between(Instant.now(), deadline);
+        progress.phase(
+                "waiting for the homeserver snapshot",
+                remaining.isNegative() ? Duration.ZERO : remaining);
         unit.signalBackup();
-        return awaitBackup(meta, before, deadline, wait);
+        return awaitBackup(meta, before, deadline, wait, progress);
     }
 
     private static long awaitBackup(
-            final Path meta, final long before, final Instant deadline, final Duration wait)
+            final Path meta,
+            final long before,
+            final Instant deadline,
+            final Duration wait,
+            final Progress progress)
             throws Failure, IOException {
         while (true) {
             final OptionalLong newest = newest(meta);
@@ -235,6 +272,7 @@ final class Keep {
                 return newest.getAsLong();
             }
             if (!Instant.now().isBefore(deadline)) {
+                progress.timeout();
                 throw new Failure(
                         Exit.TEMPORARY,
                         "the homeserver made no backup within " + wait.toSeconds() + " s");
@@ -262,7 +300,8 @@ final class Keep {
     // --- restore
     // ------------------------------------------------------------------------------------------
 
-    static ObjectNode restore(final Path dir, final Map<String, String> env, final Unit unit)
+    static ObjectNode restore(
+            final Path dir, final Map<String, String> env, final Unit unit, final PrintStream err)
             throws Failure {
         if (!unit.installed()) {
             throw new Failure(
@@ -298,7 +337,8 @@ final class Keep {
                                             new Failure(
                                                     Exit.CONFIG,
                                                     dir
-                                                            + " holds no whole backup of the homeserver"));
+                                                            + " holds no whole backup of the"
+                                                            + " homeserver"));
             final Path confThere = dir.resolve(CONF);
             if (!Files.isRegularFile(confThere)) {
                 throw new Failure(Exit.CONFIG, dir + " holds no " + CONF);
@@ -336,9 +376,14 @@ final class Keep {
                 Files.createDirectories(state);
                 made.addAll(copyContents(positions, state));
             }
-            final int exit =
-                    unit.runOnce(
-                            List.of("--restore-backup", "--execute", "server shutdown"), Map.of());
+            final int exit;
+            try (Progress progress = new Progress(err)) {
+                progress.phase("waiting for the homeserver restore run");
+                exit =
+                        unit.runOnce(
+                                List.of("--restore-backup", "--execute", "server shutdown"),
+                                Map.of());
+            }
             if (exit != 0) {
                 throw new Failure(
                         Exit.CONFIG,
@@ -415,9 +460,10 @@ final class Keep {
             final MatrixClient nobody,
             final URI url,
             final Map<String, String> env,
-            final Unit unit)
+            final Unit unit,
+            final PrintStream err)
             throws Failure {
-        return retake(nobody, url, env, unit, LocalHomeserver.START_TIMEOUT);
+        return retake(nobody, url, env, unit, LocalHomeserver.START_TIMEOUT, err);
     }
 
     /** Retakes with a bounded restart wait, including when the unit never answers. */
@@ -426,26 +472,32 @@ final class Keep {
             final URI url,
             final Map<String, String> env,
             final Unit unit,
-            final Duration within)
+            final Duration within,
+            final PrintStream err)
             throws Failure {
         final String password = Accounts.password();
-        unit.stop();
         final int exit;
-        try {
-            exit =
-                    unit.runOnce(
-                            List.of(),
-                            Map.of(
-                                    "TUWUNEL_ADMIN_EXECUTE",
-                                    "[\"users reset-password "
-                                            + Lifecycle.ADMIN
-                                            + " "
-                                            + password
-                                            + "\", \"server shutdown\"]"));
-        } finally {
-            unit.start();
+        try (Progress progress = new Progress(err)) {
+            progress.phase("stopping the restored homeserver");
+            unit.stop();
+            try {
+                progress.phase("waiting for the homeserver administrator reset run");
+                exit =
+                        unit.runOnce(
+                                List.of(),
+                                Map.of(
+                                        "TUWUNEL_ADMIN_EXECUTE",
+                                        "[\"users reset-password "
+                                                + Lifecycle.ADMIN
+                                                + " "
+                                                + password
+                                                + "\", \"server shutdown\"]"));
+            } finally {
+                progress.phase("starting the restored homeserver");
+                unit.start();
+            }
         }
-        LocalHomeserver.awaitUp(url, within, env, unit, password);
+        LocalHomeserver.awaitUp(url, within, env, unit, err, password);
         if (exit != 0) {
             throw new Failure(
                     Exit.CONFIG,
@@ -507,10 +559,14 @@ final class Keep {
     }
 
     private static FileLock exclusive(
-            final FileChannel channel, final long started, final Duration lockWait)
+            final FileChannel channel,
+            final long started,
+            final Duration lockWait,
+            final Progress progress)
             throws IOException, Failure {
         while (true) {
             if (System.nanoTime() - started >= lockWait.toNanos()) {
+                progress.timeout();
                 throw new Failure(
                         Exit.TEMPORARY,
                         "a poll or another backup held "
@@ -623,7 +679,8 @@ final class Keep {
                     throw new Failure(
                             Exit.CONFIG,
                             path
-                                    + " is neither a poll position nor the references; the copy is refused");
+                                    + " is neither a poll position nor the references; the copy is"
+                                    + " refused");
                 }
             }
         }

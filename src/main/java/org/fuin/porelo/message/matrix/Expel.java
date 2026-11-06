@@ -25,7 +25,8 @@ final class Expel {
             final List<String> args,
             final Map<String, String> env,
             final PrintStream out,
-            final Unit unit)
+            final Unit unit,
+            final PrintStream err)
             throws Failure {
         if (args.size() != 1) {
             throw new Failure(Exit.USAGE, "usage: expel <login>");
@@ -37,8 +38,8 @@ final class Expel {
                     Exit.CONFIG,
                     "expel needs the homeserver administrator's token among the secrets on stdin");
         }
-        final MatrixClient nobody = homeserver(env, unit);
-        final Accounts.Session admin = Lifecycle.admin(nobody, env, "", unit);
+        final MatrixClient nobody = homeserver(env, unit, err);
+        final Accounts.Session admin = Lifecycle.admin(nobody, env, "", unit, err);
         final AdminRoom room = AdminRoom.of(nobody.as(token), admin.userId());
         out.println(expel(env, login, AdminRoom.server(admin.userId()), room));
     }
@@ -47,10 +48,10 @@ final class Expel {
      * Behind the gate only its private socket reaches the homeserver, which the host keeps running;
      * without it, the account's own homeserver on its loopback port.
      */
-    private static MatrixClient homeserver(final Map<String, String> env, final Unit unit)
-            throws Failure {
+    private static MatrixClient homeserver(
+            final Map<String, String> env, final Unit unit, final PrintStream err) throws Failure {
         if (!gated(env)) {
-            final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
+            final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit, err);
             return new MatrixClient(new Config(local.url(), "", null, true));
         }
         return behindGate(env);

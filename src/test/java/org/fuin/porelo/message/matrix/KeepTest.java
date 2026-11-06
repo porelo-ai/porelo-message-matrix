@@ -44,6 +44,102 @@ class KeepTest {
         unit = new StandIn();
     }
 
+    /** Harm guarded: a backup must reveal its active phase without breaking its JSON answer. */
+    @Test
+    void aBackupNamesItsPhasesBeforeDoingTheirWork() throws Exception {
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        Files.createDirectories(conf().getParent());
+        Files.writeString(conf(), "PORELO_MATRIX_PORT=8008\n");
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        final ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        final StandIn answering =
+                new Snapshotting(0) {
+                    @Override
+                    public void signalBackup() throws Failure {
+                        assertThat(stderr.toString(StandardCharsets.UTF_8))
+                                .as("the snapshot phase is visible before the signal is sent")
+                                .contains("waiting for the homeserver snapshot");
+                        super.signalBackup();
+                    }
+                };
+        Keep.run(
+                "backup",
+                List.of(into.toString()),
+                env,
+                answering,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        assertThat(
+                        stderr.toString(StandardCharsets.UTF_8)
+                                .lines()
+                                .map(line -> line.replaceFirst(" \\(.*\\)$", ""))
+                                .toList())
+                .as("each wait and copy is named when its phase starts")
+                .containsExactly(
+                        "waiting for the backup locks",
+                        "waiting for the homeserver snapshot",
+                        "copying the poll positions",
+                        "waiting for the homeserver snapshot",
+                        "copying the homeserver backup");
+        assertThat(stdout.toString(StandardCharsets.UTF_8))
+                .as("stdout remains exactly the existing single JSON answer")
+                .isEqualTo("{\"backup\":2}" + System.lineSeparator());
+    }
+
+    /**
+     * Harm guarded: the second snapshot shares the first one's deadline, so announcing the whole
+     * wait again would promise time the backup no longer has.
+     */
+    @Test
+    void theSecondSnapshotIsAnnouncedWithTheTimeLeft() throws Exception {
+        Files.createDirectories(Keep.backups(env).resolve("meta"));
+        Files.createDirectories(conf().getParent());
+        Files.writeString(conf(), "PORELO_MATRIX_PORT=8008\n");
+        final Path into = Files.createDirectory(dir.resolve("into"));
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        final StandIn slowFirst =
+                new Snapshotting(0) {
+                    @Override
+                    public void signalBackup() throws Failure {
+                        super.signalBackup();
+                        if (signals == 1) {
+                            try {
+                                // Past a whole second: the time left, rounded up, is a second less.
+                                Thread.sleep(1100);
+                            } catch (final InterruptedException ex) {
+                                Thread.currentThread().interrupt();
+                                throw new Failure(Exit.TEMPORARY, "interrupted", ex);
+                            }
+                        }
+                    }
+                };
+
+        Keep.run(
+                "backup",
+                List.of(into.toString()),
+                env,
+                slowFirst,
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        final List<Long> limits =
+                stderr.toString(StandardCharsets.UTF_8)
+                        .lines()
+                        .filter(line -> line.startsWith("waiting for the homeserver snapshot"))
+                        .map(line -> Long.parseLong(line.replaceFirst(".* of (\\d+)\\)$", "$1")))
+                        .toList();
+        assertThat(limits).as("the snapshots announced").hasSize(2);
+        assertThat(limits.getFirst())
+                .as("the first snapshot has the whole wait")
+                .isEqualTo(Keep.BACKUP_WAIT.toSeconds());
+        // A slow runner may take more than the second slept; only the whole wait again is wrong.
+        assertThat(limits.getLast())
+                .as("the second snapshot has only what is left")
+                .isBetween(Keep.BACKUP_WAIT.toSeconds() - 10, Keep.BACKUP_WAIT.toSeconds() - 1);
+    }
+
     /** A homeserver that only says what it is asked, and counts what it is told to do. */
     static class StandIn implements Unit {
 
@@ -142,7 +238,8 @@ class KeepTest {
                     URI.create("http://127.0.0.1:1"),
                     env,
                     retaking,
-                    Duration.ZERO);
+                    Duration.ZERO,
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8));
             throw new AssertionError("the restarted homeserver must time out");
         } catch (final Failure failure) {
             Main.reportFailure(
@@ -150,6 +247,21 @@ class KeepTest {
         }
         assertThat(captured[0].length()).as("the run supplied a generated password").isEqualTo(32);
         final String printed = stderr.toString(StandardCharsets.UTF_8);
+        assertThat(printed.lines().toList())
+                .as("retake progress and the final failure all reach the command's stream")
+                .hasSize(6)
+                .startsWith(
+                        "stopping the restored homeserver (0 s)",
+                        "waiting for the homeserver administrator reset run (0 s)",
+                        "starting the restored homeserver (0 s)",
+                        "waiting for the homeserver on 127.0.0.1:1 (0 s of 0)");
+        assertThat(
+                        printed.lines()
+                                .limit(4)
+                                .collect(java.util.stream.Collectors.joining())
+                                .replace(" ", ""))
+                .as("the actual retake progress stream never includes its generated password")
+                .doesNotContain(captured[0]);
         assertThat(printed.replace(" ", "").contains(captured[0]))
                 .as("the generated password cannot reach stderr even with spacing")
                 .isFalse();
@@ -158,9 +270,38 @@ class KeepTest {
                                 .toList()
                                 .getLast()
                                 .equals(
-                                        "the homeserver's last error was withheld: it held a secret"))
+                                        "the homeserver's last error was withheld: it held a"
+                                                + " secret"))
                 .as("retake supplies its generated password to the diagnostic filter")
                 .isTrue();
+    }
+
+    /** Harm guarded: a blocking restore must announce its run before entering it. */
+    @Test
+    void aRestoreNamesItsRunBeforeStartingIt() throws Exception {
+        final Path saved = copy("8008");
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        final ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        final StandIn restoring =
+                new StandIn() {
+                    @Override
+                    public int runOnce(final List<String> args, final Map<String, String> secrets) {
+                        assertThat(stderr.toString(StandardCharsets.UTF_8).lines().toList())
+                                .as("the phase is visible before the blocking restore begins")
+                                .containsExactly("waiting for the homeserver restore run (0 s)");
+                        return super.runOnce(args, secrets);
+                    }
+                };
+        Keep.run(
+                "restore",
+                List.of(saved.toString()),
+                env,
+                restoring,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+        assertThat(stdout.toString(StandardCharsets.UTF_8))
+                .as("restore retains its existing single JSON answer")
+                .isEqualTo("{\"restore\":3}" + System.lineSeparator());
     }
 
     /** A copy as backup writes one: a whole backup, the settings, a position. */
@@ -201,7 +342,7 @@ class KeepTest {
         Files.writeString(into.resolve("left"), "something");
         unit.active = true;
 
-        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofSeconds(1)))
+        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofSeconds(1), System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
@@ -212,7 +353,8 @@ class KeepTest {
 
     @Test
     @DisplayName(
-            "backup gives up when no backup appears in time, as a temporary failure, and leaves no half copy")
+            "backup gives up when no backup appears in time, as a temporary failure, and leaves no"
+                    + " half copy")
     void backupWithoutAnAnswerIsTemporary() throws IOException, Failure {
         final Path into = Files.createDirectories(dir.resolve("into"));
         Files.createDirectories(Keep.backups(env));
@@ -220,7 +362,7 @@ class KeepTest {
         Files.writeString(Poll.stateDirectory(env).resolve("abc.since"), "s1\n");
         unit.active = true;
 
-        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofMillis(300)))
+        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofMillis(300), System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.TEMPORARY));
@@ -241,7 +383,7 @@ class KeepTest {
         answering.active = true;
         final Path into = Files.createDirectory(dir.resolve("into"));
 
-        Keep.backup(into, env, answering, Duration.ofSeconds(1));
+        Keep.backup(into, env, answering, Duration.ofSeconds(1), System.err);
 
         try (var files = Files.list(into.resolve("positions"))) {
             assertThat(files.map(file -> file.getFileName().toString()))
@@ -259,7 +401,7 @@ class KeepTest {
         final Path copy = copy("8008");
         Files.writeString(copy.resolve("positions").resolve(Keep.WANTED), "");
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .as("a copy cannot supply the live processes' backup gate")
                 .isInstanceOfSatisfying(
                         Failure.class,
@@ -285,7 +427,7 @@ class KeepTest {
         Files.writeString(copy.resolve("ca.crt"), "the CA's certificate");
         Files.writeString(copy.resolve("ca.key"), "the CA's key");
 
-        Keep.restore(copy, env, unit);
+        Keep.restore(copy, env, unit, System.err);
 
         assertThat(conf().resolveSibling("ca.crt"))
                 .as("no CA certificate restored into the account")
@@ -305,7 +447,7 @@ class KeepTest {
                 "PORELO_MATRIX_PORT=8008\nPORELO_MATRIX_PUBLISH=192.0.2.1:8448\n"
                         + "PORELO_MATRIX_PUBLISH_NAME=host.example\n");
 
-        Keep.restore(copy, env, unit);
+        Keep.restore(copy, env, unit, System.err);
 
         assertThat(conf()).as("only the port is restored").hasContent("PORELO_MATRIX_PORT=8008");
     }
@@ -316,7 +458,8 @@ class KeepTest {
         final Path copy = copy("8008");
         unit.database = true;
 
-        assertThat(Keep.restore(copy, env, unit).path("restore").asText()).isEqualTo("present");
+        assertThat(Keep.restore(copy, env, unit, System.err).path("restore").asText())
+                .isEqualTo("present");
         assertThat(unit.runs).as("runs of the homeserver's own").isZero();
         assertThat(Keep.backups(env)).as("no backups copied in").doesNotExist();
         assertThat(conf()).as("no settings written").doesNotExist();
@@ -329,7 +472,7 @@ class KeepTest {
         Files.createDirectories(conf().getParent());
         Files.writeString(conf(), "PORELO_MATRIX_PORT=8008\n", StandardCharsets.UTF_8);
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -344,7 +487,7 @@ class KeepTest {
         final Path copy = copy("8008");
         Files.delete(copy.resolve("database/meta/3"));
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -360,7 +503,7 @@ class KeepTest {
         Files.createSymbolicLink(
                 copy.resolve("database/private/3/OPTIONS"), Path.of("/etc/passwd"));
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -370,12 +513,13 @@ class KeepTest {
 
     @Test
     @DisplayName(
-            "a restore whose run fails takes away all it made: settings, backups, positions, database")
+            "a restore whose run fails takes away all it made: settings, backups, positions,"
+                    + " database")
     void aFailedRestoreLeavesNothing() throws Exception {
         final Path copy = copy("8008");
         unit.runExit = 1;
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -391,7 +535,7 @@ class KeepTest {
         final Path copy = copy("8008");
         Files.writeString(copy.resolve("positions/keep.lock"), "x");
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -405,7 +549,7 @@ class KeepTest {
         final Path copy = copy("8008");
         unit.active = true;
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG));
@@ -422,7 +566,7 @@ class KeepTest {
         answering.active = true;
         final Path into = Files.createDirectory(dir.resolve("into"));
 
-        final var answer = Keep.backup(into, env, answering, Duration.ofSeconds(1));
+        final var answer = Keep.backup(into, env, answering, Duration.ofSeconds(1), System.err);
 
         assertThat(answer.path("backup").asLong()).as("the backup it names").isEqualTo(7);
         assertThat(into.resolve("database/meta/7")).as("its mark").hasContent("snapshot");
@@ -446,7 +590,7 @@ class KeepTest {
                 conf(),
                 "PORELO_MATRIX_PORT=8008\n" + LocalHomeserver.SERVER_NAME + "=here.example\n");
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
@@ -468,7 +612,7 @@ class KeepTest {
         Files.delete(copy.resolve("homeserver.conf"));
         Files.createSymbolicLink(copy.resolve("homeserver.conf"), elsewhere);
 
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
@@ -491,7 +635,7 @@ class KeepTest {
                     }
                 };
         try {
-            assertThatThrownBy(() -> Keep.restore(copy, env, failing))
+            assertThatThrownBy(() -> Keep.restore(copy, env, failing, System.err))
                     .isInstanceOfSatisfying(
                             Failure.class,
                             failure -> assertThat(failure.exitCode()).isEqualTo(Exit.CONFIG))
@@ -581,7 +725,7 @@ class KeepTest {
                     };
             late.active = true;
 
-            final var answer = Keep.backup(into, env, late, Duration.ofSeconds(5));
+            final var answer = Keep.backup(into, env, late, Duration.ofSeconds(5), System.err);
 
             assertThat(answer.path("backup").asLong())
                     .as("a snapshot asked for under this backup's locks, not number 6")
@@ -637,7 +781,7 @@ class KeepTest {
                 CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                Keep.backup(into, env, second, Duration.ofSeconds(5));
+                                Keep.backup(into, env, second, Duration.ofSeconds(5), System.err);
                                 return null;
                             } catch (final Failure failure) {
                                 return failure;
@@ -645,7 +789,7 @@ class KeepTest {
                         });
         checkedEmpty.await();
 
-        Keep.backup(into, env, new Snapshotting(5), Duration.ofSeconds(5));
+        Keep.backup(into, env, new Snapshotting(5), Duration.ofSeconds(5), System.err);
         firstDone.countDown();
 
         assertThat(refused.get(30, TimeUnit.SECONDS))
@@ -675,6 +819,7 @@ class KeepTest {
                                         Config.ACCESS_TOKEN,
                                         "t")));
 
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         assertThatThrownBy(
                         () ->
                                 Keep.retake(
@@ -682,9 +827,17 @@ class KeepTest {
                                         URI.create("http://127.0.0.1:9"),
                                         env,
                                         failing,
-                                        Duration.ofMillis(1)))
+                                        Duration.ofMillis(1),
+                                        new PrintStream(stderr, true, StandardCharsets.UTF_8)))
+                .as("the failed one-off run still reports its failure after restarting")
                 .hasMessageContaining("the run fell over");
 
+        assertThat(stderr.toString(StandardCharsets.UTF_8).lines().toList())
+                .as("retake announces stopping, its one-off run, and starting after a failure")
+                .containsExactly(
+                        "stopping the restored homeserver (0 s)",
+                        "waiting for the homeserver administrator reset run (0 s)",
+                        "starting the restored homeserver (0 s)");
         assertThat(failing.done)
                 .as("stopped, run, started")
                 .containsExactly("stop", "run", "start");
@@ -698,7 +851,7 @@ class KeepTest {
         Files.writeString(meta.resolve("7"), "old snapshot");
         final Path into = Files.createDirectory(dir.resolve("into"));
         unit.active = true;
-        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ZERO))
+        assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ZERO, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> {
@@ -720,7 +873,8 @@ class KeepTest {
         unit.active = true;
         Thread.currentThread().interrupt();
         try {
-            assertThatThrownBy(() -> Keep.backup(into, env, unit, Duration.ofMillis(300)))
+            assertThatThrownBy(
+                            () -> Keep.backup(into, env, unit, Duration.ofMillis(300), System.err))
                     .isInstanceOfSatisfying(
                             Failure.class,
                             failure -> {
@@ -745,7 +899,7 @@ class KeepTest {
     void restoreIgnoresNonNumericMetadataAndReportsTheRestoredId() throws Exception {
         final Path copy = copy("8008");
         Files.writeString(copy.resolve("database/meta/not-a-backup"), "unrelated");
-        final var result = Keep.restore(copy, env, unit);
+        final var result = Keep.restore(copy, env, unit, System.err);
         assertThat(result).as("restore returns the backup identity to its caller").isNotNull();
         assertThat(result.path("restore").asLong())
                 .as("only numeric metadata identifies a backup")
@@ -790,7 +944,8 @@ class KeepTest {
                                                 env,
                                                 unit,
                                                 Duration.ZERO,
-                                                Duration.ofMillis(300)))
+                                                Duration.ofMillis(300),
+                                                System.err))
                         .isInstanceOfSatisfying(
                                 Failure.class,
                                 failure -> {
@@ -813,7 +968,7 @@ class KeepTest {
     void restoreRefusesAFileNamedRefs() throws Exception {
         final Path copy = copy("8008");
         Files.writeString(copy.resolve("positions/refs"), "not a directory");
-        assertThatThrownBy(() -> Keep.restore(copy, env, unit))
+        assertThatThrownBy(() -> Keep.restore(copy, env, unit, System.err))
                 .isInstanceOfSatisfying(
                         Failure.class,
                         failure -> {

@@ -38,13 +38,127 @@ class LocalHomeserverTest {
 
     @TempDir private Path dir;
 
+    /** Harm guarded: a slow start must not look hung or contaminate the JSON channel. */
+    @Test
+    void aSlowHomeserverReportsItsWaitWithoutWritingToStdout() throws Exception {
+        final AdvancingClock clock = new AdvancingClock();
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        final ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        final PrintStream original = System.out;
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            for (int second = 0; second < 25; second++) {
+                homeserver.answer(503, "{}");
+            }
+            homeserver.answer(200, "{}");
+            System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+            LocalHomeserver.awaitUp(
+                    URI.create(homeserver.url()),
+                    LocalHomeserver.START_TIMEOUT,
+                    Map.of("XDG_CONFIG_HOME", dir.toString()),
+                    new LoggedUnit(List.of(), "inactive"),
+                    clock,
+                    clock::nanoTime,
+                    Duration.ofSeconds(10),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                    () -> clock.advance(Duration.ofSeconds(1)));
+            assertThat(stderr.toString(StandardCharsets.UTF_8).lines().toList())
+                    .as("the phase starts immediately and repeats after ten and twenty seconds")
+                    .containsExactly(
+                            "waiting for the homeserver on "
+                                    + URI.create(homeserver.url()).getAuthority()
+                                    + " (0 s of 180)",
+                            "waiting for the homeserver on "
+                                    + URI.create(homeserver.url()).getAuthority()
+                                    + " (10 s of 180)",
+                            "waiting for the homeserver on "
+                                    + URI.create(homeserver.url()).getAuthority()
+                                    + " (20 s of 180)");
+            assertThat(homeserver.requests())
+                    .as("the server answers successfully only after twenty-five simulated seconds")
+                    .hasSize(26);
+        } finally {
+            System.setOut(original);
+        }
+        assertThat(stdout.toString(StandardCharsets.UTF_8))
+                .as("waiting adds no text to the caller's JSON answer")
+                .isEmpty();
+    }
+
+    /** Harm guarded: the injectable startup wait must filter every known credential on stderr. */
+    @ParameterizedTest
+    @ValueSource(strings = {"environment", "registration", "additional"})
+    void startupProgressUsesTheSameSecretsOnTheTestablePath(final String source) throws Exception {
+        final Map<String, String> env = new HashMap<>();
+        env.put("XDG_CONFIG_HOME", dir.toString());
+        if (source.equals("environment")) {
+            env.put(Config.ADMIN_TOKEN, "orchard");
+        }
+        Files.createDirectories(HomeserverToken.directory(env));
+        Files.writeString(
+                HomeserverToken.file(env), source.equals("registration") ? "orchard\n" : "Q7\n");
+        final AdvancingClock clock = new AdvancingClock();
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        assertThatThrownBy(
+                        () ->
+                                LocalHomeserver.awaitUp(
+                                        URI.create("http://orchard:1"),
+                                        Duration.ZERO,
+                                        env,
+                                        new LoggedUnit(List.of(), "failed"),
+                                        clock,
+                                        clock::nanoTime,
+                                        Duration.ofSeconds(10),
+                                        new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                                        () -> {},
+                                        source.equals("additional") ? "orchard" : ""))
+                .as("the zero-duration startup wait fails without making a network request")
+                .isInstanceOf(Failure.class);
+        assertThat(stderr.toString(StandardCharsets.UTF_8).lines().toList())
+                .as("all three sources of known secrets protect the progress stream")
+                .containsExactly("the homeserver's last error was withheld: it held a secret");
+    }
+
+    /** Harm guarded: a timeout must leave an identifiable wait on stderr. */
+    @Test
+    void theLastProgressLineBeforeATimeoutNamesTheWait() throws Exception {
+        final AdvancingClock clock = new AdvancingClock();
+        final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            for (int second = 0; second < 3; second++) {
+                homeserver.answer(503, "{}");
+            }
+            assertThatThrownBy(
+                            () ->
+                                    LocalHomeserver.awaitUp(
+                                            URI.create(homeserver.url()),
+                                            Duration.ofSeconds(3),
+                                            Map.of("XDG_CONFIG_HOME", dir.toString()),
+                                            new LoggedUnit(List.of(), "failed"),
+                                            clock,
+                                            clock::nanoTime,
+                                            Duration.ofSeconds(10),
+                                            new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                                            () -> clock.advance(Duration.ofSeconds(1))))
+                    .as("the homeserver never becomes ready within the budget")
+                    .isInstanceOf(Failure.class)
+                    .hasMessageContaining("did not answer within 3 s");
+            assertThat(stderr.toString(StandardCharsets.UTF_8).lines().toList().getLast())
+                    .as("even a timeout shorter than the interval ends with the named wait")
+                    .isEqualTo(
+                            "waiting for the homeserver on "
+                                    + URI.create(homeserver.url()).getAuthority()
+                                    + " (3 s of 3)");
+        }
+    }
+
     /**
      * Harm guarded: setup must not wait on a new port while the active unit keeps its old one, nor
      * read a token file the running unit, started by an earlier version, does not mount.
      */
     @Test
     @DisplayName(
-            "An active unit is stopped before its start only when its port or its token file is not yet where it goes")
+            "An active unit is stopped before its start only when its port or its token file is not"
+                    + " yet where it goes")
     void aNewPortStopsAnActiveUnitBeforeStartingIt() throws Exception {
         final Map<String, String> env = Map.of("XDG_CONFIG_HOME", dir.toString());
         final List<String> calls = new ArrayList<>();
@@ -112,7 +226,7 @@ class LocalHomeserverTest {
                 .as("the active unit started before its configuration existed")
                 .doesNotExist();
 
-        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit))
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit, System.err))
                 .as("the stand-in ends setup at start, before the HTTP wait")
                 .isSameAs(started);
 
@@ -123,14 +237,14 @@ class LocalHomeserverTest {
         Files.createDirectories(HomeserverToken.directory(env));
         Files.writeString(HomeserverToken.file(env), "Q7\n");
         calls.clear();
-        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit)).isSameAs(started);
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit, System.err)).isSameAs(started);
         assertThat(calls)
                 .as("with its port and token where they are, a running unit is left running")
                 .containsExactly("start");
 
         Files.delete(HomeserverToken.file(env));
         calls.clear();
-        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit)).isSameAs(started);
+        assertThatThrownBy(() -> LocalHomeserver.ensure(env, unit, System.err)).isSameAs(started);
         assertThat(calls)
                 .as("one an earlier version started mounts the token file; its next start moves it")
                 .containsExactly("stop", "start");
@@ -145,7 +259,8 @@ class LocalHomeserverTest {
                         List.of(
                                 "Error: an earlier failure",
                                 error,
-                                "2026-01-01 ERROR tuwunel: Critical error starting server: later logged error",
+                                "2026-01-01 ERROR tuwunel: Critical error starting server: later"
+                                        + " logged error",
                                 "CreateIOUring failed: Function not implemented (errno=38)"),
                         "failed",
                         Map.of());
@@ -153,8 +268,10 @@ class LocalHomeserverTest {
         assertThat(stderr.lines().toList())
                 .as("the timeout stays before the cause alone on the last stderr line")
                 .containsExactly(
+                        "waiting for the homeserver on 127.0.0.1:1 (0 s of 0)",
                         Main.NAME
-                                + " setup: the homeserver at http://127.0.0.1:1 did not answer within 0 s",
+                                + " setup: the homeserver at http://127.0.0.1:1 did not answer"
+                                + " within 0 s",
                         error);
     }
 
@@ -405,7 +522,8 @@ class LocalHomeserverTest {
                 startupError(List.of(line), "failed", Map.of(Config.ADMIN_TOKEN, secret));
         assertThat(stderr.lines().toList().getLast())
                 .as(
-                        "every eight-character window is withheld, including decoded and composed forms")
+                        "every eight-character window is withheld, including decoded and composed"
+                                + " forms")
                 .isEqualTo("the homeserver's last error was withheld: it held a secret");
     }
 
@@ -482,7 +600,8 @@ class LocalHomeserverTest {
         final String stderr =
                 startupError(
                         List.of(
-                                "\u001b[31mError: \u001b[0m\u001b]0;title\u0007\u0000\t\r\n\u007f\u0085\u2028\u2029"
+                                "\u001b[31mError: \u001b[0m\u001b]0;title\u0007\u0000\t\r\n"
+                                        + "\u007f\u0085\u2028\u2029"
                                         + "x".repeat(400)),
                         "failed",
                         Map.of());
@@ -541,7 +660,12 @@ class LocalHomeserverTest {
         final ByteArrayOutputStream err = new ByteArrayOutputStream();
         try {
             LocalHomeserver.awaitUp(
-                    URI.create("http://127.0.0.1:1"), Duration.ZERO, env, unit, secrets);
+                    URI.create("http://127.0.0.1:1"),
+                    Duration.ZERO,
+                    env,
+                    unit,
+                    new PrintStream(err, true, StandardCharsets.UTF_8),
+                    secrets);
             throw new AssertionError("a homeserver with no time to answer must time out");
         } catch (final Failure failure) {
             final int exit =
@@ -551,6 +675,9 @@ class LocalHomeserverTest {
                     .as("the failed start keeps its temporary exit code")
                     .isEqualTo(Exit.TEMPORARY);
         }
+        assertThat(err.toString(StandardCharsets.UTF_8).lines().toList())
+                .as("the command stream receives the phase, failure, and startup cause")
+                .hasSize(3);
         return err.toString(StandardCharsets.UTF_8);
     }
 
@@ -599,7 +726,8 @@ class LocalHomeserverTest {
 
     @Test
     @DisplayName(
-            "Without a port in homeserver.conf, a free one from 8008 on is chosen and written there, beside what the file holds")
+            "Without a port in homeserver.conf, a free one from 8008 on is chosen and written"
+                    + " there, beside what the file holds")
     void choosesAndKeeps() throws Exception {
         final Path conf = dir.resolve("porelo/matrix/homeserver.conf");
         Files.createDirectories(conf.getParent());
@@ -628,7 +756,8 @@ class LocalHomeserverTest {
 
     @Test
     @DisplayName(
-            "A port already in the file is used as it is, and one that is not a number is refused with 78")
+            "A port already in the file is used as it is, and one that is not a number is refused"
+                    + " with 78")
     void usesTheFile() throws IOException, Failure {
         final Path conf =
                 Files.writeString(
@@ -681,7 +810,7 @@ class LocalHomeserverTest {
                             Duration.ofSeconds(30),
                             () -> {
                                 try {
-                                    LocalHomeserver.awaitUp(url, Duration.ofSeconds(3));
+                                    LocalHomeserver.awaitUp(url, Duration.ofSeconds(3), System.err);
                                     return null;
                                 } catch (final Failure ex) {
                                     return ex;

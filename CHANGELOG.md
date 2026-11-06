@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `setup`, `backup` and `restore` say on stderr what they wait for when a wait starts, and how long they have waited
+  every 10 s, through the same filter as the homeserver's last error; stdout keeps its one JSON answer. A wait names
+  the time it has left, and its last line never more.
 - `join` of a person whose account is already in another project's room on the account's own homeserver invites that
   account into this project's room instead of refusing it with 77: no password is set, no session ends, and the answer
   carries `"invited":true` and no password. With `--token` it is still refused, since a token needs the password.

@@ -1,6 +1,7 @@
 package org.fuin.porelo.message.matrix;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.Normalizer;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.LongSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -64,7 +67,8 @@ final class LocalHomeserver {
 
     private static final Pattern ANSI =
             Pattern.compile(
-                    "\u001b(?:\\[[0-?]*[ -/]*[@-~]|\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)|[@-_])");
+                    "\u001b(?:\\[[0-?]*["
+                            + " -/]*[@-~]|\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)|[@-_])");
 
     private static final Pattern CONTROLS = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]");
 
@@ -115,15 +119,16 @@ final class LocalHomeserver {
         return Path.of(home, ".config");
     }
 
-    static Running ensure(final Map<String, String> env, final Unit unit) throws Failure {
+    static Running ensure(final Map<String, String> env, final Unit unit, final PrintStream err)
+            throws Failure {
         final Path conf = directory(env).resolve("homeserver.conf");
         if (!unit.installed()) {
             throw new Failure(
                     Exit.CONFIG,
                     "the unit "
                             + UNIT
-                            + " is not installed for this account:"
-                            + " install the package porelo-matrix-homeserver, or name the project's homeserver");
+                            + " is not installed for this account: install the package"
+                            + " porelo-matrix-homeserver, or name the project's homeserver");
         }
         // A homeserver started before its port was written runs on the unit's default, and one an
         // earlier version started mounts the token file, not its directory: stopped first, its
@@ -134,7 +139,7 @@ final class LocalHomeserver {
         final int port = port(conf);
         unit.start();
         final URI url = URI.create("http://127.0.0.1:" + port);
-        awaitUp(url, env, unit);
+        awaitUp(url, env, unit, err);
         return new Running(url, port, registrationToken(env));
     }
 
@@ -247,15 +252,19 @@ final class LocalHomeserver {
                 Exit.CONFIG, "no free loopback port between " + FIRST_PORT + " and " + LAST_PORT);
     }
 
-    static void awaitUp(final URI url) throws Failure {
-        awaitUp(url, START_TIMEOUT);
+    static void awaitUp(final URI url, final PrintStream err) throws Failure {
+        awaitUp(url, START_TIMEOUT, err);
     }
 
     /** Waits after a unit start, protecting any additional secrets made during this invocation. */
     static void awaitUp(
-            final URI url, final Map<String, String> env, final Unit unit, final String... secrets)
+            final URI url,
+            final Map<String, String> env,
+            final Unit unit,
+            final PrintStream err,
+            final String... secrets)
             throws Failure {
-        awaitUp(url, START_TIMEOUT, env, unit, secrets);
+        awaitUp(url, START_TIMEOUT, env, unit, err, secrets);
     }
 
     /** Waits after starting the unit, with its environment available to protect diagnostics. */
@@ -264,59 +273,147 @@ final class LocalHomeserver {
             final Duration within,
             final Map<String, String> env,
             final Unit unit,
+            final PrintStream err,
             final String... secrets)
             throws Failure {
-        if (!answersWithin(url, within)) {
+        awaitUp(
+                url,
+                within,
+                env,
+                unit,
+                Clock.systemUTC(),
+                System::nanoTime,
+                Progress.INTERVAL,
+                err,
+                () -> Thread.sleep(200),
+                secrets);
+    }
+
+    /** Until the homeserver answers on its port, within the limit given. */
+    static void awaitUp(final URI url, final Duration within, final PrintStream err)
+            throws Failure {
+        if (!answersWithin(
+                url,
+                within,
+                Clock.systemUTC(),
+                System::nanoTime,
+                Progress.INTERVAL,
+                err,
+                () -> Thread.sleep(200),
+                progressSecrets(Map.of()))) {
+            throw new Failure(Exit.TEMPORARY, timeout(url, within));
+        }
+    }
+
+    /** A wait whose deadline clock, elapsed time, and polling pause are injectable. */
+    static void awaitUp(
+            final URI url,
+            final Duration within,
+            final Map<String, String> env,
+            final Unit unit,
+            final Clock clock,
+            final LongSupplier nanoTime,
+            final Duration interval,
+            final PrintStream err,
+            final Pause pause,
+            final String... secrets)
+            throws Failure {
+        if (!answersWithin(
+                url,
+                within,
+                clock,
+                nanoTime,
+                interval,
+                err,
+                pause,
+                progressSecrets(env, secrets))) {
             throw new Failure(
                     Exit.TEMPORARY,
                     timeout(url, within) + "\n" + startupCause(env, unit, List.of(secrets)));
         }
     }
 
-    /** Until the homeserver answers on its port, within the limit given. */
-    static void awaitUp(final URI url, final Duration within) throws Failure {
-        if (!answersWithin(url, within)) {
-            throw new Failure(Exit.TEMPORARY, timeout(url, within));
+    @FunctionalInterface
+    interface Pause {
+        void sleep() throws InterruptedException;
+    }
+
+    private static List<String> progressSecrets(
+            final Map<String, String> env, final String... additional) {
+        final List<String> secrets = new ArrayList<>(List.of(additional));
+        addEnvironmentSecrets(env, secrets);
+        try {
+            secrets.add(registrationToken(env));
+        } catch (final Failure ex) {
+            // Progress carries only the endpoint, never a unit log or command output.
         }
+        return secrets;
+    }
+
+    private static void addEnvironmentSecrets(
+            final Map<String, String> env, final List<String> secrets) {
+        env.forEach(
+                (key, value) -> {
+                    if (key.startsWith("PORELO_MATRIX_")
+                            && (key.contains("TOKEN")
+                                    || key.contains("PASSWORD")
+                                    || key.contains("SECRET"))) {
+                        secrets.add(value);
+                    }
+                });
     }
 
     private static String timeout(final URI url, final Duration within) {
         return "the homeserver at " + url + " did not answer within " + within.toSeconds() + " s";
     }
 
-    private static boolean answersWithin(final URI url, final Duration within) throws Failure {
+    private static boolean answersWithin(
+            final URI url,
+            final Duration within,
+            final Clock clock,
+            final LongSupplier nanoTime,
+            final Duration interval,
+            final PrintStream err,
+            final Pause pause,
+            final List<String> secrets)
+            throws Failure {
         final HttpClient http =
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-        final Instant deadline = Instant.now().plus(within);
-        while (Instant.now().isBefore(deadline)) {
-            try {
-                final HttpResponse<Void> response =
-                        http.send(
-                                // A port that takes the connection and never answers holds
-                                // no request past this, so the limit above is kept.
-                                HttpRequest.newBuilder(url.resolve("/_matrix/client/versions"))
-                                        .timeout(Duration.ofSeconds(2))
-                                        .build(),
-                                HttpResponse.BodyHandlers.discarding());
-                if (response.statusCode() == 200) {
-                    return true;
+        final Instant deadline = clock.instant().plus(within);
+        try (Progress progress = new Progress(nanoTime, interval, err, secrets)) {
+            progress.phase("waiting for the homeserver on " + url.getRawAuthority(), within);
+            while (clock.instant().isBefore(deadline)) {
+                progress.tick();
+                try {
+                    final HttpResponse<Void> response =
+                            http.send(
+                                    // A port that takes the connection and never answers holds
+                                    // no request past this, so the limit above is kept.
+                                    HttpRequest.newBuilder(url.resolve("/_matrix/client/versions"))
+                                            .timeout(Duration.ofSeconds(2))
+                                            .build(),
+                                    HttpResponse.BodyHandlers.discarding());
+                    if (response.statusCode() == 200) {
+                        return true;
+                    }
+                } catch (final IOException ex) {
+                    // Not listening yet.
+                } catch (final InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new Failure(
+                            Exit.TEMPORARY, "interrupted while waiting for the homeserver", ex);
                 }
-            } catch (final IOException ex) {
-                // Not listening yet.
-            } catch (final InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new Failure(
-                        Exit.TEMPORARY, "interrupted while waiting for the homeserver", ex);
+                try {
+                    pause.sleep();
+                } catch (final InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new Failure(
+                            Exit.TEMPORARY, "interrupted while waiting for the homeserver", ex);
+                }
             }
-            try {
-                Thread.sleep(200);
-            } catch (final InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new Failure(
-                        Exit.TEMPORARY, "interrupted while waiting for the homeserver", ex);
-            }
+            progress.timeout();
+            return false;
         }
-        return false;
     }
 
     private static String startupCause(
@@ -345,15 +442,7 @@ final class LocalHomeserver {
             // Without the local token, no log line can be proved safe to print.
             return "the homeserver's unit is " + unit.state();
         }
-        env.forEach(
-                (key, value) -> {
-                    if (key.startsWith("PORELO_MATRIX_")
-                            && (key.contains("TOKEN")
-                                    || key.contains("PASSWORD")
-                                    || key.contains("SECRET"))) {
-                        secrets.add(value);
-                    }
-                });
+        addEnvironmentSecrets(env, secrets);
         final List<String> log =
                 unit.recentLog().stream()
                         .filter(line -> line.length() <= PodmanUnit.MESSAGE_LIMIT)
@@ -376,15 +465,33 @@ final class LocalHomeserver {
             return "the homeserver's unit is " + unit.state();
         }
         final String raw = chosen.orElseThrow();
+        return diagnosticLine(raw, secrets);
+    }
+
+    /** Filters bounded log diagnostics, honoring cancellation of their reader. */
+    static String diagnosticLine(final String raw, final List<String> secrets) {
+        return diagnosticLine(raw, secrets, true);
+    }
+
+    /** Filters progress without confusing an interrupted command with a secret-bearing line. */
+    static String progressLine(final String raw, final List<String> secrets) {
+        return diagnosticLine(raw, secrets, false);
+    }
+
+    private static String diagnosticLine(
+            final String raw, final List<String> secrets, final boolean interruptible) {
         final String clean = stripControls(raw);
-        if (!safeCause(raw, clean, secrets)) {
+        if (!safeCause(raw, clean, secrets, interruptible)) {
             return WITHHELD;
         }
         return clean.substring(0, Math.min(CAUSE_LIMIT, clean.length()));
     }
 
     private static boolean safeCause(
-            final String raw, final String clean, final List<String> secrets) {
+            final String raw,
+            final String clean,
+            final List<String> secrets,
+            final boolean interruptible) {
         if (clean.chars().anyMatch(point -> !allowedCharacter(point))) {
             return false;
         }
@@ -407,7 +514,8 @@ final class LocalHomeserver {
             for (int round = 0; round < 6; round++) {
                 final int before = forms.size();
                 for (final String form : List.copyOf(forms)) {
-                    if (Thread.currentThread().isInterrupted() || forms.size() > 1024) {
+                    if (interruptible && Thread.currentThread().isInterrupted()
+                            || forms.size() > 1024) {
                         return false;
                     }
                     forms.add(stripControls(form));

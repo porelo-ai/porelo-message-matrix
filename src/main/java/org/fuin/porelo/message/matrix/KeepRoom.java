@@ -54,7 +54,8 @@ final class KeepRoom {
             final String verb,
             final List<String> args,
             final Map<String, String> env,
-            final PrintStream out)
+            final PrintStream out,
+            final PrintStream err)
             throws Failure {
         final Options options = options(verb, args);
         // Elsewhere nothing is started: the transport's package needs no homeserver of its own.
@@ -78,7 +79,7 @@ final class KeepRoom {
                     verb
                             + " needs the homeserver administrator's token among the secrets on stdin");
         }
-        final Administrator admin = administrator(Expel.behindGate(env), env);
+        final Administrator admin = administrator(Expel.behindGate(env), env, err);
         out.println(
                 "keep-room".equals(verb)
                         ? keep(admin, project, options.persons())
@@ -118,8 +119,9 @@ final class KeepRoom {
     }
 
     private static Administrator administrator(
-            final MatrixClient nobody, final Map<String, String> env) throws Failure {
-        final Accounts.Session session = Lifecycle.admin(nobody, env, "", null);
+            final MatrixClient nobody, final Map<String, String> env, final PrintStream err)
+            throws Failure {
+        final Accounts.Session session = Lifecycle.admin(nobody, env, "", null, err);
         final String server = AdminRoom.server(session.userId());
         if (!session.userId().equals("@" + Lifecycle.ADMIN + ":" + server)) {
             throw new Failure(

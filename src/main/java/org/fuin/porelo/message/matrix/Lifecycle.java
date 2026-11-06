@@ -115,7 +115,7 @@ final class Lifecycle {
         }
         final ObjectNode answer =
                 switch (verb) {
-                    case "setup" -> setup(options, settings, env, unit);
+                    case "setup" -> setup(options, settings, env, unit, err);
                     case "enroll" -> enroll(options, settings, env);
                     case "retire" -> retire(options, settings, env);
                     case "join" -> join(options, settings, env);
@@ -154,18 +154,19 @@ final class Lifecycle {
             final Options options,
             final Settings settings,
             final Map<String, String> env,
-            final Unit unit)
+            final Unit unit,
+            final PrintStream err)
             throws Failure {
         if (settings.homeserver() != null) {
             return setupCentral(options, settings, env);
         }
-        final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit);
+        final LocalHomeserver.Running local = LocalHomeserver.ensure(env, unit, err);
         final URI url = local.url();
         final String reaches = "127.0.0.1:" + local.port();
         final String registrationToken = local.registrationToken();
         final MatrixClient nobody = client(url, "", settings);
 
-        final Accounts.Session admin = admin(nobody, env, registrationToken, unit);
+        final Accounts.Session admin = admin(nobody, env, registrationToken, unit, err);
         displayName(nobody, admin, "Porelo (administrator)");
         final MatrixClient asAdmin = nobody.as(admin.accessToken());
         AdminRoom.of(asAdmin, admin.userId());
@@ -568,7 +569,8 @@ final class Lifecycle {
             final MatrixClient nobody,
             final Map<String, String> env,
             final String registrationToken,
-            @Nullable final Unit local)
+            @Nullable final Unit local,
+            final PrintStream err)
             throws Failure {
         final String token = env.get(Config.ADMIN_TOKEN);
         if (token != null && !token.isBlank()) {
@@ -576,7 +578,7 @@ final class Lifecycle {
         }
         if (!Accounts.available(nobody, ADMIN)) {
             if (local != null && Keep.restored(env)) {
-                return Keep.retake(nobody, nobody.config().homeserver(), env, local);
+                return Keep.retake(nobody, nobody.config().homeserver(), env, local, err);
             }
             // Which token was lost cannot be told from here, and a second administrator is not what
             // was meant.

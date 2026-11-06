@@ -162,18 +162,20 @@ class KeepIT {
 
     @Test
     @DisplayName(
-            "restored on a new machine, the room goes on: setup takes it back with nothing in the vault, and the relay hands over only what it had not")
+            "restored on a new machine, the room goes on: setup takes it back with nothing in the"
+                    + " vault, and the relay hands over only what it had not")
     void theRoomOutlivesTheMachine() throws Exception {
         final First first = first();
         final Path copy = Files.createDirectories(dir.resolve("copy"));
-        final JsonNode backup = Keep.backup(copy, first.env(), first.unit(), Keep.BACKUP_WAIT);
+        final JsonNode backup =
+                Keep.backup(copy, first.env(), first.unit(), Keep.BACKUP_WAIT, System.err);
         assertThat(backup.path("backup").asLong()).as("the backup's id").isPositive();
         send(first.task(), first.room(), "sent after the copy");
         first.unit().close();
 
         final Map<String, String> env = machine("second");
         final ProcessUnit unit = unit(env, "second");
-        final JsonNode restored = Keep.restore(copy, env, unit);
+        final JsonNode restored = Keep.restore(copy, env, unit, System.err);
         assertThat(restored.path("restore").asLong())
                 .as("the backup restored")
                 .isEqualTo(backup.path("backup").asLong());
@@ -220,18 +222,22 @@ class KeepIT {
     void restoreOverADatabaseRestoresNothing() throws Exception {
         final First first = first();
         final Path copy = Files.createDirectories(dir.resolve("copy"));
-        Keep.backup(copy, first.env(), first.unit(), Keep.BACKUP_WAIT);
+        Keep.backup(copy, first.env(), first.unit(), Keep.BACKUP_WAIT, System.err);
         send(first.task(), first.room(), "sent after the copy");
         first.unit().stop();
 
-        assertThat(Keep.restore(copy, first.env(), first.unit()).path("restore").asText())
+        assertThat(
+                        Keep.restore(copy, first.env(), first.unit(), System.err)
+                                .path("restore")
+                                .asText())
                 .isEqualTo("present");
         assertThat(first.unit().runs()).as("runs of the homeserver's own").isZero();
         assertThat(Keep.restored(first.env())).as("a marker").isFalse();
 
         first.unit().start();
         LocalHomeserver.awaitUp(
-                URI.create(first.setup().path("secrets").path(Config.HOMESERVER).asText()));
+                URI.create(first.setup().path("secrets").path(Config.HOMESERVER).asText()),
+                System.err);
         assertThat(poll(with(first.env(), first.setup().path("secrets")), "again"))
                 .as("the database as it was, the message after the copy in it")
                 .containsExactly(

@@ -113,9 +113,10 @@ public final class Main {
                 case "settings" -> SettingsCheck.run(rest, in, out);
                 case "setup", "enroll", "retire", "join", "part", "clear" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
-                case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env));
-                case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, out);
-                case "backup", "restore" -> Keep.run(args[0], rest, env, new PodmanUnit(env), out);
+                case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env), err);
+                case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, out, err);
+                case "backup", "restore" ->
+                        Keep.run(args[0], rest, env, new PodmanUnit(env), out, err);
                 default -> {
                     err.println(NAME + ": unknown verb '" + args[0] + "'");
                     return Exit.USAGE;

@@ -41,7 +41,8 @@ class ExpelTest {
                                         List.of("bob"),
                                         env,
                                         new PrintStream(PrintStream.nullOutputStream()),
-                                        unit))
+                                        unit,
+                                        System.err))
                 .as("ordinary configuration follows the local unit route before any request")
                 .isInstanceOfSatisfying(
                         Failure.class,
@@ -51,7 +52,8 @@ class ExpelTest {
                                     .isEqualTo(Exit.CONFIG);
                             assertThat(failure.getMessage())
                                     .as(
-                                            "the local unit is missing, rather than gate runtime configuration")
+                                            "the local unit is missing, rather than gate runtime"
+                                                    + " configuration")
                                     .contains("is not installed for this account");
                         });
         assertThat(calls).as("expel consulted the local unit").containsExactly("installed");
@@ -232,7 +234,8 @@ class ExpelTest {
                                         List.of("bob"),
                                         env,
                                         new PrintStream(PrintStream.nullOutputStream()),
-                                        new KeepTest.StandIn()));
+                                        new KeepTest.StandIn(),
+                                        System.err));
 
         assertThat(failure).as("expel fails while nothing listens on the socket").isNotNull();
         assertThat(failure.exitCode())
