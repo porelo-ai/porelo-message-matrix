@@ -1,6 +1,6 @@
 # MX52 — A Person Joins Another Project's Room Unchanged
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one branch of `Lifecycle.join`, its answer and the doc's table, with an integration test; the answer
 gains one shape Porelo and porelo-frontend show.
 

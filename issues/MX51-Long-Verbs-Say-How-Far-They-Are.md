@@ -1,6 +1,6 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - stderr lines in `LocalHomeserver.awaitUp` and `Keep`, with their tests; stdout's contract is
 unchanged.
 
