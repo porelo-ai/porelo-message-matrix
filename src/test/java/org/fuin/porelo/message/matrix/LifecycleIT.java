@@ -1131,14 +1131,97 @@ class LifecycleIT {
         assertThat(status(url(), login("carol", password)))
                 .as("the original password stays valid")
                 .isEqualTo(200);
-        final Transport.Result again =
-                attempt(kept, "join", "--project", PROJECT, "--person", "carol");
-        assertThat(again.exit())
-                .as("an account still used by another project needs --reset: %s", again.err())
+        final JsonNode again = run(kept, "join", "--project", PROJECT, "--person", "carol");
+        assertThat(again.path("invited").asBoolean(false))
+                .as("an account still used by another project is invited back: %s", again)
+                .isTrue();
+        assertThat(membership(admin, room, id))
+                .as("the person is invited back into this room")
+                .isEqualTo("invite");
+        assertThat(status(url(), token))
+                .as("joining again leaves the original session valid")
+                .isEqualTo(200);
+    }
+
+    /**
+     * Harm guarded: joining a second project must not take a person's password and sessions from
+     * the first, nor invite them twice.
+     */
+    @Test
+    @DisplayName(
+            "join invites a member of another project's room, keeping their password and sessions")
+    void joinInvitesAMemberOfAnotherProject() throws Exception {
+        final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
+        final Map<String, String> kept =
+                with(firstRun(), setup.path("account"), setup.path("secrets"));
+        final JsonNode other = run(kept, "setup", "--project", "other");
+        final JsonNode first =
+                run(kept, "join", "--project", "other", "--person", "carol").path("login");
+        final String id = first.path("user").asText();
+        final String password = first.path("password").asText();
+        final String token = login("carol", password);
+        final MatrixClient admin =
+                new MatrixClient(Config.from(kept))
+                        .as(setup.path("account").path(Config.ADMIN_TOKEN).asText());
+        final String room = setup.path("conversation").asText();
+        final String otherRoom = other.path("conversation").asText();
+
+        final JsonNode joined = run(kept, "join", "--project", PROJECT, "--person", "carol");
+
+        assertThat(joined.path("invited").asBoolean(false))
+                .as("the answer says the person was invited: %s", joined)
+                .isTrue();
+        assertThat(joined.path("login").has("password"))
+                .as("no password is handed out for an account that keeps its own: %s", joined)
+                .isFalse();
+        assertThat(joined.path("login").path("user").asText())
+                .as("the account invited is the person's own")
+                .isEqualTo(id);
+        assertThat(joined.path("login").path("room").asText())
+                .as("the room the person is invited into")
+                .isEqualTo("#porelo-" + PROJECT + ":" + SERVER_NAME);
+        assertThat(membership(admin, room, id))
+                .as("the person is invited into this project's room")
+                .isEqualTo("invite");
+        assertThat(membership(admin, otherRoom, id))
+                .as("the other project's membership stays")
+                .isEqualTo("join");
+        assertThat(status(url(), token)).as("the person's session stays valid").isEqualTo(200);
+        assertThat(status(url(), login("carol", password)))
+                .as("the person's password stays valid")
+                .isEqualTo(200);
+
+        final String inviteEvent = memberEventId(admin, room, id);
+        final JsonNode again = run(kept, "join", "--project", PROJECT, "--person", "carol");
+
+        assertThat(again).as("a second join answers the same").isEqualTo(joined);
+        assertThat(memberEventId(admin, room, id))
+                .as("a second join invites nobody twice")
+                .isEqualTo(inviteEvent);
+        final Transport.Result token2 =
+                attempt(kept, "join", "--project", PROJECT, "--person", "carol", "--token");
+        assertThat(token2.exit())
+                .as(
+                        "a token needs the password, which an invitation does not give: %s",
+                        token2.err())
                 .isEqualTo(Exit.NOT_PERMITTED);
         assertThat(status(url(), token))
-                .as("the refused join leaves the original session valid")
+                .as("the refused token join leaves the session valid")
                 .isEqualTo(200);
+    }
+
+    /** The event id of a person's membership in a room, which a new invitation would replace. */
+    private static String memberEventId(
+            final MatrixClient admin, final String room, final String id) throws Failure {
+        for (final JsonNode event :
+                admin.get("/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/members")
+                        .path("chunk")) {
+            if ("m.room.member".equals(event.path("type").asText())
+                    && id.equals(event.path("state_key").asText())) {
+                return event.path("event_id").asText();
+            }
+        }
+        throw new AssertionError("no membership of " + id + " in " + room);
     }
 
     /** Harm guarded: a removed person's sessions and password must stop granting access. */

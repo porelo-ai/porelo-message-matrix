@@ -52,7 +52,8 @@ editor says so before anything is committed.
 
 prints a login, once: the homeserver, your user, the room and a password. On the local homeserver,
 forward its port (8008 unless taken) to reach it from your computer, and sign in with any Matrix client.
-`--reset` gives you a new password.
+`--reset` gives you a new password. If you already have an account here for another project, you get no new
+password: you are invited into this project's room, and accept the invitation in the client you use already.
 
 What you write in the room reaches every task of the project. Mention a task (pick it from your client's
 list) or reply to its message to say it is meant for that one. To write to one task alone, open a direct

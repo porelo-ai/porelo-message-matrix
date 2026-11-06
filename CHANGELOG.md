@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `join` of a person whose account is already in another project's room on the account's own homeserver invites that
+  account into this project's room instead of refusing it with 77: no password is set, no session ends, and the answer
+  carries `"invited":true` and no password. With `--token` it is still refused, since a token needs the password.
 - `backup` lets a snapshot an earlier backup asked for finish before it copies the positions, and copies a later one, so a
   late snapshot is not taken for its own; a target another backup filled in the meantime is refused with 78 and left as it is. The unit keeps 96 snapshots
   instead of 48, since each backup leaves two.

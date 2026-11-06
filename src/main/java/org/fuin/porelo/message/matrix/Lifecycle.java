@@ -942,10 +942,18 @@ final class Lifecycle {
                     options.token()
                             ? Accounts.alone(place.nobody(), person, password)
                             : Accounts.login(place.nobody(), person, password);
+        } else if (!options.token()
+                && membersElsewhere(place.admin(), server, room).containsKey(id)) {
+            return invited(options, place, person, id, room);
         } else {
             throw new Failure(
                     Exit.NOT_PERMITTED,
-                    "'" + person + "' has an account already; --reset gives it a new password");
+                    "'"
+                            + person
+                            + "' has an account already; "
+                            + (options.token()
+                                    ? "a token needs its password, which --reset replaces"
+                                    : "--reset gives it a new password"));
         }
         if (options.display() != null) {
             displayName(place.nobody(), account, options.display());
@@ -988,6 +996,53 @@ final class Lifecycle {
                         + ", room "
                         + alias(options.project(), AdminRoom.server(place.adminId()))
                         + ". The password is shown once.");
+        return answer;
+    }
+
+    /**
+     * A person another project's room already has keeps their account as it is: the administrator
+     * invites it into this room, once, and the person accepts in their own client. No password is
+     * set, no session ended, and the nickname is the person's own.
+     */
+    private static ObjectNode invited(
+            final Options options,
+            final Place place,
+            final String person,
+            final String id,
+            final String room)
+            throws Failure {
+        final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
+        final JsonNode member =
+                place.admin().find(path + "/state/m.room.member/" + MatrixClient.segment(id));
+        final String membership = member == null ? "" : member.path("membership").asText("");
+        if (!"join".equals(membership) && !"invite".equals(membership)) {
+            place.admin()
+                    .post(
+                            path + "/invite",
+                            MatrixClient.JSON.createObjectNode().put("user_id", id));
+        }
+        final boolean loopback = loopback(place.url());
+        final String alias = alias(options.project(), AdminRoom.server(place.adminId()));
+        final ObjectNode answer = MatrixClient.JSON.createObjectNode();
+        final ObjectNode login = answer.putObject("login");
+        login.put("homeserver", place.url().toString())
+                .put("user", id)
+                .put("room", alias)
+                .put("loopback", Boolean.toString(loopback));
+        if (loopback) {
+            login.put("port", Integer.toString(place.url().getPort()));
+        }
+        answer.put("invited", true);
+        answer.put(
+                "shown",
+                person
+                        + " has a Matrix account here already, "
+                        + id
+                        + ", and is invited into "
+                        + alias
+                        + ": accept the invitation in the client signed in as "
+                        + id
+                        + "; the password stays as it is.");
         return answer;
     }
 

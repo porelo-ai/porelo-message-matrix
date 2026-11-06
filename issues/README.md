@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 | <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
@@ -28,7 +29,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx52"></a>[MX52](MX52-A-Person-Joins-Another-Projects-Room-Unchanged.md) | S | - | A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions |
 | <a id="mx51"></a>[MX51](MX51-Long-Verbs-Say-How-Far-They-Are.md) | S | - | `setup`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes |
 
 ## Backlog
