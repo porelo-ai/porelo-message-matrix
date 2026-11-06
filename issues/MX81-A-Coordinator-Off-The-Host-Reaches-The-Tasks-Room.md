@@ -1,6 +1,6 @@
 # MX81 — A Coordinator Off The Host Reaches The Task's Room
 
-**Status:** Backlog. Bug, found by the operator on 2026-11-06 in a rehearsal of the move.
+**Status:** Implementing; accepted by the operator, 2026-11-06. Bug, found by the operator on 2026-11-06 in a rehearsal of the move.
 **Size:** S - the start's steps, their check on a host, and the documents; [MX76](README.md#mx76)'s code is there.
 
 **What must be true.** A task started on a host for a project whose agents report to a coordinator on the development
