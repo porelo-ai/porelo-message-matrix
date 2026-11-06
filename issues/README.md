@@ -41,7 +41,6 @@ sequence.
 
 | # | Size | Blocked by | Open questions | What it covers |
 |---|---|---|---|---|
-| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | 1 | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | 0 | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes |
 
 ## Accepted
@@ -63,6 +62,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 
 ## Finished
 
