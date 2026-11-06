@@ -133,7 +133,8 @@ final class GateRequest {
                                     "transfer-encoding",
                                     "authorization",
                                     "connection",
-                                    "origin")
+                                    "origin",
+                                    "sec-fetch-site")
                             .contains(name)) {
                 throw malformed();
             }
@@ -365,6 +366,11 @@ final class GateRequest {
 
     String host() {
         return fields.getOrDefault("host", "");
+    }
+
+    /** The {@code Sec-Fetch-Site} a browser sends, null when none was sent. */
+    @Nullable String fetchSite() {
+        return fields.get("sec-fetch-site");
     }
 
     /** The {@code Origin} a browser client sends, empty from any other client. */

@@ -93,6 +93,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- The host's gate lets only a page at the forward the request came in on, `http://` and its `Host`, or Element
+  Desktop's `vector://vector` read its answers; a page on another local port or name, such as the forge's web
+  through the same tunnel, is refused with 403 and can no longer register a name of the person's. An SSO sign-in whose
+  `Sec-Fetch-Site` is other than `none` or `same-origin` is refused with 400 and makes no account.
 - A token goes to a plain-`http` loopback homeserver only when the port is the account's own: another uid listening
   there - another account, while the account's own homeserver is down - gets 78 before any request.
 - An account the transport takes back with a new password - one whose token Porelo lost, or one restored

@@ -435,9 +435,38 @@ class GateTest {
                                     forward,
                                     "Origin: " + origin + "\r\n"))
                     .as("a fetch from %s, which could read where it was sent", origin)
-                    .isEqualTo(400);
+                    .isBetween(400, 403);
+            assertThat(lastAnswer).as("no token in a refusal").doesNotContain("loginToken");
         }
-        assertThat(lastAnswer).as("no token in a refusal").doesNotContain("loginToken");
+    }
+
+    /**
+     * Harm guarded: a page elsewhere, or on another local port, starts the person's sign-in by
+     * navigating their browser to the gate, making their account and a login token.
+     */
+    @Test
+    void ssoIsStartedOnlyByThePersonOrTheForwardsOwnPage() throws Exception {
+        final String forward = "walk.localhost:8448";
+        for (final String site : List.of("cross-site", "same-site", "Cross-Site", "None")) {
+            assertThat(
+                            sso(
+                                    "http://walk.localhost:8448/callback",
+                                    forward,
+                                    "Sec-Fetch-Site: " + site + "\r\n"))
+                    .as("a sign-in started from %s", site)
+                    .isEqualTo(400);
+            assertThat(lastAnswer).as(site).doesNotContain("loginToken");
+        }
+        assertThat(calls).as("no account made, no token asked").isEmpty();
+        for (final String site : List.of("none", "same-origin")) {
+            assertThat(
+                            sso(
+                                    "http://walk.localhost:8448/callback",
+                                    forward,
+                                    "Sec-Fetch-Site: " + site + "\r\n"))
+                    .as("a sign-in started from %s", site)
+                    .isEqualTo(302);
+        }
     }
 
     private int sso(final String redirect, final String host, final String headers)
@@ -743,7 +772,10 @@ class GateTest {
     @Test
     void theGatesOwnAnswersAllowItsClientsOrigin() throws Exception {
         for (final String origin :
-                List.of("vector://vector", "http://walk.localhost:8448", "http://127.0.0.1:8448")) {
+                List.of(
+                        "vector://vector",
+                        "http://walk.localhost:8448",
+                        "http://WALK.localhost:8448")) {
             for (final String path :
                     List.of("/.well-known/matrix/client", "/_matrix/client/v3/login")) {
                 assertThat(
@@ -799,6 +831,48 @@ class GateTest {
                         .isEqualTo(403);
                 assertThat(lastAnswer).as(origin).doesNotContain("Access-Control-");
             }
+        }
+        assertThat(calls).as("nothing was sent upstream").isEmpty();
+    }
+
+    /**
+     * Harm guarded: a script on another local site in the person's browser, such as the forge's web
+     * through the same tunnel, reads the gate's answers or registers a name of the person's.
+     */
+    @Test
+    void aPageOnAnotherLocalSiteIsRefused() throws Exception {
+        for (final String origin :
+                List.of(
+                        "http://127.0.0.1:8448",
+                        "http://walk.localhost:9999",
+                        "http://forge.localhost:8448",
+                        "http://localhost:8448",
+                        "https://walk.localhost:8448",
+                        "http://walk.localhost")) {
+            for (final String method : List.of("OPTIONS", "GET")) {
+                assertThat(
+                                request(
+                                        method,
+                                        "/_matrix/client/v3/login",
+                                        "",
+                                        "",
+                                        "walk.localhost:8448",
+                                        "Origin: " + origin + "\r\n"))
+                        .as(method + " from " + origin)
+                        .isEqualTo(403);
+                assertThat(lastAnswer).as(origin).doesNotContain("Access-Control-");
+            }
+            assertThat(
+                            request(
+                                    "POST",
+                                    "/_matrix/client/v3/register",
+                                    "",
+                                    "{\"username\":\"porelo.alice\",\"password\":\"fixture\",\"auth\":{\"type\":\"m.login.dummy\"}}",
+                                    "walk.localhost:8448",
+                                    "Origin: " + origin + "\r\n"))
+                    .as("a registration from " + origin)
+                    .isEqualTo(403);
+            assertThat(lastAnswer).as(origin).doesNotContain("access_token");
         }
         assertThat(calls).as("nothing was sent upstream").isEmpty();
     }

@@ -180,8 +180,11 @@ minutes, usable once by that host login alone. Only its SHA-256, login and expir
 callback `element://vector/…`, or an `http` page at the forward the request came in on, its `Host`, which the
 gate itself does not serve. A redirect anywhere else, a client listening on a loopback port of its own as some
 desktop clients do among them, is refused with 400 and issues no token, and so is a request that carries an
-`Origin`: a sign-in is a navigation, and a page that fetches it could read where it was sent. So a page elsewhere,
-or on another local port, that sends the person's browser to the gate cannot take their sign-in. Registration offers the `m.login.dummy` authentication stage;
+`Origin`: a sign-in is a navigation, and a page that fetches it could read where it was sent. A navigation whose
+`Sec-Fetch-Site` is other than `none` or `same-origin` is refused with 400 too, before any account is made: another
+page started it, and `same-site` ignores ports. A client that sends no such header, as a desktop client's own browser
+call may not, is taken. So a page elsewhere, or on another local port, that sends the person's browser to the gate
+cannot take or start their sign-in. Registration offers the `m.login.dummy` authentication stage;
 the gate creates an available account and signs it in with the supplied password. The caller may
 register or use only `@<login>` or `@<name>.<login>`, where `<name>` starts with a lower-case letter
 or digit and then contains lower-case letters, digits, underscores or hyphens. `@porelo` belongs to
@@ -191,7 +194,9 @@ most 64 identities by token hash.
 Only the client and media APIs pass. The gate answers discovery and sign-in flows, and hides admin,
 federation and key APIs with 404. A browser client such as Element Desktop is served under CORS: the
 gate answers its preflight without a token and names its origin in the headers of its own answers.
-Only Element Desktop's origin `vector://vector` and pages served from loopback or a `*.localhost`
-name are allowed; a request from any other origin is refused with 403, so a page elsewhere cannot
-read a sign-in answer the person's browser was made to ask for. Room aliases `porelo-<project>` are reserved: no client makes or takes one, and the host's helper keeps a project's room as the administrator (see [the transport](transport.md)). Refusal logs contain only the login, method, path without its query,
+Only Element Desktop's origin `vector://vector` and a page at the forward the request came in on, `http://` and its
+`Host`, are allowed; a request from any other origin, another local port or name and `https` among them, is refused
+with 403. The gate takes the ssh peer's login as who asks, so a page elsewhere, or on another local site such as the
+forge's web through the same tunnel, could otherwise read a sign-in answer or register a name of the person's and
+read its token. Room aliases `porelo-<project>` are reserved: no client makes or takes one, and the host's helper keeps a project's room as the administrator (see [the transport](transport.md)). Refusal logs contain only the login, method, path without its query,
 and status. The administrator token is read only for gate operations and is never returned to clients.

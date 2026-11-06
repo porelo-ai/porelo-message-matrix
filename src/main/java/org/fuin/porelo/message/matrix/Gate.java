@@ -155,7 +155,10 @@ final class Gate {
             if (request == null) {
                 return;
             }
-            final String origin = GateRules.originAllowed(request.origin()) ? request.origin() : "";
+            final String origin =
+                    GateRules.originAllowed(request.origin(), request.host())
+                            ? request.origin()
+                            : "";
             final int status;
             try {
                 final GateResponse answer = decide(request);
@@ -223,7 +226,7 @@ final class Gate {
         if (!GateRules.hostAllowed(request.host())) {
             return GateResponse.error(400, "M_UNRECOGNIZED");
         }
-        if (!GateRules.originAllowed(request.origin())) {
+        if (!GateRules.originAllowed(request.origin(), request.host())) {
             return forbidden();
         }
         // No answer of the gate's own is framed for a request that takes none.
@@ -477,7 +480,9 @@ final class Gate {
         final String redirect = request.parameter("redirectUrl");
         // A sign-in is a navigation, which sends no Origin; a page that fetches could read the
         // token.
-        if (!request.origin().isEmpty() || !GateRules.redirectAllowed(redirect, request.host())) {
+        if (!request.origin().isEmpty()
+                || !GateRules.startedHere(request.fetchSite())
+                || !GateRules.redirectAllowed(redirect, request.host())) {
             return GateResponse.error(400, "M_INVALID_PARAM");
         }
         final Administrator admin = administrator();

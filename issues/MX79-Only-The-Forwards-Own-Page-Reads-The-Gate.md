@@ -1,6 +1,6 @@
 # MX79 — Only The Forward's Own Page Reads The Gate
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - two rules in `GateRules` and `Gate.sso`, one header kept by `GateRequest`, their tests and the gate's page in
 `doc/homeserver.md`.
 

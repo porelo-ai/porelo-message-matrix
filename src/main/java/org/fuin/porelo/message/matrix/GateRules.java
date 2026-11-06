@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /** Pure admission and identity decisions for the host's gate. */
 final class GateRules {
@@ -124,15 +125,24 @@ final class GateRules {
 
     /**
      * An {@code Origin} whose page may read the gate's answers: none (a client that is no browser),
-     * Element Desktop's, or a page served from this machine's loopback. A page elsewhere could
-     * otherwise read a login answer the person's browser was made to ask for.
+     * Element Desktop's, or the page at the forward the request came in on, its {@code host}. A
+     * page on another local port or name, such as the forge's web through the same tunnel, could
+     * otherwise register a name of the person's and read its token.
      */
-    static boolean originAllowed(final String origin) {
+    static boolean originAllowed(final String origin, final String host) {
         if (origin.isEmpty() || origin.equals("vector://vector")) {
             return true;
         }
-        final String host = origin.replaceFirst("^https?://", "");
-        return !host.equals(origin) && !host.contains("/") && hostAllowed(host);
+        return hostAllowed(host) && origin.equalsIgnoreCase("http://" + host);
+    }
+
+    /**
+     * Whether a browser says the person, or a page at the forward itself, started this navigation:
+     * no {@code Sec-Fetch-Site} (no browser, or one before that header), {@code none} or {@code
+     * same-origin}. A {@code same-site} page may be on another local port.
+     */
+    static boolean startedHere(final @Nullable String site) {
+        return site == null || site.equals("none") || site.equals("same-origin");
     }
 
     static boolean clientPath(final String path) {
