@@ -64,7 +64,12 @@ setup and its local registry settings, and the project's procedure for an agent'
   5. *The check:* the move's check for this repository, red before the start, green after.
   6. *The way back:* what the forge holds of the task's work is fetched into the checkout here, the coordinator switches
      the upstream back, and the session here resumes.
-- **No test goes red first:** nothing that can do harm changes in the code. The move's red-first check is the move's
+- **The change the trial carries is real work the Build reads**, since a push of documents, issues or `porelo.yml`
+  alone starts no Build on the forge: proposed, [MX60](README.md#mx60), the host's gate naming in its log why it
+  answered 502 or could not act as the administrator, never a token. It changes `Gate.java` and `GateTest` alone, asks
+  nothing of another repository, and the task runs its tests without a homeserver. The operator confirms it before the
+  start; it then goes through Accepted to Backlog like any issue, and is set Implementing inside the task.
+- **No test goes red first for the move itself:** nothing that can do harm changes in the code for it. The move's red-first check is the move's
   check against this repository before the start.
 
 ## Acceptance
@@ -77,14 +82,6 @@ setup and its local registry settings, and the project's procedure for an agent'
 - A message naming `Agent Matrix` in the room wakes the task's agent, and its answer appears in the room.
 - After the way back, this checkout holds the task's commit and the session here works on it.
 - Seen to fail: the check against the repository before its move.
-
-## Open questions
-
-- **Which change the trial carries.** The Build skips a push that changes only documents, issues or `porelo.yml`, so a
-  document correction, as other moves carry, shows the *Shared rules check* green but starts no Build on the forge.
-  Either the trial carries [MX80](README.md#mx80)'s last step, built and tested here, whose first Build on a forge is
-  then the one in the task (recommended: it is real work the Build reads, and the forge is where it must be shown), or
-  a small change to code or to `settings.xml` that this issue names before the start.
 
 ## To be checked
 
