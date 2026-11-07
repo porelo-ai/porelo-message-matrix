@@ -44,6 +44,7 @@ sequence.
 
 | # | Size | Blocked by | Open questions | What it covers |
 |---|---|---|---|---|
+| <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | 2 | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | 0 | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes |
 
 ## Accepted
