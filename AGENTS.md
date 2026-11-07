@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `b141286c14aeb6a0` · changed 2026-11-01T08:21Z
+> **BEGIN Shared Area** · sha256 `6273b0dc00a2d23d` · changed 2026-11-07T18:02Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -188,9 +188,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   defined in the optional `.AGENTS.md` or fed into every agent's context; machines are rented only
   through the shared tooling, and nothing else names a provider.
 - **The documents' checks run locally before every handover, and on GitHub once a day.** Every
-  change is handed over with `check-shared`, `check-citations`, `check-readmes`, `check-doc-site`,
-  `check-actions` and the tests that read documents green on the host, on the exact commit, and the
-  code it changed read against the repository's skills. The named *Shared rules check* workflow runs
+  change is handed over with `check-shared`, `check-citations`, `check-commits`, `check-readmes`,
+  `check-doc-site`, `check-actions` and the tests that read documents green on the host, on the
+  exact commit, and the code it changed read against the repository's skills. The named *Shared rules check* workflow runs
   on a daily schedule, on a pull request and by hand, never on a push; the required document checks
   on push and pull request run in a suitable light workflow.
 - **The issues of one repository in one sprint share one full workflow run on the stack's top commit,
@@ -458,10 +458,10 @@ and the UTC time that text last changed; change it in the channel first, never i
 
 ### Estimates and handovers
 
-- **Before analysis or implementation, report `estimate=<min> velocity median=<min>` from the
-  relevant measured size median.** Explain departures, label a guess when measurements are
-  unavailable, and report the cause at once when elapsed time reaches one and a half times the
-  estimate.
+- **Before analysis or implementation, report `estimate=<min> velocity median=<min>`, and the
+  estimate is the measured median of the issue's size.** A reason to expect more or less is named
+  beside it and never changes the number; label a guess when no measurement exists, and report the
+  cause at once when elapsed time reaches one and a half times the estimate.
 - **Timing starts with the first plan reading or brief and ends when the work is ready for handover,
   including waits.** Keep the original estimate and starting size, record measured VM and sub-agent
   times, count returns after first readiness as rework, and explain long waits or size growth. Count
@@ -472,7 +472,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   with `+`: estimates summed, the earliest start and the stack's readiness, VM time and tokens counted
   once.
 
-> **END Shared Area** · sha256 `b141286c14aeb6a0`
+> **END Shared Area** · sha256 `6273b0dc00a2d23d`
 
 ## What this repository is
 
