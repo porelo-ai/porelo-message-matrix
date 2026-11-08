@@ -1,6 +1,6 @@
 # MX87 — A Person's Room Mention Is For All Agents
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one condition in `Person`, its tests and the contract line Porelo reads.
 
 **What must be true.** A person who mentions the whole room (`@room`, which the client sends as `m.mentions.room`) in

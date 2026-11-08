@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Agent Pi: the person file's `to` names that account beside the client's mentions and the replied-to sender.
 - A person's line in the room headed `All agents: …` is marked `"all": true` in its person file, meant for every task of
   the project.
+- A person's line in the room that mentions the whole room (`@room`, `m.mentions.room`) is marked `"all": true` too.
 - `setup`, `backup` and `restore` say on stderr what they wait for when a wait starts, and how long they have waited
   every 10 s, through the same filter as the homeserver's last error; stdout keeps its one JSON answer. A wait names
   the time it has left, and its last line never more.

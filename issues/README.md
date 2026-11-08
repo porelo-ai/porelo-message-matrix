@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx87"></a>[MX87](MX87-A-Persons-Room-Mention-Is-For-All-Agents.md) | S | - | A person's line that mentions the whole room (`@room`) is marked `"all": true`, as one headed `All agents:` |
 | <a id="mx86"></a>[MX86](MX86-A-Persons-Line-For-All-Agents-Says-So.md) | S | [MX85](README.md#mx85) | A person's line headed `All agents: …` is marked `"all": true` in its person file, so Porelo hands it to every task of the project |
 | <a id="mx85"></a>[MX85](MX85-A-Persons-Line-Headed-By-A-Task-Names-It.md) | S | - | A person's line headed `Agent Pi: …`, typed with no pill, is meant for the member shown as Agent Pi, so Porelo wakes that task |
 | <a id="mx84"></a>[MX84](MX84-Setup-Waits-For-No-Poll-It-Need-Not.md) | S | - | Several tasks of one project started at once all get through `setup`: it takes the relay's poll lock only when it must forget the relay's position |
@@ -34,7 +35,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx87"></a>[MX87](MX87-A-Persons-Room-Mention-Is-For-All-Agents.md) | S | - | A person's line that mentions the whole room (`@room`) is marked `"all": true`, as one headed `All agents:` |
 
 ## Backlog
 

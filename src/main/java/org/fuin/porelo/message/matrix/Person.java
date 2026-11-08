@@ -20,10 +20,10 @@ import org.jspecify.annotations.Nullable;
  * Whom they are meant for is what Matrix states, and the one rule the room's agents keep: the
  * accounts the client marked as mentioned, the sender of the message they reply to, and a member
  * shown as {@code Agent <Word>} that the first line's head names, as the room tool reads it; that
- * may be nobody. A head that says {@code All agents} marks the words as meant for every task.
- * Porelo maps those accounts to its tasks, checks the sender is in the room, and puts the words
- * through the filter on the way in; the transport only says who wrote what, and to whom it was
- * meant.
+ * may be nobody. A head that says {@code All agents}, or a mention of the whole room, marks the
+ * words as meant for every task. Porelo maps those accounts to its tasks, checks the sender is in
+ * the room, and puts the words through the filter on the way in; the transport only says who wrote
+ * what, and to whom it was meant.
  */
 final class Person {
 
@@ -148,9 +148,12 @@ final class Person {
             // The writer naming themselves names nobody else, so it neither marks nor hides a
             // helper.
             to.removeIf(id -> id.isEmpty() || id.equals(sender) || !id.startsWith("@"));
-            // "All agents" in the head, as the agents write it, is meant for every task; whether,
-            // asks nobody.
-            all = MeantFor.head(body, Map.of()).room();
+            // "All agents" in the head, as the agents write it, or the client's @room, is meant for
+            // every task; whether, asks nobody.
+            final JsonNode roomMention = content.path("m.mentions").path("room");
+            all =
+                    MeantFor.head(body, Map.of()).room()
+                            || (roomMention.isBoolean() && roomMention.booleanValue());
             helpers =
                     !all
                             && !to.isEmpty()

@@ -97,7 +97,8 @@ room, or in a direct chat with one task's account, and the tasks get it.
 - **Every task reads the whole room.** `to` only
   says whom a message is meant for: the accounts the client marked as mentioned, the sender of what
   it replies to, and a member shown as `Agent <Word>` whom the first line's head names, as in
-  `Agent Pi: the Build is green`. A head that says `All agents` marks the line as meant for every task.
+  `Agent Pi: the Build is green`. A head that says `All agents`, or the client's mention of the whole room
+  (`@room`), marks the line as meant for every task.
 - A person's words are not filtered on the way in. Porelo takes them only from a member of the room.
 
 **Why so:** the transport still reads no meaning into a message. A mention and a reply are structure that

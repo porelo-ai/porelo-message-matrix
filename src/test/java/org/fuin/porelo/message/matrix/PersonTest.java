@@ -3,6 +3,8 @@ package org.fuin.porelo.message.matrix;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -250,19 +252,35 @@ class PersonTest {
             final String sender,
             final String... mentions)
             throws Exception {
-        final var event =
+        final ObjectNode event = typedEvent(body, sender);
+        if (mentions.length > 0) {
+            final var ids =
+                    ((ObjectNode) event.path("content"))
+                            .putObject("m.mentions")
+                            .putArray("user_ids");
+            for (final String mention : mentions) {
+                ids.add(mention);
+            }
+        }
+        return handedOver(homeserver, event, directTo);
+    }
+
+    /** A typed line's event, from {@code sender}, mentioning nobody. */
+    private static ObjectNode typedEvent(final String body, final String sender) {
+        final ObjectNode event =
                 MatrixClient.JSON
                         .createObjectNode()
                         .put("event_id", "$typed")
                         .put("sender", sender)
                         .put("origin_server_ts", 1790000000000L);
-        final var content = event.putObject("content").put("msgtype", "m.text").put("body", body);
-        if (mentions.length > 0) {
-            final var ids = content.putObject("m.mentions").putArray("user_ids");
-            for (final String mention : mentions) {
-                ids.add(mention);
-            }
-        }
+        event.putObject("content").put("msgtype", "m.text").put("body", body);
+        return event;
+    }
+
+    /** The one person file {@code event} gives, in the room or a direct chat. */
+    private JsonNode handedOver(
+            final FakeHomeserver homeserver, final ObjectNode event, final String directTo)
+            throws Exception {
         final MatrixClient client =
                 new MatrixClient(
                         Config.from(
@@ -383,6 +401,57 @@ class PersonTest {
 
             assertThat(file.has("all")).as("marked for all agents").isFalse();
         }
+    }
+
+    /**
+     * Harm guarded: a person who mentions the whole room with {@code @room}, beside the relay,
+     * reaches no task that happens not to look, or is answered by the relay instead.
+     */
+    @Test
+    void aRoomMentionMarksTheLineForAll() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final ObjectNode event = roomMention(BooleanNode.TRUE);
+            ((ObjectNode) event.path("content").path("m.mentions"))
+                    .putArray("user_ids")
+                    .add("@relay:x");
+
+            final JsonNode file = handedOver(homeserver, event, null);
+
+            assertThat(file.path("all").isBoolean() && file.path("all").booleanValue())
+                    .as("marked as meant for all agents, a JSON true")
+                    .isTrue();
+            assertThat(file.has("helpers")).as("marked for the helpers alone").isFalse();
+            assertThat(homeserver.requests()).as("requests to the homeserver").isEmpty();
+        }
+    }
+
+    /** Harm guarded: a line for somebody else wakes every task of the project. */
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "\"true\"", "1"})
+    void onlyARoomMentionThatIsTrueIsForAll(final String room) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file =
+                    handedOver(homeserver, roomMention(MatrixClient.JSON.readTree(room)), null);
+
+            assertThat(file.has("all")).as("marked for all agents").isFalse();
+        }
+    }
+
+    /** Harm guarded: one task's direct chat wakes every task of the project. */
+    @Test
+    void aDirectChatMentioningTheRoomIsNeverForAll() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file = handedOver(homeserver, roomMention(BooleanNode.TRUE), "@pi:x");
+
+            assertThat(file.has("all")).as("marked for all agents").isFalse();
+        }
+    }
+
+    /** A plain line from a person whose client marked {@code m.mentions.room} with {@code room}. */
+    private static ObjectNode roomMention(final JsonNode room) {
+        final ObjectNode event = typedEvent("hi everyone", "@ann:x");
+        ((ObjectNode) event.path("content")).putObject("m.mentions").set("room", room);
+        return event;
     }
 
     /**

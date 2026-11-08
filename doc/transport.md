@@ -250,7 +250,8 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
     then empty, and is not for all agents; otherwise it is absent, never `false`. Porelo then wakes no task and
     answers through `send` with the relay's token.
   - **Its `all`** is present and `true` exactly when the room line's head says `All agents` by the room tool's rule
-    (the whole phrase, in any case, before the first colon on the first line, within 300 code points); otherwise it is
+    (the whole phrase, in any case, before the first colon on the first line, within 300 code points), or when the
+    person's client mentioned the whole room (`m.mentions.room` is the JSON `true`, as for `@room`); otherwise it is
     absent, never `false`. Porelo then hands it to every task of the project. Deciding it asks the homeserver nothing,
     though `to` may still ask for the members' names; a direct chat is never marked, and reaches only its task.
   - **In a direct chat**, `to` is the task's own account and `direct` is `true`.
