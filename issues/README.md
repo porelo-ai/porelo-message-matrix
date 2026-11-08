@@ -32,6 +32,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx85"></a>[MX85](MX85-A-Persons-Line-Headed-By-A-Task-Names-It.md) | S | - | A person's line headed `Agent Pi: …`, typed with no pill, is meant for the member shown as Agent Pi, so Porelo wakes that task |
 
 ## Backlog
 
