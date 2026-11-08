@@ -33,6 +33,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx86"></a>[MX86](MX86-A-Persons-Line-For-All-Agents-Says-So.md) | S | [MX85](README.md#mx85) | A person's line headed `All agents: …` is marked `"all": true` in its person file, so Porelo hands it to every task of the project |
 
 ## Backlog
 
