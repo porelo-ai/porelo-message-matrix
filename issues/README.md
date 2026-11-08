@@ -31,6 +31,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx84"></a>[MX84](MX84-Setup-Waits-For-No-Poll-It-Need-Not.md) | S | - | Several tasks of one project started at once all get through `setup`: it takes the relay's poll lock only when it must forget the relay's position |
 
 ## Backlog
 
