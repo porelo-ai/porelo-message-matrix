@@ -235,13 +235,34 @@ class PersonTest {
     /** Whom a person's typed line is meant for, in a room whose members show {@link #MEMBERS}. */
     private List<String> toOfTyped(final FakeHomeserver homeserver, final String body)
             throws Exception {
+        return typed(homeserver, body, null, "@ann:x")
+                .path("to")
+                .valueStream()
+                .map(JsonNode::asText)
+                .toList();
+    }
+
+    /** The person file a typed line gives, from {@code sender}, in the room or a direct chat. */
+    private JsonNode typed(
+            final FakeHomeserver homeserver,
+            final String body,
+            final String directTo,
+            final String sender,
+            final String... mentions)
+            throws Exception {
         final var event =
                 MatrixClient.JSON
                         .createObjectNode()
                         .put("event_id", "$typed")
-                        .put("sender", "@ann:x")
+                        .put("sender", sender)
                         .put("origin_server_ts", 1790000000000L);
-        event.putObject("content").put("msgtype", "m.text").put("body", body);
+        final var content = event.putObject("content").put("msgtype", "m.text").put("body", body);
+        if (mentions.length > 0) {
+            final var ids = content.putObject("m.mentions").putArray("user_ids");
+            for (final String mention : mentions) {
+                ids.add(mention);
+            }
+        }
         final MatrixClient client =
                 new MatrixClient(
                         Config.from(
@@ -251,7 +272,9 @@ class PersonTest {
                                         Config.ACCESS_TOKEN,
                                         "t")));
 
-        assertThat(Person.deliver(client, "@relay:x", "!room", event, inbound, state, null, null))
+        assertThat(
+                        Person.deliver(
+                                client, "@relay:x", "!room", event, inbound, state, null, directTo))
                 .as("the person's words are handed over")
                 .isNull();
 
@@ -260,12 +283,106 @@ class PersonTest {
             files = list.toList();
         }
         assertThat(files).as("one person file is handed over").hasSize(1);
-        return MatrixClient.JSON
-                .readTree(Files.readString(files.getFirst()))
-                .path("to")
-                .valueStream()
-                .map(JsonNode::asText)
-                .toList();
+        return MatrixClient.JSON.readTree(Files.readString(files.getFirst()));
+    }
+
+    /**
+     * Harm guarded: a person who writes "All agents: ..." as the agents do reaches no task that
+     * happens not to look, though everybody was meant.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {"All agents: the Build is green", "all agents: hi", "Hi, All Agents: x"})
+    void aHeadForAllAgentsMarksTheLineForAll(final String body) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file = typed(homeserver, body, null, "@ann:x");
+
+            assertThat(file.path("all").isBoolean() && file.path("all").booleanValue())
+                    .as("marked as meant for all agents, a JSON true")
+                    .isTrue();
+            assertThat(homeserver.requests()).as("requests to the homeserver").isEmpty();
+        }
+    }
+
+    /** Harm guarded: a line for somebody else wakes every task of the project. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "All agentsX: hi",
+                "recall agents: hi",
+                "hello: All agents",
+                "All agents without a colon",
+                "All agents\nnow: hi"
+            })
+    void onlyAWholeBroadcastInTheHeadIsForAll(final String body) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file = typed(homeserver, body, null, "@ann:x");
+
+            assertThat(file.has("all")).as("marked for all agents").isFalse();
+        }
+    }
+
+    /**
+     * Harm guarded: a long line that mentions all agents somewhere wakes every task, though only a
+     * head within 300 code points addresses anyone.
+     */
+    @Test
+    void aBroadcastBeyondTheHeadsReachIsNotForAll() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode within =
+                    typed(homeserver, "x".repeat(288) + " All agents: hi", null, "@ann:x");
+            assertThat(within.path("all").booleanValue())
+                    .as("colon at code point 299, marked for all agents")
+                    .isTrue();
+        }
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode beyond =
+                    typed(homeserver, "x".repeat(289) + " All agents: hi", null, "@ann:x");
+            assertThat(beyond.has("all"))
+                    .as("colon at code point 300, marked for all agents")
+                    .isFalse();
+        }
+    }
+
+    /** Harm guarded: a line for every task is answered by the relay instead, and nobody wakes. */
+    @Test
+    void aLineForAllAgentsIsNeverForTheHelpersAlone() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file = typed(homeserver, "All agents: hi", null, "@ann:x", "@relay:x");
+
+            assertThat(file.path("all").isBoolean() && file.path("all").booleanValue())
+                    .as("marked as meant for all agents, a JSON true")
+                    .isTrue();
+            assertThat(file.has("helpers")).as("marked for the helpers alone").isFalse();
+        }
+    }
+
+    /**
+     * Harm guarded: a line for all agents that also names a task loses that task, or keeps a helper
+     * that Porelo takes for a task.
+     */
+    @Test
+    void aLineForAllAgentsKeepsWhomElseItNames() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, MEMBERS);
+
+            final JsonNode file =
+                    typed(homeserver, "All agents, Agent Pi: hi", null, "@ann:x", "@relay:x");
+
+            assertThat(file.path("to").valueStream().map(JsonNode::asText).toList())
+                    .as("whom else it is meant for")
+                    .containsExactly("@pi:x");
+        }
+    }
+
+    /** Harm guarded: one task's direct chat wakes every task of the project. */
+    @Test
+    void aDirectChatIsNeverForAll() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final JsonNode file = typed(homeserver, "All agents: hi", "@pi:x", "@ann:x");
+
+            assertThat(file.has("all")).as("marked for all agents").isFalse();
+        }
     }
 
     /**

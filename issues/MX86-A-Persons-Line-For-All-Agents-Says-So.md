@@ -1,6 +1,6 @@
 # MX86 — A Person's Line For All Agents Says So
 
-**Status:** Implementing; accepted by the operator, 2026-11-08.
+**Status:** Review; blocked by [MX85](README.md#mx85).
 **Size:** S - one field in the person file, set in `Person`, its tests and the contract; Porelo reads it.
 
 **What must be true.** A person who writes `All agents: …` in the project's room gets a person file marked

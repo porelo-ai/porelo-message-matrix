@@ -236,7 +236,7 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
   all)"; the message is never cut. Without `--shown` the body is "A Porelo message.", never the message.
 - **An event without `org.fuin.porelo.message`**, the message in its body as before, is not delivered.
 - **A person's file** is `{"sender", "account"?, "to": [...], "body", "eventId", "replyTo"?, "direct"?, "helpers"?,
-  "at"}`.
+  "all"?, "at"}`.
   - **Its `account`** is the person's login, present exactly when `sender` is a login's own account: a bare name,
     with no dot, on the polling account's homeserver, never `porelo` or `porelo-…`. On a host's homeserver only that
     login's gate makes it. From any other account it is absent, never guessed: absent means no known person.
@@ -247,8 +247,12 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
     sync, and only for a head that holds an `Agent <Word>`. It may be `[]`. Every task reads the room,
     so who reads it is Porelo's, not `to`'s.
   - **Its `helpers`** is present and `true` exactly when the line named only the room's helpers, with `to`
-    then empty; otherwise it is absent, never `false`. Porelo then wakes no task and answers through `send`
-    with the relay's token.
+    then empty, and is not for all agents; otherwise it is absent, never `false`. Porelo then wakes no task and
+    answers through `send` with the relay's token.
+  - **Its `all`** is present and `true` exactly when the room line's head says `All agents` by the room tool's rule
+    (the whole phrase, in any case, before the first colon on the first line, within 300 code points); otherwise it is
+    absent, never `false`. Porelo then hands it to every task of the project. Deciding it asks the homeserver nothing,
+    though `to` may still ask for the members' names; a direct chat is never marked, and reaches only its task.
   - **In a direct chat**, `to` is the task's own account and `direct` is `true`.
   - **Not handed over:** notices, edits, and anything not text.
 - **On a central homeserver only a person's own account is a person**: a bare name, with no dot, on the

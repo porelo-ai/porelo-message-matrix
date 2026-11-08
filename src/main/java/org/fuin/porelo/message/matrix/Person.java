@@ -20,9 +20,10 @@ import org.jspecify.annotations.Nullable;
  * Whom they are meant for is what Matrix states, and the one rule the room's agents keep: the
  * accounts the client marked as mentioned, the sender of the message they reply to, and a member
  * shown as {@code Agent <Word>} that the first line's head names, as the room tool reads it; that
- * may be nobody. Porelo maps those accounts to its tasks, checks the sender is in the room, and
- * puts the words through the filter on the way in; the transport only says who wrote what, and to
- * whom it was meant.
+ * may be nobody. A head that says {@code All agents} marks the words as meant for every task.
+ * Porelo maps those accounts to its tasks, checks the sender is in the room, and puts the words
+ * through the filter on the way in; the transport only says who wrote what, and to whom it was
+ * meant.
  */
 final class Person {
 
@@ -103,6 +104,7 @@ final class Person {
         }
         final Set<String> to = new LinkedHashSet<>();
         boolean helpers = false;
+        boolean all = false;
         final String replyTo =
                 content.path("m.relates_to").path("m.in_reply_to").path("event_id").asText("");
         if (directTo != null) {
@@ -146,8 +148,12 @@ final class Person {
             // The writer naming themselves names nobody else, so it neither marks nor hides a
             // helper.
             to.removeIf(id -> id.isEmpty() || id.equals(sender) || !id.startsWith("@"));
+            // "All agents" in the head, as the agents write it, is meant for every task; whether,
+            // asks nobody.
+            all = MeantFor.head(body, Map.of()).room();
             helpers =
-                    !to.isEmpty()
+                    !all
+                            && !to.isEmpty()
                             && to.stream()
                                     .allMatch(id -> id.equals(self) || id.equals(administrator));
             // Whom it is meant for, not who reads it: every task of the project reads every message
@@ -174,6 +180,9 @@ final class Person {
         }
         if (helpers) {
             file.put("helpers", true);
+        }
+        if (all) {
+            file.put("all", true);
         }
         file.put("eventId", eventId);
         if (!replyTo.isEmpty()) {

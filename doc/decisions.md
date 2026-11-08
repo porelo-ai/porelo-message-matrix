@@ -9,7 +9,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [A backup drains what came before it](#a-backup-drains-what-came-before-it) | `backup` signals twice under its locks and copies the second snapshot, covering one earlier backup that died, not two. |
 | [The homeserver is Tuwunel](#the-homeserver-is-tuwunel) | Built and tested against Tuwunel, pinned by digest; Conduit is the measured alternative. |
 | [A message is a text event: a line for a person, the message and its signature beside it](#a-message-is-a-text-event-a-line-for-a-person-the-message-and-its-signature-beside-it) | One `m.text` event: the line for a person as its body, the message and its signature in fields of their own. |
-| [A person's words reach the tasks; whom they are meant for is what Matrix states](#a-persons-words-reach-the-tasks-whom-they-are-meant-for-is-what-matrix-states) | A person's text in the room and in a direct chat reaches the tasks; mentions, replies and an `Agent <Word>:` head say whom it is meant for. |
+| [A person's words reach the tasks; whom they are meant for is what Matrix states](#a-persons-words-reach-the-tasks-whom-they-are-meant-for-is-what-matrix-states) | A person's text in the room and in a direct chat reaches the tasks; mentions, replies and an `Agent <Word>:` or `All agents:` head say whom it is meant for. |
 | [The position of a poll is saved after its files](#the-position-of-a-poll-is-saved-after-its-files) | A crash delivers a message twice, never skips one. |
 | [A position from an earlier database is refused, by the rooms kept beside it](#a-position-from-an-earlier-database-is-refused-by-the-rooms-kept-beside-it) | A poll whose account is in none of the saved rooms stops with 78. |
 | [`max_bytes` is what every message fits, not what most do](#max_bytes-is-what-every-message-fits-not-what-most-do) | 10240 bytes, the worst case of escaping in a 64 KiB event. |
@@ -97,14 +97,14 @@ room, or in a direct chat with one task's account, and the tasks get it.
 - **Every task reads the whole room.** `to` only
   says whom a message is meant for: the accounts the client marked as mentioned, the sender of what
   it replies to, and a member shown as `Agent <Word>` whom the first line's head names, as in
-  `Agent Pi: the Build is green`.
+  `Agent Pi: the Build is green`. A head that says `All agents` marks the line as meant for every task.
 - A person's words are not filtered on the way in. Porelo takes them only from a member of the room.
 
 **Why so:** the transport still reads no meaning into a message. A mention and a reply are structure that
 the person's client puts into the event; the text itself is handed over as typed. The head is the one rule read
 from the text: it is how the agents name each other in their own room (the room tool's), and a task is shown by its
 agent's name, so a person who types `Agent Pi:` as the agents do, with no pill, means that task. Only a whole
-`Agent <Word>` name before the first colon counts, never a word in the message. Porelo's own messages
+`Agent <Word>` name or `All agents` before the first colon counts, never a word in the message. Porelo's own messages
 are still told by the transport's marks, the message field and the signature beside it. A person's file
 has no `.sig`, and its name says whose it is. Whether and how it reaches a task is Porelo's.
 A direct chat is taken only from somebody who already shares the project's room with the task's account,
