@@ -57,6 +57,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx83"></a>[MX83](MX83-The-Homeservers-Data-Survives-A-Volume-Prune.md) | - | - | The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked |
 | <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
