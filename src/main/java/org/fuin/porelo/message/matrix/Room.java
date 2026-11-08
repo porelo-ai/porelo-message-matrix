@@ -21,7 +21,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -351,18 +350,11 @@ final class Room {
     /** The current room members and the names their room profiles show. */
     private static Map<String, String> members(final MatrixClient client, final String room)
             throws Failure {
-        final Map<String, String> members = new LinkedHashMap<>();
-        get(client, "/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/joined_members")
-                .path("joined")
-                .properties()
-                .forEach(
-                        member ->
-                                members.put(
-                                        member.getKey(),
-                                        member.getValue()
-                                                .path("display_name")
-                                                .asText(member.getKey())));
-        return members;
+        try {
+            return Person.members(client, room);
+        } catch (final Failure failure) {
+            throw serverFailure(failure);
+        }
     }
 
     /** A sync cut short by the server is completed before any decision about unread work. */

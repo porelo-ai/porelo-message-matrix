@@ -240,9 +240,11 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
   - **Its `account`** is the person's login, present exactly when `sender` is a login's own account: a bare name,
     with no dot, on the polling account's homeserver, never `porelo` or `porelo-…`. On a host's homeserver only that
     login's gate makes it. From any other account it is absent, never guessed: absent means no known person.
-  - **Its `to`** is whom it is meant for, as Matrix states it: the accounts the client marked as mentioned
-    (`m.mentions`, else `matrix.to` links), plus the sender of the message it replies to, less the writer
-    and the room's helpers (the administrator and the relay). It may be `[]`. Every task reads the room,
+  - **Its `to`** is whom it is meant for, as the event states it: the accounts the client marked as mentioned
+    (`m.mentions`, else `matrix.to` links), plus the sender of the message it replies to, plus each member
+    shown as `Agent <Word>` whom the first line's head names by the room tool's rule (above, "Talking in the room"), less the writer
+    and the room's helpers (the administrator and the relay). The members' names are asked once per room and
+    sync, and only for a head that holds an `Agent <Word>`. It may be `[]`. Every task reads the room,
     so who reads it is Porelo's, not `to`'s.
   - **Its `helpers`** is present and `true` exactly when the line named only the room's helpers, with `to`
     then empty; otherwise it is absent, never `false`. Porelo then wakes no task and answers through `send`

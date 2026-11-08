@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
@@ -237,6 +238,8 @@ final class Poll {
             throw new Failure(Exit.PROTOCOL, "the sync answered no next_batch");
         }
         int handed = 0;
+        // The names each room's members show, asked once in this sync for the heads people type.
+        final Map<String, Map<String, String>> shown = new HashMap<>();
         // A task's direct chats: answer the invitations first, so a chat a person just opened is
         // joined now and
         // read from the next poll on.
@@ -324,7 +327,8 @@ final class Poll {
                                         inbound,
                                         stateDir,
                                         central,
-                                        null)
+                                        null,
+                                        shown)
                                 : "not a Porelo message (poll --persons hands a person's words over): from "
                                         + event.path("sender").asText("?")
                                         + " in "

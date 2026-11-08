@@ -6,7 +6,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,11 +17,12 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A person's words in the room, handed to Porelo, which gives them to every task of the project.
- * Whom they are meant for is what Matrix states, never read out of the text: the accounts the
- * client marked as mentioned, and the sender of the message they reply to; that may be nobody.
- * Porelo maps those accounts to its tasks, checks the sender is in the room, and puts the words
- * through the filter on the way in; the transport only says who wrote what, and to whom it was
- * meant.
+ * Whom they are meant for is what Matrix states, and the one rule the room's agents keep: the
+ * accounts the client marked as mentioned, the sender of the message they reply to, and a member
+ * shown as {@code Agent <Word>} that the first line's head names, as the room tool reads it; that
+ * may be nobody. Porelo maps those accounts to its tasks, checks the sender is in the room, and
+ * puts the words through the filter on the way in; the transport only says who wrote what, and to
+ * whom it was meant.
  */
 final class Person {
 
@@ -45,6 +49,26 @@ final class Person {
             final Path stateDir,
             @Nullable final String central,
             @Nullable final String directTo)
+            throws Failure {
+        return deliver(
+                client, self, room, event, inbound, stateDir, central, directTo, new HashMap<>());
+    }
+
+    /**
+     * As {@link #deliver(MatrixClient, String, String, JsonNode, Path, Path, String, String)}, with
+     * the names each room's members show kept in {@code shown} across one poll, so a room is asked
+     * for them once however many heads its people type.
+     */
+    static @Nullable String deliver(
+            final MatrixClient client,
+            final String self,
+            final String room,
+            final JsonNode event,
+            final Path inbound,
+            final Path stateDir,
+            @Nullable final String central,
+            @Nullable final String directTo,
+            final Map<String, Map<String, String>> shown)
             throws Failure {
         final String sender = event.path("sender").asText("?");
         // On a central homeserver the room holds every other person's tasks and relays too, whose
@@ -108,6 +132,16 @@ final class Person {
                     to.add(original.path("sender").asText(""));
                 }
             }
+            // A head typed as the agents write it, "Agent Pi: ...", names the member shown so.
+            final String body = content.path("body").asText();
+            if (MeantFor.mayNameAnAgent(body)) {
+                Map<String, String> names = shown.get(room);
+                if (names == null) {
+                    names = shownOrNone(client, room);
+                    shown.put(room, names);
+                }
+                to.addAll(MeantFor.head(body, names).users());
+            }
             final String administrator = "@" + Lifecycle.ADMIN + ":" + AdminRoom.server(self);
             // The writer naming themselves names nobody else, so it neither marks nor hides a
             // helper.
@@ -157,5 +191,39 @@ final class Person {
             throw new IllegalStateException("A JSON tree could not be written", ex);
         }
         return null;
+    }
+
+    /**
+     * The names the room's members show; none where the polling account is no longer let ask, as
+     * when it was taken out after the sync, so the words are handed over as before, named by what
+     * the client marked. A homeserver not reached still ends the poll, and the line is read again.
+     */
+    private static Map<String, String> shownOrNone(final MatrixClient client, final String room)
+            throws Failure {
+        try {
+            return members(client, room);
+        } catch (final Failure failure) {
+            if (failure.exitCode() == Exit.NOT_PERMITTED) {
+                return Map.of();
+            }
+            throw failure;
+        }
+    }
+
+    /** The room's members and the names their room profiles show. */
+    static Map<String, String> members(final MatrixClient client, final String room)
+            throws Failure {
+        final Map<String, String> members = new LinkedHashMap<>();
+        client.get("/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/joined_members")
+                .path("joined")
+                .properties()
+                .forEach(
+                        member ->
+                                members.put(
+                                        member.getKey(),
+                                        member.getValue()
+                                                .path("display_name")
+                                                .asText(member.getKey())));
+        return members;
     }
 }

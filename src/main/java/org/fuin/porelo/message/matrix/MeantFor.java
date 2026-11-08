@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /** The people a room line addresses, without any transport or state. */
 record MeantFor(Set<String> users, boolean room) {
@@ -23,12 +24,10 @@ record MeantFor(Set<String> users, boolean room) {
 
     /** Names in the first line's head, for the mentions sent with a post. */
     static MeantFor head(final String body, final Map<String, String> members) {
-        final String first = body.lines().findFirst().orElse("");
-        final int colon = first.indexOf(':');
-        if (colon < 0 || first.codePointCount(0, colon) >= 300) {
+        final String head = headOf(body);
+        if (head == null) {
             return new MeantFor(Set.of(), false);
         }
-        final String head = first.substring(0, colon);
         final Set<String> users = new LinkedHashSet<>();
         members.forEach(
                 (id, name) -> {
@@ -37,6 +36,25 @@ record MeantFor(Set<String> users, boolean room) {
                     }
                 });
         return new MeantFor(Set.copyOf(users), phrase(head.toLowerCase(Locale.ROOT), "all agents"));
+    }
+
+    /**
+     * Whether the first line's head may name a member shown as {@code Agent <Word>}, decided
+     * without the members, so a line that cannot name one costs no request for them.
+     */
+    static boolean mayNameAnAgent(final String body) {
+        final String head = headOf(body);
+        return head != null && AGENT.matcher(head).find();
+    }
+
+    /** The first line up to its first colon, within the first 300 code points; or none. */
+    private static @Nullable String headOf(final String body) {
+        final String first = body.lines().findFirst().orElse("");
+        final int colon = first.indexOf(':');
+        if (colon < 0 || first.codePointCount(0, colon) >= 300) {
+            return null;
+        }
+        return first.substring(0, colon);
     }
 
     /** A name or broadcast inside a longer word must not address another reader. */

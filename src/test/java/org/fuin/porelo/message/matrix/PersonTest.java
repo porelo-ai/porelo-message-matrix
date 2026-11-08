@@ -224,4 +224,161 @@ class PersonTest {
                 .as("a login's own account is a person")
                 .isNull();
     }
+
+    /** The room's members, as {@code joined_members} answers, with the names they show. */
+    private static final String MEMBERS =
+            """
+            {"joined":{"@pi:x":{"display_name":"Agent Pi"},"@pine:x":{"display_name":"Agent Pine"},\
+            "@omp:x":{"display_name":"omp"},"@ann:x":{"display_name":"ann"}}}
+            """;
+
+    /** Whom a person's typed line is meant for, in a room whose members show {@link #MEMBERS}. */
+    private List<String> toOfTyped(final FakeHomeserver homeserver, final String body)
+            throws Exception {
+        final var event =
+                MatrixClient.JSON
+                        .createObjectNode()
+                        .put("event_id", "$typed")
+                        .put("sender", "@ann:x")
+                        .put("origin_server_ts", 1790000000000L);
+        event.putObject("content").put("msgtype", "m.text").put("body", body);
+        final MatrixClient client =
+                new MatrixClient(
+                        Config.from(
+                                Map.of(
+                                        Config.HOMESERVER,
+                                        homeserver.url(),
+                                        Config.ACCESS_TOKEN,
+                                        "t")));
+
+        assertThat(Person.deliver(client, "@relay:x", "!room", event, inbound, state, null, null))
+                .as("the person's words are handed over")
+                .isNull();
+
+        final List<Path> files;
+        try (Stream<Path> list = Files.list(inbound)) {
+            files = list.toList();
+        }
+        assertThat(files).as("one person file is handed over").hasSize(1);
+        return MatrixClient.JSON
+                .readTree(Files.readString(files.getFirst()))
+                .path("to")
+                .valueStream()
+                .map(JsonNode::asText)
+                .toList();
+    }
+
+    /**
+     * Harm guarded: a person who types "Agent Pi: ..." as the agents do, with no pill, wakes no
+     * task, and the line is read only when the task happens to look.
+     */
+    @Test
+    void aHeadNamingATasksShownNameIsMeantForIt() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, MEMBERS);
+
+            assertThat(toOfTyped(homeserver, "Agent Pi: the Build is green, please answer here"))
+                    .as("whom the typed line is meant for")
+                    .containsExactly("@pi:x");
+        }
+    }
+
+    /** Harm guarded: a name inside a longer one, or in the words, wakes a task not meant. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "Agent Pine: hello",
+                "Agent Pi2: hello",
+                "hello: Agent Pi, are you there",
+                "Agent Pi without a colon",
+                "agent pi: hello"
+            })
+    void onlyAWholeShownNameInTheHeadNamesATask(final String body) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, MEMBERS);
+
+            assertThat(toOfTyped(homeserver, body))
+                    .as("whom the typed line is meant for")
+                    .doesNotContain("@pi:x");
+        }
+    }
+
+    /** Harm guarded: a task shown by its own name is woken by every line that happens to say it. */
+    @Test
+    void aShownNameThatIsNoAgentsIsNeverNamedByAHead() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, MEMBERS);
+
+            assertThat(toOfTyped(homeserver, "omp, Agent Smith: hello"))
+                    .as("whom it is meant for")
+                    .isEmpty();
+        }
+    }
+
+    /** Harm guarded: every line a person types costs the homeserver a members request. */
+    @ParameterizedTest
+    @ValueSource(strings = {"hello everybody", "status: green", "agent pi: hello", "Agent : hi"})
+    void aLineWhoseHeadNamesNoAgentAsksNothing(final String body) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            assertThat(toOfTyped(homeserver, body)).as("whom it is meant for").isEmpty();
+            assertThat(homeserver.requests()).as("requests to the homeserver").isEmpty();
+        }
+    }
+
+    /** Harm guarded: a sync with many headed lines in a room asks for its members each time. */
+    @Test
+    void aRoomsMembersAreAskedOncePerSync() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, MEMBERS);
+            final MatrixClient client =
+                    new MatrixClient(
+                            Config.from(
+                                    Map.of(
+                                            Config.HOMESERVER,
+                                            homeserver.url(),
+                                            Config.ACCESS_TOKEN,
+                                            "t")));
+            final Map<String, Map<String, String>> shown = new java.util.HashMap<>();
+
+            for (final String id : List.of("$one", "$two")) {
+                final var event =
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("event_id", id)
+                                .put("sender", "@ann:x")
+                                .put("origin_server_ts", 1790000000000L);
+                event.putObject("content").put("msgtype", "m.text").put("body", "Agent Pi: hi");
+                assertThat(
+                                Person.deliver(
+                                        client,
+                                        "@relay:x",
+                                        "!room",
+                                        event,
+                                        inbound,
+                                        state,
+                                        null,
+                                        null,
+                                        shown))
+                        .as("the person's words are handed over")
+                        .isNull();
+            }
+
+            assertThat(homeserver.requests()).as("requests for the room's members").hasSize(1);
+        }
+    }
+
+    /**
+     * Harm guarded: the relay taken out of a room after its sync ends every poll 77, and no other
+     * room's words reach the tasks either.
+     */
+    @Test
+    void aRoomThatNoLongerLetsTheRelayAskIsHandedOverNamedAsBefore() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(403, "{\"errcode\":\"M_FORBIDDEN\",\"error\":\"not in the room\"}");
+
+            assertThat(toOfTyped(homeserver, "Agent Pi: hello"))
+                    .as("whom it is meant for")
+                    .isEmpty();
+        }
+    }
 }

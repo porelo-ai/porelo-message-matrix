@@ -1,6 +1,6 @@
 # MX85 — A Person's Line Headed By A Task Names It
 
-**Status:** Implementing; accepted by the operator, 2026-11-08. Found in a move to a host.
+**Status:** Review.
 **Size:** S - one method in `Person`, one call in `Poll`, their tests, and the decision it revises; the person
 file's `to` keeps its meaning and only names more accounts.
 
@@ -9,9 +9,9 @@ a person file whose `to` names the account shown as Agent Pi, so Porelo wakes th
 
 ## What happened
 
-In the third move the operator wrote in porelo's room on a host. With the tasks shown as `Agent Pi` and so on
-(Porelo passes the agent's name as `--display` at `enroll`), the operator's decision is that `Agent Pi: …` names
-the task, as it does in the agents' own room. Today the transport fills `to` only from what the person's client
+In a move to a host a person wrote in the project's room. A task is shown by its agent's name, `Agent Pi`
+(Porelo passes it as `--display` at `enroll`), and `Agent Pi: …` is to name that task, as it does in the agents'
+own room. Today the transport fills `to` only from what the person's client
 marked: `m.mentions`, else `matrix.to` links in the formatted body, plus the sender of the message replied to.
 Typed text that only names a task gives `to: []`, and no task is woken.
 
@@ -23,13 +23,15 @@ Typed text that only names a task gives `to: []`, and no task is woken.
   `matrix.to` links and the replied-to sender, and the same removals follow: the writer, the polling account and the
   administrator.
 - **The member names come from the room's `joined_members`**, asked once per room per poll and only when a person's
-  line in that room is to be written; a direct chat is meant for its task already and asks nothing.
+  line in that room has an `Agent <Word>` in its head; a direct chat is meant for its task already and asks nothing.
+  Refused because the relay was taken out after the sync, the line is handed over named as before; a homeserver not
+  reached ends the poll, so the line is read again.
 - **`All agents` is not marked**: what a person's line headed so means waits for the operator.
 - **`doc/decisions.md`** ("A person's words reach the tasks; whom they are meant for is what Matrix states") and
   **`doc/transport.md`** ("Its `to`") say that a head naming a task's shown name counts as naming it.
 - **The test that goes red first:** `PersonTest` (or the poll test that writes person files): a person's line
   `Agent Pi: the Build is green` in a room whose member `@pi:x` shows as `Agent Pi` gives `to: ["@pi:x"]`; today
-  `[]`. Beside it: a name inside a word (`Agent Pine`) names nobody, a name after the colon names nobody, and a
+  `[]`. Beside it: a longer name (`Agent Pine`) never names Agent Pi, a name after the colon names nobody, and a
   member whose shown name is not `Agent <Word>` is never named by the head.
 
 ## Acceptance
