@@ -1353,7 +1353,7 @@ final class Lifecycle {
     /**
      * As {@link #forgetPosition(Path, String, String, Report, Duration)}, for a position {@code
      * forgettable} says goes, asked of it under the lock: a poll that ended during the wait may
-     * have saved another.
+     * have saved another. A position it keeps as read without the lock does not wait for a poll.
      */
     static void forgetPosition(
             final Path stateDir,
@@ -1364,6 +1364,9 @@ final class Lifecycle {
             final Predicate<Poll.Position> forgettable) {
         final Path lockFile = stateDir.resolve(key + ".lock");
         if (!Files.exists(lockFile) && !Files.exists(stateDir.resolve(key + ".since"))) {
+            return;
+        }
+        if (!mayForget(stateDir.resolve(key + ".since"), forgettable)) {
             return;
         }
         try (FileChannel channel =
@@ -1388,6 +1391,22 @@ final class Lifecycle {
             }
         } catch (final IOException | Failure ex) {
             report.kept("the poll position of " + relay, ex.getMessage());
+        }
+    }
+
+    /**
+     * Whether the position, read without the lock, may go: {@code poll} replaces it in one atomic
+     * move, so the read is whole. Only a position naming its rooms says that nothing goes; without
+     * them, a poll still running may yet save one from rooms it read before. A read that fails is
+     * asked again under the lock, which reports it.
+     */
+    private static boolean mayForget(
+            final Path position, final Predicate<Poll.Position> forgettable) {
+        try {
+            final Poll.Position read = Poll.readPosition(position);
+            return read.rooms().isEmpty() || forgettable.test(read);
+        } catch (final Failure ex) {
+            return true;
         }
     }
 

@@ -142,6 +142,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Tasks of one project started at once on a central homeserver no longer end `setup` with 75 while the project's
+  relay is being polled: setup waits for the relay's poll only when it must forget the relay's position.
 - A connection the gate closes for idling no longer reads as a bad request, with an answer to nobody and an
   exception.
 - A person's provisioning account invited into the room before it registered joins at its first `setup`,

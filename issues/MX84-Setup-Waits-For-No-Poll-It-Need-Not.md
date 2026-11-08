@@ -1,6 +1,6 @@
 # MX84 — Setup Waits For No Poll It Need Not
 
-**Status:** Implementing; accepted by the operator, 2026-11-08. Bug, found in a move to a host.
+**Status:** Review; accepted by the operator, 2026-11-08. Bug, found in a move to a host.
 **Size:** S - one method in `Lifecycle` and its tests; no contract another repository reads.
 
 **What must be true.** Several tasks of one project started at once on a central homeserver all get through `setup`.
@@ -24,12 +24,15 @@ running after 45 s", and nothing was created.
 
 - **`Lifecycle.forgetPosition` with a predicate first reads the position without the lock**; `poll` replaces that file
   in one atomic move, so the read is whole. Where the predicate says nothing goes, it returns at once and leaves the
-  lock alone. A position that may go is asked again under the lock, as today. A read that fails without the lock falls
-  back to the locked path, which reports the fault.
+  lock alone. Only a position that names its rooms can say so. A missing position, or one without rooms, still waits,
+  since a poll still running may yet save one from rooms it read before the relay left them. A position that may go
+  is asked again under the lock, as today. A read that fails without the lock falls back to the locked path, which
+  reports the fault.
 - **`clear`'s use, which forgets whatever there is, still waits for a running poll**, as it must.
 - **The test that goes red first:** `ForgetPositionTest`. With a poll holding the relay's lock and the position taken
   in a room the relay is still in, setup's check ends at once and reports nothing kept; today it waits out its time
-  and reports the position kept, which `setup` turns into 75. The existing tests keep holding the rest: a position
+  and reports the position kept, which `setup` turns into 75. Beside it, a setup with no position yet still waits for
+  the running poll, and an unreadable position is reported kept. The existing tests keep holding the rest: a position
   only in rooms left is still forgotten, a position saved during the wait is still judged as found under the lock,
   and `clear` still waits for a poll.
 
