@@ -17,16 +17,36 @@ that is stays Porelo's choice. No verb today tells Porelo who is in the room, so
 
 ## Plan
 
-- **A verb `members --project P`**, on the account's own homeserver as the administrator, and on a central homeserver
-  with the login's token, the room resolved as `enroll` resolves it. It answers
-  `{"room":"#porelo-P:server","members":[{"id":"@…","shown":"…","state":"join|invite","kind":"task|person|helper"}]}`,
-  ordered by kind, then name. A task is an account `enroll` made (`@<task>` or `@<task>.<login>`), a helper the
-  administrator, a relay or `@porelo.<login>`, a person any other account. No room: `{"members":[]}`, exit 0.
-- **It reads, never changes**: no join, invite or profile write; on a host it answers the same through the gate.
+- **A verb `members --project P [--login L] [--loopback-only]`**, a lifecycle verb in `describe`, taking its settings and
+  the account's secrets on stdin like `part` (in `Main.TAKES_INPUT`; no registration token lent, no machine secret
+  needed). `P` is a name, `default` is refused (78) before anything is read, and `--loopback-only` is held as for the
+  other verbs. It answers on stdout, exit 0:
+  `{"room":"<alias>","members":[{"id":"@…","shown":"…","state":"join|invite","kind":"task|person|helper|other"}]}`;
+  a `task` member also carries `"task":"<container>"`, and on a central homeserver `"login":"<login>"`, so Porelo maps
+  it to its task by name, never by the shown name, which can change and repeat.
+- **Which room**: on the account's own homeserver `#porelo-P:<server>`, held to the administrator's own room as `part`
+  holds it (`ours`); on a central homeserver the configured room, as `enroll` resolves it, held to an invite-only room
+  closed to guests (`checkCentralRoom`, never leaving it) with this project's relay `@porelo-relay-P.<login>` joined in
+  it - otherwise 78, so another project's room is never answered under `P`. `room` in the answer is that alias.
+- **Who counts**: members with `membership` `join` or `invite` only, asked as `/members?membership=join` and
+  `?membership=invite`, each `id` once (`join` first). A room the caller's account is not joined to, a missing room, or
+  no secrets from `setup` yet answer `{"room":…,"members":[]}`, exit 0 - never a homeserver started, a file written,
+  an account registered or a session logged in or out.
+- **Its kind, from the id alone**, helpers first: `@porelo`, `@porelo.<login>` and `@porelo-relay-<name>[.<login>]` on
+  the room's server are helpers; `@porelo-P-<task>` (own homeserver) or `@porelo-P-<task>.<login>` (central) a task,
+  `task` its localpart before `.<login>`; on a central homeserver a person only as `Login.person` reads one, on the
+  account's own homeserver any other plain name not starting `porelo`; anything else `other`.
+- **Its name**: the member event's `displayname`, with control and format characters removed and cut to 64 code
+  points; the id when nothing is left. Ordered task, person, helper, other, then by `shown`, then by `id`.
+- **It reads, never changes**: no join, leave, invite, kick or profile write.
 - **The test that goes red first:** `LifecycleTest` against a scripted homeserver: a room with a task, a person, an
-  invited person and the helpers answers each with its kind, state and shown name; a member with no display name is
-  shown by its id; a missing room answers an empty list. `RoomIT` against the real homeserver: after `enroll` and
-  `join`, `members` names both under the names they were given.
+  invited person, a left and a banned account, the helpers and a stranger answers each with its kind, state and shown
+  name, without the left and banned; a name with a control character is cleaned and an empty one shown by its id; a
+  missing room and a room the caller left answer an empty list; a central room without the project's relay is 78;
+  `default` is 78 with no request made. `RoomIT` against the real homeserver: after `enroll` and `join`, `members` names
+  both under the names they were given.
+- **Not in this issue, from the plan's reading**: a second `--project` silently replacing the first, and a homeserver's
+  error text passed to stderr unfiltered, hold for every verb and go into an issue of their own.
 
 ## Acceptance
 
