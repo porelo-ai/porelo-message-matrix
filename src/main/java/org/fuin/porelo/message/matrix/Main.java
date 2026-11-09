@@ -31,6 +31,7 @@ public final class Main {
                     "join",
                     "part",
                     "clear",
+                    "members",
                     "expel",
                     "keep-room",
                     "drop-room");
@@ -111,7 +112,7 @@ public final class Main {
                 case "homeserver-token" -> HomeserverToken.run(rest, env);
                 case "gate" -> Gate.run(rest, env, out, err);
                 case "settings" -> SettingsCheck.run(rest, in, out);
-                case "setup", "enroll", "retire", "join", "part", "clear" ->
+                case "setup", "enroll", "retire", "join", "part", "clear", "members" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
                 case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env), err);
                 case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, out, err);

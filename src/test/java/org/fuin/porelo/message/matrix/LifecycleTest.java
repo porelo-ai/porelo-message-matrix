@@ -109,7 +109,8 @@ class LifecycleTest {
             strings = {
                 "setup --project default",
                 "enroll --project default --task t",
-                "join --project default --person p"
+                "join --project default --person p",
+                "members --project default"
             })
     void theDefaultProjectGetsNoRoomOnAnyHomeserver(final String command) throws Exception {
         final List<String> args = List.of(command.split(" "));
@@ -516,5 +517,370 @@ class LifecycleTest {
                     .as("busy is temporary, worth trying again")
                     .isEqualTo(Exit.TEMPORARY);
         }
+    }
+
+    private static final String NOT_FOUND = "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"none\"}";
+
+    /** The central room's answers up to its member lists, as members asks them. */
+    private static void aClosedCentralRoom(final FakeHomeserver homeserver) {
+        homeserver
+                .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                .answer(200, "{\"joined_rooms\":[\"!room:example.org\"]}")
+                .answer(200, "{\"join_rule\":\"invite\"}")
+                .answer(200, "{\"guest_access\":\"forbidden\"}");
+    }
+
+    private static String member(final String id, final String membership, final String name) {
+        return "{\"type\":\"m.room.member\",\"state_key\":\""
+                + id
+                + "\",\"content\":{\"membership\":\""
+                + membership
+                + "\",\"displayname\":\""
+                + name
+                + "\"}}";
+    }
+
+    /**
+     * Harm guarded: the window says nobody is in a room two people and a task are in, or shows one
+     * who left as still in, or a member under a name the room does not show.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members on a central homeserver lists who is joined or invited, each once, and changes nothing")
+    void membersListsTheCentralRoom() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            aClosedCentralRoom(homeserver);
+            homeserver
+                    .answer(200, "{\"membership\":\"join\"}")
+                    .answer(
+                            200,
+                            "{\"chunk\":["
+                                    + member(
+                                            "@porelo-demo-pi.hosta:example.org", "join", "Agent Pi")
+                                    + ","
+                                    + member("@ada:example.org", "join", "Ada\\u0007")
+                                    + ","
+                                    + member("@porelo-relay-demo.hosta:example.org", "join", "")
+                                    + ","
+                                    + member(
+                                            "@porelo.hosta:example.org",
+                                            "join",
+                                            "Porelo (administrator)")
+                                    + "]}")
+                    .answer(
+                            200,
+                            "{\"chunk\":[" + member("@bea:example.org", "invite", "Bea") + "]}");
+
+            final String answer =
+                    out(
+                            central(homeserver.url()),
+                            centralAccount(),
+                            "members",
+                            "--project",
+                            "demo",
+                            "--login",
+                            "hosta");
+
+            assertThat(MatrixClient.JSON.readTree(answer))
+                    .as("each member with its kind, state and the room's name")
+                    .isEqualTo(
+                            MatrixClient.JSON.readTree(
+                                    "{\"room\":\"!room:example.org\",\"members\":["
+                                            + "{\"id\":\"@porelo-demo-pi.hosta:example.org\",\"shown\":\"Agent Pi\","
+                                            + "\"state\":\"join\",\"kind\":\"task\",\"task\":\"porelo-demo-pi\",\"login\":\"hosta\"},"
+                                            + "{\"id\":\"@ada:example.org\",\"shown\":\"Ada\",\"state\":\"join\",\"kind\":\"person\"},"
+                                            + "{\"id\":\"@bea:example.org\",\"shown\":\"Bea\",\"state\":\"invite\",\"kind\":\"person\"},"
+                                            + "{\"id\":\"@porelo-relay-demo.hosta:example.org\","
+                                            + "\"shown\":\"@porelo-relay-demo.hosta:example.org\",\"state\":\"join\",\"kind\":\"helper\"},"
+                                            + "{\"id\":\"@porelo.hosta:example.org\",\"shown\":\"Porelo (administrator)\","
+                                            + "\"state\":\"join\",\"kind\":\"helper\"}]}"));
+            assertThat(homeserver.requests())
+                    .as("both member lists are asked by membership, and nothing is written")
+                    .allSatisfy(request -> assertThat(request.method()).isEqualTo("GET"))
+                    .anySatisfy(request -> assertThat(request.query()).isEqualTo("membership=join"))
+                    .anySatisfy(
+                            request -> assertThat(request.query()).isEqualTo("membership=invite"));
+        }
+    }
+
+    /** Harm guarded: another project's room is answered as this project's. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {
+                "404:{\"errcode\":\"M_NOT_FOUND\",\"error\":\"none\"}",
+                "200:{\"membership\":\"leave\"}",
+                "200:{\"membership\":\"invite\"}"
+            })
+    @org.junit.jupiter.api.DisplayName(
+            "members in a central room the project's relay is not joined to ends 78, naming it")
+    void membersRefusesACentralRoomWithoutTheRelay(final String relay) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            aClosedCentralRoom(homeserver);
+            homeserver.answer(
+                    Integer.parseInt(relay.substring(0, 3)),
+                    relay.substring(relay.indexOf(':') + 1));
+
+            assertThat(
+                            reason(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "members",
+                                    "--project",
+                                    "demo",
+                                    "--login",
+                                    "hosta"))
+                    .as("not this project's room")
+                    .startsWith(Exit.CONFIG + " ")
+                    .contains("@porelo-relay-demo.hosta:example.org");
+        }
+    }
+
+    /**
+     * Harm guarded: a login out of the room is shown the members of the moment it left, as if they
+     * were in now.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members in a central room the login is not in answers nobody, asking no list")
+    void membersOutOfTheRoomAnswersNobody() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                    .answer(200, "{\"joined_rooms\":[\"!other:example.org\"]}");
+
+            assertThat(
+                            out(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "members",
+                                    "--project",
+                                    "demo",
+                                    "--login",
+                                    "hosta"))
+                    .as("an empty list")
+                    .isEqualTo("{\"room\":\"!room:example.org\",\"members\":[]}\n");
+            assertThat(homeserver.requests())
+                    .as("no member list is asked")
+                    .noneSatisfy(request -> assertThat(request.rawPath()).endsWith("/members"));
+        }
+    }
+
+    /** Harm guarded: asking who is in starts a homeserver or makes a room before setup. */
+    @Test
+    @org.junit.jupiter.api.DisplayName("members before setup answers nobody, asking no homeserver")
+    void membersBeforeSetupAnswersNobody() throws Exception {
+        final List<String> unitCalls = new java.util.ArrayList<>();
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            for (final String settings : List.of("{}", central(homeserver.url()))) {
+                final java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                Lifecycle.run(
+                        "members",
+                        List.of("--project", "demo", "--login", "hosta"),
+                        account(),
+                        new java.io.ByteArrayInputStream(
+                                settings.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                        new java.io.PrintStream(
+                                bytes, true, java.nio.charset.StandardCharsets.UTF_8),
+                        new java.io.PrintStream(java.io.OutputStream.nullOutputStream()),
+                        recording(unitCalls));
+                assertThat(bytes.toString(java.nio.charset.StandardCharsets.UTF_8))
+                        .as("with the settings %s, an empty list", settings)
+                        .isEqualTo(
+                                "{}".equals(settings)
+                                        ? "{\"members\":[]}\n"
+                                        : "{\"room\":\"!room:example.org\",\"members\":[]}\n");
+            }
+            assertThat(homeserver.requests()).as("no homeserver is asked").isEmpty();
+        }
+        assertThat(unitCalls).as("no homeserver is looked at or started").isEmpty();
+    }
+
+    /**
+     * Harm guarded: a missing room on the account's own homeserver is made, or ends in an error.
+     */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members on the account's own homeserver with no room answers nobody")
+    void membersWithNoRoomOnTheOwnHomeserverAnswersNobody() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(200, "{\"user_id\":\"@porelo:example.org\"}").answer(404, NOT_FOUND);
+            final Map<String, String> env = new java.util.HashMap<>(account());
+            env.put(Config.HOMESERVER, homeserver.url());
+            env.put(Config.ADMIN_TOKEN, "admin-token");
+
+            assertThat(out("{}", env, "members", "--project", "demo"))
+                    .as("an empty list under the project's alias")
+                    .isEqualTo("{\"room\":\"#porelo-demo:example.org\",\"members\":[]}\n");
+            assertThat(homeserver.requests())
+                    .as("only read")
+                    .allSatisfy(request -> assertThat(request.method()).isEqualTo("GET"));
+        }
+    }
+
+    /** Harm guarded: a room behind a host's gate, named by its alias, is never found. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members in a central room named by its alias reads the room the alias names")
+    void membersResolvesACentralAlias() throws Exception {
+        final String settings = "{\"homeserver\":\"%s\",\"room\":\"#porelo-demo:example.org\"}";
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                    .answer(200, "{\"room_id\":\"!room:example.org\"}")
+                    .answer(200, "{\"joined_rooms\":[\"!room:example.org\"]}")
+                    .answer(200, "{\"join_rule\":\"invite\"}")
+                    .answer(200, "{\"guest_access\":\"forbidden\"}")
+                    .answer(200, "{\"membership\":\"join\"}")
+                    .answer(200, "{\"chunk\":[" + member("@ada:example.org", "join", "Ada") + "]}")
+                    .answer(200, "{\"chunk\":[]}");
+
+            assertThat(
+                            out(
+                                    settings.formatted(homeserver.url()),
+                                    centralAccount(),
+                                    "members",
+                                    "--project",
+                                    "demo"))
+                    .as("the alias's room, under the alias")
+                    .isEqualTo(
+                            "{\"room\":\"#porelo-demo:example.org\",\"members\":[{\"id\":\"@ada:example.org\","
+                                    + "\"shown\":\"Ada\",\"state\":\"join\",\"kind\":\"person\"}]}\n");
+        }
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                    .answer(404, NOT_FOUND);
+
+            assertThat(
+                            out(
+                                    settings.formatted(homeserver.url()),
+                                    centralAccount(),
+                                    "members",
+                                    "--project",
+                                    "demo"))
+                    .as("an alias naming no room: nobody")
+                    .isEqualTo("{\"room\":\"#porelo-demo:example.org\",\"members\":[]}\n");
+        }
+    }
+
+    /** Harm guarded: who is in an open room is answered as who is in the project's. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members in an open central room ends 78 and leaves nothing, asking only")
+    void membersRefusesAnOpenCentralRoomWithoutLeavingIt() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                    .answer(200, "{\"joined_rooms\":[\"!room:example.org\"]}")
+                    .answer(200, "{\"join_rule\":\"public\"}")
+                    .answer(200, "{\"guest_access\":\"can_join\"}");
+
+            assertThat(
+                            reason(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "members",
+                                    "--project",
+                                    "demo"))
+                    .as("not a room the project's can be")
+                    .startsWith(Exit.CONFIG + " ")
+                    .contains("cannot be used as the project's room");
+            assertThat(homeserver.requests())
+                    .as("only asked")
+                    .allSatisfy(request -> assertThat(request.method()).isEqualTo("GET"));
+        }
+    }
+
+    /** Harm guarded: a room under the project's alias that someone else made is answered. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members on the account's own homeserver in a room someone else made ends 78")
+    void membersRefusesARoomTheAdministratorDidNotMake() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo:example.org\"}")
+                    .answer(200, "{\"room_id\":\"!other:example.org\"}")
+                    .answer(
+                            200,
+                            "{\"chunk\":[{\"type\":\"m.room.create\",\"sender\":\"@eve:example.org\"}]}")
+                    .answer(200, "{\"join_rule\":\"invite\"}")
+                    .answer(200, "{\"guest_access\":\"forbidden\"}");
+
+            assertThat(reason("{}", ownAccount(homeserver), "members", "--project", "demo"))
+                    .as("not Porelo's room")
+                    .startsWith(Exit.CONFIG + " ")
+                    .contains("@eve:example.org");
+        }
+    }
+
+    /** Harm guarded: a homeserver's broken answer is taken for a room nobody is in. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members where the homeserver names no room for the alias ends 76")
+    void membersRefusesAnAliasAnsweredWithNoRoom() throws Exception {
+        for (final String found : List.of("{}", "{\"room_id\":null}", "{\"room_id\":\"\"}")) {
+            try (FakeHomeserver homeserver = new FakeHomeserver()) {
+                homeserver.answer(200, "{\"user_id\":\"@porelo:example.org\"}").answer(200, found);
+
+                assertThat(reason("{}", ownAccount(homeserver), "members", "--project", "demo"))
+                        .as("the alias answered %s", found)
+                        .startsWith(Exit.PROTOCOL + " ");
+            }
+        }
+    }
+
+    /** Harm guarded: another login's name is taken, or none checked, before setup. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members on a central homeserver before setup checks the login, then answers nobody")
+    void membersBeforeSetupOnACentralHomeserverChecksTheLogin() throws Exception {
+        final Map<String, String> env = new java.util.HashMap<>(account());
+        env.put("PORELO_MATRIX_LOGIN", "hosta");
+        final String settings = central("https://matrix.example.org");
+
+        assertThat(reason(settings, env, "members", "--project", "demo", "--login", "bob"))
+                .as("a login that is not the kept one")
+                .startsWith(Exit.CONFIG + " --login bob does not match");
+        assertThat(reason(settings, account(), "members", "--project", "demo"))
+                .as("no login at all")
+                .startsWith(Exit.CONFIG + " ");
+        assertThat(out(settings, env, "members", "--project", "demo"))
+                .as("the configured room, nobody in it yet")
+                .isEqualTo("{\"room\":\"!room:example.org\",\"members\":[]}\n");
+    }
+
+    /** Harm guarded: an empty homeserver Porelo kept ends in an error instead of nobody. */
+    @Test
+    @org.junit.jupiter.api.DisplayName(
+            "members on the account's own homeserver with an empty homeserver kept answers nobody")
+    void membersWithABlankHomeserverAnswersNobody() throws Exception {
+        final Map<String, String> env = new java.util.HashMap<>(account());
+        env.put(Config.HOMESERVER, " ");
+        env.put(Config.ADMIN_TOKEN, "admin-token");
+
+        assertThat(out("{}", env, "members", "--project", "demo"))
+                .as("not set up")
+                .isEqualTo("{\"members\":[]}\n");
+    }
+
+    /** Harm guarded: an option members has no use for is taken silently. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"--task t", "--person p", "--display D", "--reset", "--token"})
+    void membersRefusesOptionsItHasNoUseFor(final String option) {
+        final List<String> args =
+                new java.util.ArrayList<>(List.of("members", "--project", "demo"));
+        args.addAll(List.of(option.split(" ")));
+
+        assertThat(reason("{}", account(), args.toArray(String[]::new)))
+                .as(option)
+                .startsWith(Exit.USAGE + " usage: members");
+    }
+
+    private Map<String, String> ownAccount(final FakeHomeserver homeserver) {
+        final Map<String, String> env = new java.util.HashMap<>(account());
+        env.put(Config.HOMESERVER, homeserver.url());
+        env.put(Config.ADMIN_TOKEN, "admin-token");
+        return env;
     }
 }

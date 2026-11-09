@@ -35,17 +35,19 @@ import org.jspecify.annotations.Nullable;
  */
 final class Lifecycle {
 
-    static final List<String> VERBS = List.of("setup", "enroll", "retire", "join", "part", "clear");
+    static final List<String> VERBS =
+            List.of("setup", "enroll", "retire", "join", "part", "clear", "members");
 
     /** The provisioning account: the first registered, so the homeserver's administrator. */
     static final String ADMIN = "porelo";
 
     /** What a project's, a task's or a person's name may be, as part of a Matrix id. */
-    private static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
+    /** A project, task or local person name. */
+    static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
 
     static final String DEFAULT_PROJECT = "default";
 
-    private static final Set<String> GIVES_A_ROOM = Set.of("setup", "enroll", "join");
+    private static final Set<String> ABOUT_A_ROOM = Set.of("setup", "enroll", "join", "members");
 
     private Lifecycle() {}
 
@@ -121,6 +123,7 @@ final class Lifecycle {
                     case "join" -> join(options, settings, env);
                     case "part" -> part(options, settings, env);
                     case "clear" -> clear(options, settings, env);
+                    case "members" -> members(options, settings, env);
                     default -> throw new IllegalArgumentException(verb);
                 };
         print(out, answer);
@@ -140,7 +143,7 @@ final class Lifecycle {
     /** {@code retire}, {@code part} and {@code clear} stay open, so a leftover can still go. */
     private static void refuseARoomForTheDefaultProject(final String verb, final String project)
             throws Failure {
-        if (DEFAULT_PROJECT.equals(project) && GIVES_A_ROOM.contains(verb)) {
+        if (DEFAULT_PROJECT.equals(project) && ABOUT_A_ROOM.contains(verb)) {
             throw new Failure(
                     Exit.CONFIG,
                     verb
@@ -1078,6 +1081,140 @@ final class Lifecycle {
                 : answer.put("kept", id).put("why", "a member of " + other + " too");
     }
 
+    // --- members
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * Who is in the project's room, read and never changed: on the account's own homeserver as its
+     * administrator in the administrator's own room, on a central homeserver as the login in the
+     * room configured for it, which must be closed and hold this project's relay.
+     */
+    private static ObjectNode members(
+            final Options options, final Settings settings, final Map<String, String> env)
+            throws Failure {
+        final String token = env.getOrDefault(Config.ADMIN_TOKEN, "").strip();
+        final URI central = settings.homeserver();
+        if (central != null) {
+            // The login is checked as for every central verb, before anything is answered.
+            final String login = centralLogin(options, env);
+            if (token.isEmpty()) {
+                return Members.answer(
+                        Objects.requireNonNull(settings.room()),
+                        options.project(),
+                        "",
+                        login,
+                        List.of());
+            }
+            return membersCentral(options, settings, env, central, token, login);
+        }
+        if (token.isEmpty() || env.getOrDefault(Config.HOMESERVER, "").isBlank()) {
+            // No setup yet: nobody is in a room that has not been made, nor is its name known.
+            final ObjectNode answer = MatrixClient.JSON.createObjectNode();
+            answer.putArray("members");
+            return answer;
+        }
+        final Place place = place(settings, env);
+        final String server = AdminRoom.server(place.adminId());
+        final String alias = alias(options.project(), server);
+        final JsonNode found =
+                place.admin()
+                        .find("/_matrix/client/v3/directory/room/" + MatrixClient.segment(alias));
+        if (found == null) {
+            return Members.answer(alias, options.project(), server, null, List.of());
+        }
+        final String room = ours(place.admin(), place.adminId(), alias, roomId(found, alias));
+        return Members.answer(
+                alias, options.project(), server, null, memberEvents(place.admin(), room));
+    }
+
+    private static ObjectNode membersCentral(
+            final Options options,
+            final Settings settings,
+            final Map<String, String> env,
+            final URI url,
+            final String token,
+            final String login)
+            throws Failure {
+        final MatrixClient nobody = client(url, "", settings);
+        final MatrixClient asLogin = nobody.as(token);
+        final String server = AdminRoom.server(loginId(nobody, asLogin, login));
+        final String configuredRoom = Objects.requireNonNull(settings.room());
+        final String room;
+        if (configuredRoom.startsWith("#")) {
+            final JsonNode found =
+                    asLogin.find(
+                            "/_matrix/client/v3/directory/room/"
+                                    + MatrixClient.segment(configuredRoom));
+            if (found == null) {
+                return Members.answer(configuredRoom, options.project(), server, login, List.of());
+            }
+            room = roomId(found, configuredRoom);
+        } else {
+            room = configuredRoom;
+        }
+        if (!joined(asLogin, room)) {
+            // Out of the room, a member list would be the one of the moment the login left.
+            return Members.answer(configuredRoom, options.project(), server, login, List.of());
+        }
+        checkCentralRoom(asLogin, configuredRoom, room, false);
+        final String relay = "@porelo-relay-" + options.project() + "." + login + ":" + server;
+        final JsonNode relayIn =
+                asLogin.find(
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(room)
+                                + "/state/m.room.member/"
+                                + MatrixClient.segment(relay));
+        if (relayIn == null || !"join".equals(relayIn.path("membership").asText(""))) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    configuredRoom
+                            + " is not the room of the project "
+                            + options.project()
+                            + ": its relay "
+                            + relay
+                            + " is not in it");
+        }
+        return Members.answer(
+                configuredRoom, options.project(), server, login, memberEvents(asLogin, room));
+    }
+
+    /** The room an alias names, as the homeserver answered it; nothing else is taken for one. */
+    private static String roomId(final JsonNode found, final String alias) throws Failure {
+        final JsonNode id = found.path("room_id");
+        if (!id.isTextual() || !id.asText().startsWith("!")) {
+            throw new Failure(Exit.PROTOCOL, "the homeserver named no room for " + alias);
+        }
+        return id.asText();
+    }
+
+    private static boolean joined(final MatrixClient client, final String room) throws Failure {
+        for (final JsonNode id :
+                client.get("/_matrix/client/v3/joined_rooms").path("joined_rooms")) {
+            if (room.equals(id.asText(""))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The room's joined and invited members' events, asked apart so no one who left comes. */
+    private static List<JsonNode> memberEvents(final MatrixClient client, final String room)
+            throws Failure {
+        final List<JsonNode> events = new ArrayList<>();
+        for (final String membership : List.of("join", "invite")) {
+            for (final JsonNode event :
+                    client.get(
+                                    "/_matrix/client/v3/rooms/"
+                                            + MatrixClient.segment(room)
+                                            + "/members?membership="
+                                            + membership)
+                            .path("chunk")) {
+                events.add(event);
+            }
+        }
+        return events;
+    }
+
     /**
      * Whether the administrator put {@code id} out of {@code room}, as {@code part} does. An
      * account that left by itself - a retired task's, deactivated - is not one, so no person takes
@@ -1786,7 +1923,7 @@ final class Lifecycle {
                     case "setup" -> task == null && person == null;
                     case "enroll", "retire" -> task != null && person == null;
                     case "join", "part" -> person != null && task == null;
-                    case "clear" -> task == null && person == null;
+                    case "clear", "members" -> task == null && person == null;
                     default -> false;
                 };
         if (project == null || !ok) {
@@ -1832,6 +1969,8 @@ final class Lifecycle {
                             case "retire" ->
                                     "retire --project <project> --task <task> [--login <login>]";
                             case "clear" -> "clear [--project <project>] [--login <login>]";
+                            case "members" ->
+                                    "members --project <project> [--login <login>] [--loopback-only]";
                             case "part" ->
                                     "part --project <project> --person <person> [--login <login>] [--loopback-only]";
                             default ->

@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx95"></a>[MX95](MX95-The-Transport-Says-Who-Is-In-The-Room.md) | M | - | `members --project P` tells Porelo who is joined or invited in a project's room, each with the name the room shows and whether a task, a person or a helper, so the window can say who is in |
 | <a id="mx94"></a>[MX94](MX94-The-Homeserver-Holds-Its-Limits-On-Any-Machine.md) | S | - | The local homeserver's container sets its open files too, and a test runs the real homeserver under a process limit its uncapped pool would break |
 | <a id="mx88"></a>[MX88](MX88-A-Head-Names-A-Task-By-Its-Whole-Display.md) | S | - | A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so |
 | <a id="mx87"></a>[MX87](MX87-A-Persons-Room-Mention-Is-For-All-Agents.md) | S | - | A person's line that mentions the whole room (`@room`) is marked `"all": true`, as one headed `All agents:` |
@@ -40,7 +41,6 @@ sequence.
 | <a id="mx89"></a>[MX89](MX89-A-Test-Person-Signs-In-Through-The-Gate-Unattended.md) | S | - | A rehearsal signs the test person into the project's room through the gate's SSO without a browser, posts, reads and logs out; no login a real host does not offer |
 | <a id="mx90"></a>[MX90](MX90-The-Rooms-Scenarios-Are-Rehearsed-On-A-Host.md) | S | [MX89](README.md#mx89) | A rehearsal proves on a host that a person's line reaches exactly the tasks meant (a head, `All agents:`, `@room`, nobody, a direct chat) and that the task's answer comes back |
 | <a id="mx91"></a>[MX91](MX91-The-Rehearsal-Says-A-Wake-Was-Answered.md) | XS | [MX89](README.md#mx89) | The rehearsal tells the move check a wake was answered only after it saw the task's answer in the room |
-| <a id="mx95"></a>[MX95](MX95-The-Transport-Says-Who-Is-In-The-Room.md) | M | - | `members --project P` tells Porelo who is joined or invited in a project's room, each with the name the room shows and whether a task, a person or a helper, so the window can say who is in |
 
 ## Backlog
 

@@ -1,6 +1,6 @@
 # MX95 — The Transport Says Who Is In The Room
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** M - one new verb, its contract in `doc/transport.md`, which Porelo reads, and its tests on both homeserver
 kinds.
 
@@ -30,12 +30,15 @@ that is stays Porelo's choice. No verb today tells Porelo who is in the room, so
   it - otherwise 78, so another project's room is never answered under `P`. `room` in the answer is that alias.
 - **Who counts**: members with `membership` `join` or `invite` only, asked as `/members?membership=join` and
   `?membership=invite`, each `id` once (`join` first). A room the caller's account is not joined to, a missing room, or
-  no secrets from `setup` yet answer `{"room":…,"members":[]}`, exit 0 - never a homeserver started, a file written,
-  an account registered or a session logged in or out.
+  no secrets from `setup` yet answer `{"room":…,"members":[]}`, exit 0 (before `setup` on the account's own homeserver
+  `{"members":[]}`, since no room has a name yet; on a central homeserver after the login is checked) - never a
+  homeserver started, a file written, an account registered or a session logged in or out.
 - **Its kind, from the id alone**, helpers first: `@porelo`, `@porelo.<login>` and `@porelo-relay-<name>[.<login>]` on
   the room's server are helpers; `@porelo-P-<task>` (own homeserver) or `@porelo-P-<task>.<login>` (central) a task,
   `task` its localpart before `.<login>`; on a central homeserver a person only as `Login.person` reads one, on the
-  account's own homeserver any other plain name not starting `porelo`; anything else `other`.
+  account's own homeserver any other plain name not starting `porelo`; anything else `other`. A task's and a local
+  person's name must follow the transport's name rule, and the server is what follows the id's first `:`; an id
+  outside Matrix's syntax (printable ASCII, at most 255 bytes) is left out, so nothing unreadable reaches the window.
 - **Its name**: the member event's `displayname`, with control and format characters removed and cut to 64 code
   points; the id when nothing is left. Ordered task, person, helper, other, then by `shown`, then by `id`.
 - **It reads, never changes**: no join, leave, invite, kick or profile write.

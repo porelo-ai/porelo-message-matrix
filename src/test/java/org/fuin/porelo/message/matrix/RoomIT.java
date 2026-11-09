@@ -544,6 +544,45 @@ class RoomIT {
                 content);
     }
 
+    /**
+     * Harm guarded: the window says nobody is in a room people and a task are in, or shows a member
+     * under a name the room does not show, or a helper as a person.
+     */
+    @Test
+    void membersNamesEveryoneEnrolledAndJoinedUnderTheNamesTheyWereGiven() throws Exception {
+        lifecycle(
+                kept,
+                "enroll",
+                "--project",
+                "demo",
+                "--task",
+                "porelo-demo-pi",
+                "--display",
+                "Agent Pi");
+
+        final JsonNode answer = lifecycle(kept, "members", "--project", "demo");
+
+        final Map<String, String> byKind = new java.util.TreeMap<>();
+        for (final JsonNode member : answer.path("members")) {
+            byKind.merge(
+                    member.path("kind").asText(),
+                    member.path("shown").asText() + " " + member.path("state").asText(),
+                    (a, b) -> a + ", " + b);
+        }
+        assertThat(answer.path("room").asText())
+                .as("the project's room")
+                .startsWith("#porelo-demo:");
+        assertThat(byKind)
+                .as("the task and each person under the name given, joined; nothing unknown")
+                .containsEntry("task", "Agent Pi join")
+                .containsEntry("person", "Agent Core join, Agent Matrix join, Agent Smith join")
+                .containsEntry("helper", "Porelo (administrator) join, Porelo (delivery) join")
+                .doesNotContainKey("other");
+        assertThat(answer.path("members").findValuesAsText("task"))
+                .as("the task by the name it was enrolled under")
+                .containsExactly("porelo-demo-pi");
+    }
+
     /** Makes a second real room the two people share. */
     private String anotherRoom() throws Exception {
         final ObjectNode request =

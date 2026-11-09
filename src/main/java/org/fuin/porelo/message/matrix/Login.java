@@ -22,7 +22,7 @@ final class Login {
         return value;
     }
 
-    private static boolean valid(final String value) {
+    static boolean valid(final String value) {
         return NAME.matcher(value).matches()
                 && !"porelo".equals(value)
                 && !value.startsWith("porelo-");

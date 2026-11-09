@@ -52,7 +52,7 @@ class LoopbackOnlyTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({"setup", "enroll", "join"})
+    @CsvSource({"setup", "enroll", "join", "members"})
     @DisplayName(
             "A homeserver that is not loopback is refused with 78, before anything is asked of it")
     void refusedBeforeAnyRequest(final String verb) {
@@ -63,6 +63,7 @@ class LoopbackOnlyTest {
                             new String[] {
                                 "enroll", "--project", "p", "--task", "t", "--loopback-only"
                             };
+                    case "members" -> new String[] {"members", "--project", "p", "--loopback-only"};
                     default ->
                             new String[] {
                                 "join", "--project", "p", "--person", "n", "--loopback-only"

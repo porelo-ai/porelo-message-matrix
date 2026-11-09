@@ -125,4 +125,45 @@ class MainTest {
     private String stderr() {
         return errBytes.toString(StandardCharsets.UTF_8);
     }
+
+    /**
+     * Harm guarded: members reads no secrets from its input, so it answers nobody for every room,
+     * or the command line never reaches it.
+     */
+    @Test
+    @DisplayName("members takes its secrets from the input and asks the homeserver with them")
+    void membersReadsItsSecretsFromTheInput() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver
+                    .answer(200, "{\"user_id\":\"@porelo.hosta:example.org\"}")
+                    .answer(200, "{\"joined_rooms\":[]}");
+
+            final int exit =
+                    Main.run(
+                            new String[] {"members", "--project", "demo"},
+                            Map.of(),
+                            new java.io.ByteArrayInputStream(
+                                    ("{\"settings\":{\"homeserver\":\""
+                                                    + homeserver.url()
+                                                    + "\",\"room\":\"!room:example.org\"},"
+                                                    + "\"secrets\":{\""
+                                                    + Config.ADMIN_TOKEN
+                                                    + "\":\"from-the-input\",\"PORELO_MATRIX_LOGIN\":\"hosta\"}}")
+                                            .getBytes(StandardCharsets.UTF_8)),
+                            new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                            err);
+
+            assertThat(exit).as(stderr()).isZero();
+            assertThat(outBytes.toString(StandardCharsets.UTF_8))
+                    .as("the room, read with the input's secrets")
+                    .isEqualTo("{\"room\":\"!room:example.org\",\"members\":[]}\n");
+            assertThat(homeserver.requests())
+                    .as("asked as the login, with the token from the input")
+                    .isNotEmpty()
+                    .allSatisfy(
+                            request ->
+                                    assertThat(request.authorization())
+                                            .isEqualTo("Bearer from-the-input"));
+        }
+    }
 }
