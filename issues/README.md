@@ -47,6 +47,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
