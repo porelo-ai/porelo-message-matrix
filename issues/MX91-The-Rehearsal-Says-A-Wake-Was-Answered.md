@@ -1,6 +1,6 @@
 # MX91 — The Rehearsal Says A Wake Was Answered
 
-**Status:** Backlog; blocked by [MX89](README.md#mx89).
+**Status:** Implementing; blocked by [MX89](README.md#mx89).
 **Size:** XS - one step of the rehearsal client: wait for an answer, then report it; no change to the move check.
 
 **What must be true.** The check of an agent's move asks whoever posted the waking message to say they read the

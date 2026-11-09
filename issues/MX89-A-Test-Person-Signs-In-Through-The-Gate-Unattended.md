@@ -1,6 +1,6 @@
 # MX89 — A Test Person Signs In Through The Gate Unattended
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - one test-scope program and its tests in this repository; it ships nothing and changes no contract.
 
 **What must be true.** A rehearsal on a host, with no person at a keyboard, signs the test person into the project's

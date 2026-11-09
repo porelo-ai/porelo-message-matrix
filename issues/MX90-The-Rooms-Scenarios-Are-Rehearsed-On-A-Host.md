@@ -1,6 +1,6 @@
 # MX90 — The Room's Scenarios Are Rehearsed On A Host
 
-**Status:** Backlog; blocked by [MX89](README.md#mx89).
+**Status:** Implementing; blocked by [MX89](README.md#mx89).
 **Size:** S - one step list for the rehearsal and one try on a local VM host; no code that ships.
 
 **What must be true.** A rehearsal on a host proves, unattended, that what a person writes in the project's room
