@@ -47,7 +47,6 @@ sequence.
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
-| <a id="mx92"></a>[MX92](MX92-Element-Web-Signs-In-Headless-As-A-Smoke.md) | M | [MX89](README.md#mx89) | Optional smoke: Element web, headless in a test VM, signs in through the gate, sends a line with a pill and shows the task's answer |
 
 ## Analyzed
 
@@ -122,6 +121,7 @@ sequence.
 
 | # | Title | Why |
 |---|---|---|
+| <a id="mx92"></a>[MX92](README.md#mx92) | Element Web Signs In Headless As A Smoke | The gate answers a browser page only from its own origin or Element Desktop's, so Element web cannot sign in there unless the host is widened; the scripted client already proves the same path, and Element's look stays in the operator's own test |
 | <a id="mx45"></a>[MX45](README.md#mx45) | A Project Admin Brings The Room Onto A Central Homeserver | Replaced by [MX65](README.md#mx65): the host's helper makes and keeps the room with `keep-room` and `drop-room`, and `setup --create-room` is gone |
 | <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
 | <a id="mx53"></a>[MX53](README.md#mx53) | A Person Added Again Keeps Their Name | Replaced by the one-key design; a purged login is never made again on a host, so a person comes back under a new login ([MX57](README.md#mx57)) |
