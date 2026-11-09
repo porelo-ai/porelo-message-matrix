@@ -361,6 +361,130 @@ class KeepRoomIT {
                 .isEqualTo(403);
     }
 
+    /**
+     * Harm guarded: a person shows in the room as their whole Matrix id though the host passed a
+     * name, an account the host names before its first sign-in exists unnamed, or a name the person
+     * then chose is overwritten on the next run.
+     */
+    @Test
+    @Timeout(180)
+    void aPersonShowsUnderTheNameTheHostPassesUntilTheyChooseTheirOwn() throws Exception {
+        final String input =
+                "{\"settings\":{\"names\":{\""
+                        + login
+                        + "\":\"Ada\",\"bob\":\"Bob\"}},\"secrets\":{\""
+                        + Config.ADMIN_TOKEN
+                        + "\":\""
+                        + adminToken
+                        + "\"}}";
+        final String persons = login + ",bob";
+        final JsonNode first = named(input, persons);
+        final List<String> fields = new java.util.ArrayList<>();
+        first.fieldNames().forEachRemaining(fields::add);
+        assertThat(fields)
+                .as("the names change nothing in the answer")
+                .containsExactly("room", "conversation", "created_room", "invited", "removed");
+        final String conversation = first.path("conversation").asText();
+        final MatrixClient admin = nobody.as(adminToken);
+        assertThat(
+                        admin.get(
+                                        "/_matrix/client/v3/profile/"
+                                                + MatrixClient.segment(id(login))
+                                                + "/displayname")
+                                .path("displayname")
+                                .asText())
+                .as("an account made before its first sign-in is made named")
+                .isEqualTo("Ada");
+        assertThat(shown(admin, conversation, id("bob")))
+                .as("the invitation shows the name")
+                .isEqualTo("Bob");
+
+        final MatrixClient person = signedIn();
+        person.post(
+                "/_matrix/client/v3/join/" + MatrixClient.segment(conversation),
+                MatrixClient.JSON.createObjectNode());
+        assertThat(shown(admin, conversation, id(login)))
+                .as("the person, signing in for the first time, shows the name passed")
+                .isEqualTo("Ada");
+
+        final String profile =
+                "/_matrix/client/v3/profile/" + MatrixClient.segment(id(login)) + "/displayname";
+        person.put(profile, MatrixClient.JSON.createObjectNode().put("displayname", ""));
+        final com.fasterxml.jackson.databind.node.ObjectNode same = first.deepCopy();
+        same.put("created_room", false).putArray("invited");
+        assertThat(named(input, persons)).as("the answer of a run without names").isEqualTo(same);
+        assertThat(shown(admin, conversation, id(login)))
+                .as("a name emptied is given again")
+                .isEqualTo("Ada");
+
+        person.put(profile, MatrixClient.JSON.createObjectNode().put("displayname", "Ada L."));
+        named(input, persons);
+        assertThat(shown(admin, conversation, id(login)))
+                .as("the name the person chose stays")
+                .isEqualTo("Ada L.");
+    }
+
+    /** keep-room's answer for the project "names", the names passed on {@code input}. */
+    private JsonNode named(final String input, final String persons) throws Exception {
+        final Transport.Result result =
+                Transport.runWithInput(
+                        env, input, "keep-room", "--project", "names", "--persons", persons);
+        assertThat(result.exit()).as("named: %s", result.err()).isZero();
+        assertThat(result.out() + result.err()).as("never the token").doesNotContain(adminToken);
+        return MatrixClient.JSON.readTree(result.out());
+    }
+
+    /** The person signed in through the gate's single sign-on, as a person's client does. */
+    private MatrixClient signedIn() throws Exception {
+        final MatrixClient client =
+                new MatrixClient(
+                        new Config(
+                                URI.create("unix:" + listener.toUri().getRawPath()),
+                                "",
+                                null,
+                                true));
+        final Wire.Reply redirect =
+                client.rawExchange(
+                        "GET",
+                        "/_matrix/client/v3/login/sso/redirect/porelo?redirectUrl="
+                                + MatrixClient.segment("element://vector/webapp/"),
+                        null);
+        assertThat(redirect.statusCode()).as("SSO redirect").isEqualTo(302);
+        final String raw = new String(redirect.raw(), java.nio.charset.StandardCharsets.ISO_8859_1);
+        final String location =
+                raw.lines()
+                        .filter(l -> l.regionMatches(true, 0, "Location:", 0, 9))
+                        .findFirst()
+                        .orElseThrow()
+                        .substring(9)
+                        .strip();
+        final MatrixClient.Answer signedIn =
+                client.exchange(
+                        "POST",
+                        "/_matrix/client/v3/login",
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("type", "m.login.token")
+                                .put(
+                                        "token",
+                                        GateRequest.query(URI.create(location).getRawQuery())
+                                                .get("loginToken")));
+        assertThat(signedIn.status()).as("signed in").isEqualTo(200);
+        return client.as(signedIn.body().path("access_token").asText());
+    }
+
+    /** The name the room shows for a member, from its member event. */
+    private static String shown(final MatrixClient admin, final String room, final String id)
+            throws Failure {
+        return admin.get(
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(room)
+                                + "/state/m.room.member/"
+                                + MatrixClient.segment(id))
+                .path("displayname")
+                .asText();
+    }
+
     private Map<String, String> relayOf(final Map<String, String> held, final JsonNode setup) {
         final Map<String, String> relay = new HashMap<>(held);
         setup.path("secrets")

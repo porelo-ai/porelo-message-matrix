@@ -50,6 +50,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the room shows for it and whether it is a task (with the task's name, and its login on a central homeserver), a
   person, one of the room's helpers or something else, so the window can show who is in and which name reaches a task.
   It changes nothing; a missing room, a room the login left, or no setup yet answer an empty list.
+- `keep-room` takes a name for each person on its input, `{"settings":{"names":{"<login>":"<name>"}}}`, and gives it
+  to the person's account where it shows none, making an account not there yet with it, so a person on a host shows
+  under that name in the room from their first line on instead of their whole Matrix id. A name the person chose
+  stays. A sign-in through the gate while `keep-room` makes the account gets its token.
 - Behind the host's gate, the host's helper keeps a project's room as the administrator: `keep-room --project P
   --persons A,B,…` makes it and keeps it to the persons named, whether or not they have signed in, and `drop-room
   --project P` deletes it with its conversation. No client can make or take a project's alias through the gate.

@@ -64,7 +64,8 @@ final class Lifecycle {
     /**
      * A nickname a person gives a task: shown in the room and the direct chat, what @ completes to.
      */
-    private static final Pattern DISPLAY = Pattern.compile("[^\\p{Cc}\\p{Cf}@:]{1,64}");
+    /** A display name: what enroll --display and a person's name on keep-room's input allow. */
+    static final Pattern DISPLAY = Pattern.compile("[^\\p{Cc}\\p{Cf}@:]{1,64}");
 
     static void run(
             final String verb,

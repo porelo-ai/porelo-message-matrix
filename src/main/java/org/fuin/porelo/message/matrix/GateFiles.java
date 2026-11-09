@@ -113,6 +113,11 @@ final class GateFiles {
         }
     }
 
+    /** The lock under which an account is made, in the gate's {@code directory}. */
+    static Path usersLock(final Path directory) {
+        return directory.resolve(".users.lock");
+    }
+
     static FileChannel lock(final Path file) throws IOException {
         return FileChannel.open(
                 file,

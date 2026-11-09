@@ -489,7 +489,9 @@ final class Gate {
         final GateResponse available = availability(admin, login);
         if (available.status() == 200) {
             final GateResponse created = create(admin, login, Accounts.secret());
-            if (created.status() != 200 && created.status() != 201) {
+            // Made meanwhile, by another sign-in or by the host's helper naming it: theirs either
+            // way.
+            if (created.status() != 200 && created.status() != 201 && !inUse(created)) {
                 return created;
             }
         } else if (available.status() != 400
@@ -502,6 +504,11 @@ final class Gate {
         final String suffix = fragment < 0 ? "" : redirect.substring(fragment);
         return GateResponse.redirect(
                 base + (base.contains("?") ? "&" : "?") + "loginToken=" + token + suffix);
+    }
+
+    private static boolean inUse(final GateResponse answer) throws IOException {
+        return answer.status() == 400
+                && answer.json().path("errcode").asText("").equals("M_USER_IN_USE");
     }
 
     private GateResponse availability(final Administrator admin, final String localpart)
@@ -530,7 +537,7 @@ final class Gate {
         // Different gate processes must not turn a concurrent registration into a password reset.
         final Path directory = GateFiles.directory(env);
         synchronized (Gate.class) {
-            try (var channel = GateFiles.lock(directory.resolve(".users.lock"));
+            try (var channel = GateFiles.lock(GateFiles.usersLock(directory));
                     var held = channel.lock()) {
                 final GateResponse free = availability(admin, localpart);
                 if (free.status() != 200) {

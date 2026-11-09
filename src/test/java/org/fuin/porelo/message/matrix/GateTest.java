@@ -1143,6 +1143,22 @@ class GateTest {
         assertThat(lastAnswer).contains("loginToken=");
     }
 
+    /**
+     * Harm guarded: a person signing in while the host's helper makes their account, named, is
+     * refused, though the account is theirs either way.
+     */
+    @Test
+    void aSignInWhoseAccountIsMadeMeanwhileGetsItsToken() throws Exception {
+        takenAtSecondAsk = true;
+        asked = 0;
+
+        assertThat(sso("element://vector/login", "localhost", ""))
+                .as("made between the gate's two asks")
+                .isEqualTo(302);
+        assertThat(lastAnswer).contains("loginToken=");
+        assertNoAccountWasMade();
+    }
+
     /** Harm guarded: a request after a refusal reads as part of the one before it. */
     @Test
     void aBadRequestsAnswerEndsTheConnection() throws Exception {

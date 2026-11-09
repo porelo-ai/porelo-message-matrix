@@ -1,6 +1,6 @@
 # MX96 — A Person Shows Under The Name They Chose
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** M - `keep-room`'s input and its naming of accounts, one fix in the gate's sign-in, their contract in
 `doc/transport.md`, which Porelo reads, and tests against the real homeserver behind its gate.
 
@@ -44,8 +44,9 @@ does.
   with a name - its bare login too - keeps it; an expelled login is neither; a key that is no listed login is 78 and a
   name with `:` or a control character 64, each with no request made and the name not in the message. `GateTest`: a
   sign-in whose account is made between the gate's two asks gets its token. `KeepRoomIT`, folded into its existing
-  run behind the real gate: the test's own login (the gate signs in the socket's user) named `Ada`, signed in by SSO
-  and joined, shows `Ada` among the room's members; after the person sets `Ada L.`, a second run keeps it.
+  run behind the real gate: the test's own login (the gate signs in the socket's user) named `Ada` before its first
+  sign-in, then signed in by SSO and joined, shows `Ada` among the room's members; a name the person empties is given
+  again, and after the person sets `Ada L.`, a further run keeps it.
 - **The contract**: the `keep-room` section of `doc/transport.md` and the gate's part of `doc/homeserver.md` say all
   of the above; Porelo's half is to pass the names.
 
@@ -54,7 +55,16 @@ does.
 - On a host, a person whose name the host passes shows under it in the room from their first line on; one with a name
   of their own keeps it; a test fails if the id is shown where a name was given, or a name lands on another login.
 
-## To be checked
+## Checked
 
-- Whether the pinned Tuwunel takes `"displayname"` in `PUT /_synapse/admin/v2/users/{id}`, at creation and for an
-  existing account, and leaves an account made there without one; measured against the real homeserver first.
+- The pinned Tuwunel takes `"displayname"` in `PUT /_synapse/admin/v2/users/{id}`, at creation and for an existing
+  account, and carries it into the account's member events; an account it makes there shows none of its own. Measured
+  by `KeepRoomIT` on the rented test host, so the session fallback of the plan is not built.
+
+## Read
+
+- The code reading (seven findings) is fixed: settings that are not one JSON object of at most 1 MiB, trailing text
+  included, are 78; the expulsion is looked at under the gate's lock, a link there counting; a key that is no login is
+  78 before anything is asked; a busy homeserver is 75, a refused token 77, an answer without `available` 76, none
+  writing; the lock's path is the gate's own; the test runs `keep-room` with names before the first sign-in. Left as
+  is: `KeepRoom.run` passing the names has no unit test of its own, since `KeepRoomIT` fails without it.

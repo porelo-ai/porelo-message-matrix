@@ -115,7 +115,7 @@ public final class Main {
                 case "setup", "enroll", "retire", "join", "part", "clear", "members" ->
                         Lifecycle.run(args[0], rest, env, in, out, err, new PodmanUnit(env));
                 case "expel" -> Expel.run(rest, env, out, new PodmanUnit(env), err);
-                case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, out, err);
+                case "keep-room", "drop-room" -> KeepRoom.run(args[0], rest, env, in, out, err);
                 case "backup", "restore" ->
                         Keep.run(args[0], rest, env, new PodmanUnit(env), out, err);
                 default -> {

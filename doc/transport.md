@@ -140,6 +140,18 @@ again at its next follow.
   no members: its room stays. At most 500 logins; the project `default` is refused (78). A kick is no ban, so a login
   named again is invited again. It answers
   `{"room":"#porelo-P:server","conversation":"!…","created_room":true|false,"invited":[…],"removed":[…]}`.
+- **A person shows under the name the host passes**, given on the input beside the secrets, never on the command line,
+  where a comma or `=` in a name could split into another login's entry:
+  `{"settings":{"names":{"<login>":"<name>"}},"secrets":{…}}`. A key that is no login of `--persons`, another setting,
+  names of another shape, or settings that are not one JSON object of at most 1 MiB are refused (78); a name breaking
+  `enroll --display`'s rule (1 to 64 characters, no control or format characters, `@` or `:`) is refused (64), saying
+  whose and not repeating it. Both before anything is looked at. After the ban check and before the invitations, each
+  named login's account is given its name where it shows none (no display name, or an empty one), and a named login with
+  no account yet is made with its name, under the gate's lock, so it never exists unnamed and a sign-in at that moment
+  still gets its token. A name the account already shows - the person's own choice, their bare login too - stays, on
+  every run. A login the gate expelled, also while the run waited for that lock, is neither made nor named. A homeserver
+  busy (429, 5xx) is 75, one refusing the token (401, 403) 77, an unclear answer 76, each before that login is written.
+  A login with no name is not made, as before. The answer is the same.
 - **A person taken out reads nothing said after it**, and still what was said up to it: a Matrix homeserver answers a
   former member's history to the moment they left. `removed` in the answer names who went.
 - **A person taken out comes back through Porelo.** Their relay's `poll` answers 78 and their tasks are out until

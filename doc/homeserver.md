@@ -174,7 +174,8 @@ a sync already held open completes at its own timeout.
 
 Clients see SSO named “Your login on this host” and token login. Password login is accepted but not
 listed: the transport's accounts sign in with theirs, and nobody knows a person account's. SSO creates the
-person's `@<login>` account if missing and redirects to the client with a gate token valid for two
+person's `@<login>` account if missing, under the same lock `keep-room` names accounts under, and an account made
+meanwhile counts as there; it redirects to the client with a gate token valid for two
 minutes, usable once by that host login alone. Only its SHA-256, login and expiry are kept, under
 `gate/login-tokens/` with mode 0600. The token goes only to the homeserver's own clients: Element Desktop's
 callback `element://vector/…`, or an `http` page at the forward the request came in on, its `Host`, which the

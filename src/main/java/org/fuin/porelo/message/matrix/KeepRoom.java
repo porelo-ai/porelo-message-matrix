@@ -3,7 +3,9 @@ package org.fuin.porelo.message.matrix;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -54,10 +56,14 @@ final class KeepRoom {
             final String verb,
             final List<String> args,
             final Map<String, String> env,
+            final InputStream settings,
             final PrintStream out,
             final PrintStream err)
             throws Failure {
         final Options options = options(verb, args);
+        // Checked before anything is looked at, so a bad name changes nothing.
+        final Map<String, String> names =
+                "keep-room".equals(verb) ? Names.read(settings, options.persons()) : Map.of();
         // Elsewhere nothing is started: the transport's package needs no homeserver of its own.
         if (!Expel.gated(env)) {
             throw new Failure(
@@ -82,7 +88,12 @@ final class KeepRoom {
         final Administrator admin = administrator(Expel.behindGate(env), env, err);
         out.println(
                 "keep-room".equals(verb)
-                        ? keep(admin, project, options.persons())
+                        ? keep(
+                                admin,
+                                project,
+                                options.persons(),
+                                names,
+                                LocalHomeserver.directory(env))
                         : drop(admin, project));
     }
 
@@ -131,7 +142,11 @@ final class KeepRoom {
     }
 
     private static ObjectNode keep(
-            final Administrator admin, final String project, final List<String> persons)
+            final Administrator admin,
+            final String project,
+            final List<String> persons,
+            final Map<String, String> names,
+            final Path home)
             throws Failure {
         final String alias = admin.alias(project);
         final String existing = admin.room(project);
@@ -139,7 +154,8 @@ final class KeepRoom {
                 existing == null
                         ? Lifecycle.room(admin.client(), admin.id(), project, admin.server())
                         : existing;
-        final ObjectNode kept = keepTo(admin.client(), room, alias, admin.server(), persons);
+        final ObjectNode kept =
+                keepTo(admin.client(), room, alias, admin.server(), persons, names, home);
         final ObjectNode answer =
                 MatrixClient.JSON
                         .createObjectNode()
@@ -205,6 +221,22 @@ final class KeepRoom {
             final String server,
             final List<String> logins)
             throws Failure {
+        return keepTo(asMaker, room, alias, server, logins, Map.of(), Path.of("/nonexistent"));
+    }
+
+    /**
+     * As {@link #keepTo(MatrixClient, String, String, String, List)}, each named login's account
+     * given its name after the ban check and before it is invited, so its invitation shows it.
+     */
+    static ObjectNode keepTo(
+            final MatrixClient asMaker,
+            final String room,
+            final String alias,
+            final String server,
+            final List<String> logins,
+            final Map<String, String> names,
+            final Path home)
+            throws Failure {
         final String path = "/_matrix/client/v3/rooms/" + MatrixClient.segment(room);
         final List<String> listed = new ArrayList<>(new TreeSet<>(logins));
         final Set<String> kept = new TreeSet<>(listed);
@@ -222,6 +254,8 @@ final class KeepRoom {
                 }
             }
         }
+
+        Names.give(asMaker, server, names, home);
 
         final ObjectNode answer = MatrixClient.JSON.createObjectNode();
         final var invited = answer.putArray("invited");

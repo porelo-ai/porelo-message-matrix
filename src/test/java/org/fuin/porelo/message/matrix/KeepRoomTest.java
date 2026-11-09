@@ -203,6 +203,65 @@ class KeepRoomTest {
         }
     }
 
+    /**
+     * Harm guarded: an account is named on a run refused for a ban, or named after its invitation
+     * went out, so the invitation shows the Matrix id.
+     */
+    @Test
+    void aNameIsGivenAfterTheBanCheckAndBeforeTheInvitation(@TempDir final Path home)
+            throws Exception {
+        Files.createDirectories(home.resolve("gate"));
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final MatrixClient admin =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "token", null, true));
+            homeserver.answer(200, membership(Map.of("@ada:example.org", "ban")).toString());
+
+            assertThatThrownBy(
+                            () ->
+                                    KeepRoom.keepTo(
+                                            admin,
+                                            "!r",
+                                            "#porelo-p:example.org",
+                                            "example.org",
+                                            List.of("ada"),
+                                            Map.of("ada", "Ada"),
+                                            home))
+                    .as("a banned login")
+                    .isInstanceOf(Failure.class);
+            assertThat(homeserver.requests())
+                    .as("nothing named on a refused run")
+                    .noneMatch(r -> r.rawPath().contains("/_synapse/"));
+
+            homeserver.clearAnswers();
+            homeserver
+                    .answer(200, membership(Map.of()).toString())
+                    .answer(200, "{\"available\":true}")
+                    .answer(200, "{}")
+                    .answer(200, "{}")
+                    .answer(200, "{}")
+                    .answer(200, membership(Map.of()).toString());
+            KeepRoom.keepTo(
+                    admin,
+                    "!r",
+                    "#porelo-p:example.org",
+                    "example.org",
+                    List.of("ada"),
+                    Map.of("ada", "Ada"),
+                    home);
+
+            final List<String> writes =
+                    homeserver.requests().stream()
+                            .filter(r -> !r.method().equals("GET"))
+                            .map(r -> r.method() + " " + r.rawPath())
+                            .toList();
+            assertThat(writes)
+                    .as("made with the name first, then both invitations")
+                    .startsWith(
+                            "PUT /_synapse/admin/v2/users/%40ada%3Aexample.org",
+                            "POST /_matrix/client/v3/rooms/%21r/invite");
+        }
+    }
+
     private static com.fasterxml.jackson.databind.JsonNode membership(
             final Map<String, String> members) {
         final var answer = MatrixClient.JSON.createObjectNode();
