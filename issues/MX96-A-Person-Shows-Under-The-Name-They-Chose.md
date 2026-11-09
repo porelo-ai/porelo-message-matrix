@@ -1,6 +1,6 @@
 # MX96 — A Person Shows Under The Name They Chose
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - `keep-room`'s input and its naming of accounts, one fix in the gate's sign-in, their contract in
 `doc/transport.md`, which Porelo reads, and tests against the real homeserver behind its gate.
 
