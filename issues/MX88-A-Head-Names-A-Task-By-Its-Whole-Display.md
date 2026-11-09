@@ -14,6 +14,8 @@
   named when that whole form equals its display name, case-sensitive. A suffix that names no member names nobody; no
   fallback to the bare name. Today a member shown `Agent Pi (fix)` is never named, and `Agent Pi (fix):` names
   `Agent Pi`.
+- **An agent's name may hold hyphens:** Porelo shows `claude-code` as `Agent Claude-Code`, so `<Word>` is parts of
+  letters, numbers and `_` joined by single hyphens, read whole: `Agent Claude-Code:` never names `Agent Claude`.
 - `mayNameAnAgent`, the broadcast and the 300-code-point head are unchanged; the room tool's reading (`MeantFor.line`,
   `post`) takes the same rule.
 - **`doc/transport.md`** ("Whom a line addresses") and **`doc/decisions.md`** name both forms.

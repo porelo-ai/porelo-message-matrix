@@ -238,6 +238,32 @@ class MeantForTest {
                 .containsExactly("@pi-s:x");
     }
 
+    /**
+     * Harm guarded: a task of an agent with a hyphenated name never wakes, or wakes a task of the
+     * agent whose name is its first part.
+     */
+    @Test
+    void anAgentsHyphenatedNameIsReadWhole() {
+        final Map<String, String> members =
+                Map.of(
+                        "@cc:x", "Agent Claude-Code",
+                        "@cc-fix:x", "Agent Claude-Code (fix)",
+                        "@claude:x", "Agent Claude");
+
+        assertThat(MeantFor.head("Agent Claude-Code: hi", members).users())
+                .as("the task shown by the hyphenated agent alone")
+                .containsExactly("@cc:x");
+        assertThat(MeantFor.head("Agent Claude-Code (fix): hi", members).users())
+                .as("its sibling with a short name")
+                .containsExactly("@cc-fix:x");
+        assertThat(MeantFor.head("Agent Claude: hi", members).users())
+                .as("the agent named by the first part alone")
+                .containsExactly("@claude:x");
+        assertThat(MeantFor.head("Agent Claude-: hi", members).users())
+                .as("a trailing hyphen ends the name")
+                .containsExactly("@claude:x");
+    }
+
     /** Harm guarded: the room tool wakes one task of an agent for its sibling's line. */
     @Test
     void theRoomToolReadsALineForOneSiblingAsNotForTheOther() {

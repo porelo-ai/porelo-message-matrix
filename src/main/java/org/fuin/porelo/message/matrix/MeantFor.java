@@ -15,7 +15,7 @@ record MeantFor(Set<String> users, boolean room) {
     /** A task as the room shows it, its agent and its short name where that differs, as a word. */
     private static final Pattern DISPLAY =
             Pattern.compile(
-                    "(?<![\\p{L}\\p{N}_])Agent [\\p{L}\\p{N}_]+(?: \\([\\p{L}\\p{N}_.-]+\\))?");
+                    "(?<![\\p{L}\\p{N}_])Agent [\\p{L}\\p{N}_]+(?:-[\\p{L}\\p{N}_]+)*(?: \\([\\p{L}\\p{N}_.-]+\\))?");
 
     /** The mentions for a post, excluding its writer. */
     static MeantFor post(

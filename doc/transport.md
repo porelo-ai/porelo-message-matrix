@@ -177,7 +177,7 @@ or a user id is refused. It acts only in that room on the account's own homeserv
   the first 300 code points; without such a colon the line is prose with no head. A member's display
   name of the form `Agent <Word>` or `Agent <Word> (<short>)` names that member when the head holds that
   whole form as a phrase, case-sensitive, read as the longest such form at each place; `<Word>` is letters, numbers
-  and `_`, `<short>` letters, numbers, `_`, `.` and `-`, and a parenthesis holding anything else leaves the bare name:
+  and `_`, in parts joined by single hyphens (`Agent Claude-Code`), `<short>` letters, numbers, `_`, `.` and `-`, and a parenthesis holding anything else leaves the bare name:
   `Agent Core` matches `(cc Agent Core)` and
   `Agent Smith, Agent Core`, and never `Agent Corey`, `Agent Core (fix)` or the body; `Agent Pi (fix)`
   names only the member shown so, and a short name no member shows names nobody. A member listed in `m.mentions.user_ids`
