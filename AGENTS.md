@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `d14b704dac9e3353` · changed 2026-11-09T07:07Z
+> **BEGIN Shared Area** · sha256 `a10e8e42ec48a8d7` · changed 2026-11-09T07:16Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -37,6 +37,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Only the coordinating agent writes to the operator; while the operator sits at the console, only
   there.** Other agents say what the operator should know in the channel, to the coordinator.
 - **To the operator, plain technical terms, never coined words** - "merge", not a word of one's own.
+- **A post states only what a result already on screen shows**: an edit, the room read and the post
+  that reports them are separate commands, and a shared hand-over file is read again right before it
+  is rewritten.
 
 ### Commits and pushes
 
@@ -45,7 +48,8 @@ and the UTC time that text last changed; change it in the channel first, never i
   in one push, one commit each.
 - **An edit replaces an exact block, never everything between two landmarks; only the files you
   edited are formatted.** Before a commit, `git status` is read and only your own files are added,
-  never with `git add -A`.
+  never with `git add -A` or `git add -u`; files are added by name, and `git show --stat` is read after
+  the commit, since one worktree may hold two issues' work.
 - **Unless the operator says otherwise, the operator pushes, and agents commit and stop.** An
   instruction to push covers exactly what it names.
 - **A change that needs another repository's change names that dependency when it is handed over**,
@@ -64,7 +68,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   requirement number; the reasoning goes into an issue or a decision. A squash of several changes names
   what they share, not each of them. Trailers may follow below a blank line, and nothing else.
 - **An agent's commit names its help in an `Assisted-by: <tool>, <model>` trailer, and an agent never
-  writes a `Signed-off-by:`**: the operator vouches for the project's own commits by pushing them. A
+  writes a `Signed-off-by:` or `Co-Authored-By:`**, even when its harness suggests one: the operator vouches for the project's own commits by pushing them. A
   pull request from outside carries its author's `Signed-off-by:`, the Developer Certificate of Origin.
 - **A commit Porelo makes itself carries Porelo's own trailers, `Porelo-Change-Id` and
   `Porelo-Signs-Anew`, and nothing else.**
@@ -76,11 +80,15 @@ and the UTC time that text last changed; change it in the channel first, never i
   generated changelog is changed only through its sources, never by hand.
 - **Signing and release-tag creation belong to the operator.** Hand over the release commit, next
   snapshot, and exact signed-tag command; never request the signing passphrase.
-- **Before a push that requires a build, check that no skip instruction suppresses it.** Resolve
-  that instruction before relying on CI to verify the push.
+- **A skip instruction such as `[skip ci]` never heads a push that must build**: GitHub reads only the head
+  commit and skips the whole push, so issue and status commits go below the last code commit; a push of
+  issues or documents alone may end with one.
 - **After an authorized push, follow the repository’s build through every job to its final result
   and verify its `head_sha`.** Report the run ID and commit, with success or the failed step and
   relevant error.
+- **A branch is brought up to `main` by rebasing it, never by merging `main` in**, and takes another's
+  work by cherry-pick or new commits on the current tip; conflicts are resolved commit by commit, and the
+  whole suite runs on the rebased head before the hand-over.
 
 ### Issues
 
@@ -308,6 +316,15 @@ and the UTC time that text last changed; change it in the channel first, never i
   as something work waits on; built issues are ready for it.
 - **Porelo's own host is rented for a few hours at a time**, so local work never needs a running host;
   a product decision still allows hosts that stay.
+- **A deliberate break to see a test red is put back from a copy taken just before it**, never with
+  `git checkout`, which drops uncommitted work in that file; `git diff --stat` afterward equals the one
+  before.
+- **While a build of one's own runs in a tree, nothing in that tree is edited, stashed or built a
+  second time**; a fix that cannot wait stops the build first, and parallel work goes in another
+  worktree.
+- **A package removal on a shared machine is simulated first** (`dnf remove --assumeno`, `apt-get -s
+  remove`), since dependents go with it; if it takes anything this run did not install, stop and ask in
+  the channel.
 
 ### Claims and writing
 
@@ -339,6 +356,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Replies to the operator after reading messages mention only what requires this role to act or
   answer.** State the action or need without retelling other entries; unrelated reads produce no
   summary, waiting update, or watcher acknowledgment.
+- **A sub-agent's statement about code is checked before it is relayed**: the named file, method or
+  line is read before it goes into the channel, an issue or a question for the operator, since an
+  invented fact reads as confident as a true one.
 
 ### Security and tools
 
@@ -405,7 +425,9 @@ and the UTC time that text last changed; change it in the channel first, never i
   read its final changes against the repository's skills, and every finding has been checked.** An
   issue gets this reading once, and the result of a reading is never read again: its findings are fixed,
   each with a test seen to fail first, and the issue is handed over. A grave finding the fix does not
-  settle becomes an issue of its own, without a reading of its own; smaller ones gather in one issue of
+  settle becomes an issue of its own, without a reading of its own; grave is another person's key, card,
+  socket, mailbox or container reached, a credential shown or lent, a key trusted that should not be,
+  or data lost. Smaller ones (address forms, quoting, encodings, words, test gaps) gather in one issue of
   the repository. The reading starts as soon as the code it reads stands, beside other work, never
   after another part's fixes.
 - **An issue of size M or larger, or one that touches a trust boundary, has its plan read before it
@@ -486,6 +508,8 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **An ecosystem adapter or build-tool plugin only helps a project start**: it is judged by whether its
   answer matches the real build, secures nothing, and once `project.yml` exists Porelo never watches,
   compares or updates what stands in it.
+- **A measurement of a library or an approach is a small throwaway project of about five minutes**,
+  holding only the planned classes, never a slice of the real repository.
 
 ### Estimates and handovers
 
@@ -503,7 +527,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   with `+`: estimates summed, the earliest start and the stack's readiness, VM time and tokens counted
   once.
 
-> **END Shared Area** · sha256 `d14b704dac9e3353`
+> **END Shared Area** · sha256 `a10e8e42ec48a8d7`
 
 ## What this repository is
 
