@@ -35,6 +35,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx88"></a>[MX88](MX88-A-Head-Names-A-Task-By-Its-Whole-Display.md) | S | - | A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so |
 
 ## Backlog
 
