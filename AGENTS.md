@@ -516,6 +516,10 @@ over a Matrix homeserver. Porelo's side of it - the peer table, a task's account
   in the `FROM` line of `homeserver/Dockerfile`, with its changelog line and a VM run. `ghcr.io` gives an image
   no publication date, so the agent reads its `org.opencontainers.image.created` and takes nothing younger
   than three days.
+- **A test that is plainly flaky and blocks a delivery is disabled for the time being, and filed as an issue at the
+  top of *Backlog***; setting that state is the agent's own here, an exception to the operator's states. The test is
+  fixed right after; when two or three tries at the fix fail, the agent says so in the channel and stops on it. A real
+  fault is fixed, never disabled.
 - **Installed machine-wide, this transport is polled by every account's `porelod`** and answers 78 where it
   is not configured, so a machine-wide install is only for an announced test and is removed after it.
 
