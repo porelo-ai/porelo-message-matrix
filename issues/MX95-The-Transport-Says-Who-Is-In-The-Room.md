@@ -1,6 +1,6 @@
 # MX95 — The Transport Says Who Is In The Room
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** M - one new verb, its contract in `doc/transport.md`, which Porelo reads, and its tests on both homeserver
 kinds.
 
