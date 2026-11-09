@@ -2,7 +2,7 @@
 
 ## Shared across the Porelo repositories
 
-> **BEGIN Shared Area** · sha256 `3d30493cf384c7ea` · changed 2026-11-09T06:53Z
+> **BEGIN Shared Area** · sha256 `d14b704dac9e3353` · changed 2026-11-09T07:07Z
 
 Identical in every repository `project.yml` names but `porelo-parent`, which holds only the parent pom
 and no `AGENTS.md`. The markers carry the SHA-256 of the lines between them (the first 16 hex digits)
@@ -34,6 +34,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Only `AGENTS.md` and `.AGENTS.md` survive a session; the harness's own memory is never used.** A
   rule, an operator decision about how to work or an open point worth keeping goes into one of them
   at once.
+- **Only the coordinating agent writes to the operator; while the operator sits at the console, only
+  there.** Other agents say what the operator should know in the channel, to the coordinator.
+- **To the operator, plain technical terms, never coined words** - "merge", not a word of one's own.
 
 ### Commits and pushes
 
@@ -301,6 +304,10 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **An assigned isolated test environment’s test-only vault may be unlocked, reset, or recreated
   without another approval once the test is agreed.** Consume its passphrase in that environment
   through a passphrase command, without reading or printing it into the session.
+- **The operator's test is the acceptance of a story, its goal, never a blockade** - nothing lists it
+  as something work waits on; built issues are ready for it.
+- **Porelo's own host is rented for a few hours at a time**, so local work never needs a running host;
+  a product decision still allows hosts that stay.
 
 ### Claims and writing
 
@@ -363,6 +370,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **Provider credentials for development and CI are deliberately separate.** Never synchronize or
   copy them between environments; check an authentication or quota failure against the credential
   used in the failing environment.
+- **Porelo protects the person from the agents and from threats from outside, not from their own
+  rights or deliberate choices**; what a person builds into a task's image is their own risk. Every
+  new guard and every reading's finding is judged by this.
 
 ### Skills
 
@@ -473,6 +483,9 @@ and the UTC time that text last changed; change it in the channel first, never i
 - **A new Java library uses `LGPL-3.0-or-later`; an API that others build their own extensions
   against (such as an adapter's or a plugin's interface library) uses `Apache-2.0`.** Keep existing
   product licenses unless a license change is explicitly agreed.
+- **An ecosystem adapter or build-tool plugin only helps a project start**: it is judged by whether its
+  answer matches the real build, secures nothing, and once `project.yml` exists Porelo never watches,
+  compares or updates what stands in it.
 
 ### Estimates and handovers
 
@@ -490,7 +503,7 @@ and the UTC time that text last changed; change it in the channel first, never i
   with `+`: estimates summed, the earliest start and the stack's readiness, VM time and tokens counted
   once.
 
-> **END Shared Area** · sha256 `3d30493cf384c7ea`
+> **END Shared Area** · sha256 `d14b704dac9e3353`
 
 ## What this repository is
 
