@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx88"></a>[MX88](MX88-A-Head-Names-A-Task-By-Its-Whole-Display.md) | S | - | A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so |
 | <a id="mx87"></a>[MX87](MX87-A-Persons-Room-Mention-Is-For-All-Agents.md) | S | - | A person's line that mentions the whole room (`@room`) is marked `"all": true`, as one headed `All agents:` |
 | <a id="mx86"></a>[MX86](MX86-A-Persons-Line-For-All-Agents-Says-So.md) | S | [MX85](README.md#mx85) | A person's line headed `All agents: …` is marked `"all": true` in its person file, so Porelo hands it to every task of the project |
 | <a id="mx85"></a>[MX85](MX85-A-Persons-Line-Headed-By-A-Task-Names-It.md) | S | - | A person's line headed `Agent Pi: …`, typed with no pill, is meant for the member shown as Agent Pi, so Porelo wakes that task |
@@ -35,7 +36,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx88"></a>[MX88](MX88-A-Head-Names-A-Task-By-Its-Whole-Display.md) | S | - | A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so |
 
 ## Backlog
 

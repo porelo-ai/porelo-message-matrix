@@ -5,13 +5,17 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /** The people a room line addresses, without any transport or state. */
 record MeantFor(Set<String> users, boolean room) {
 
-    private static final Pattern AGENT = Pattern.compile("Agent [\\p{L}\\p{N}_]+");
+    /** A task as the room shows it, its agent and its short name where that differs, as a word. */
+    private static final Pattern DISPLAY =
+            Pattern.compile(
+                    "(?<![\\p{L}\\p{N}_])Agent [\\p{L}\\p{N}_]+(?: \\([\\p{L}\\p{N}_.-]+\\))?");
 
     /** The mentions for a post, excluding its writer. */
     static MeantFor post(
@@ -28,10 +32,11 @@ record MeantFor(Set<String> users, boolean room) {
         if (head == null) {
             return new MeantFor(Set.of(), false);
         }
+        final Set<String> named = displays(head);
         final Set<String> users = new LinkedHashSet<>();
         members.forEach(
                 (id, name) -> {
-                    if (AGENT.matcher(name).matches() && phrase(head, name)) {
+                    if (named.contains(name)) {
                         users.add(id);
                     }
                 });
@@ -39,12 +44,13 @@ record MeantFor(Set<String> users, boolean room) {
     }
 
     /**
-     * Whether the first line's head may name a member shown as {@code Agent <Word>}, decided
-     * without the members, so a line that cannot name one costs no request for them.
+     * Whether the first line's head may name a member shown as {@code Agent <Word>} or {@code Agent
+     * <Word> (<short>)}, decided without the members, so a line that cannot name one costs no
+     * request for them.
      */
     static boolean mayNameAnAgent(final String body) {
         final String head = headOf(body);
-        return head != null && AGENT.matcher(head).find();
+        return head != null && !displays(head).isEmpty();
     }
 
     /** The first line up to its first colon, within the first 300 code points; or none. */
@@ -55,6 +61,20 @@ record MeantFor(Set<String> users, boolean room) {
             return null;
         }
         return first.substring(0, colon);
+    }
+
+    /**
+     * Every task the head names, each as a whole display, so {@code Agent Pi} is never read out of
+     * {@code Agent Pi (fix)} nor the other way round.
+     */
+    private static Set<String> displays(final String head) {
+        final Set<String> named = new LinkedHashSet<>();
+        final Matcher m = DISPLAY.matcher(head);
+        // Each search starts just past the last one's start, so "Agent Agent Pi" still names Pi.
+        for (int from = 0; from < head.length() && m.find(from); from = m.start() + 1) {
+            named.add(m.group());
+        }
+        return named;
     }
 
     /** A name or broadcast inside a longer word must not address another reader. */

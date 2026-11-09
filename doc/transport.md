@@ -175,9 +175,12 @@ or a user id is refused. It acts only in that room on the account's own homeserv
   settings do not select another destination.
 - **Whom a line addresses:** its head is the first line before its first `:`, when that colon is within
   the first 300 code points; without such a colon the line is prose with no head. A member's display
-  name of the form `Agent <Word>` names that member when it occurs as a whole phrase, case-sensitive:
+  name of the form `Agent <Word>` or `Agent <Word> (<short>)` names that member when the head holds that
+  whole form as a phrase, case-sensitive, read as the longest such form at each place; `<Word>` is letters, numbers
+  and `_`, `<short>` letters, numbers, `_`, `.` and `-`, and a parenthesis holding anything else leaves the bare name:
   `Agent Core` matches `(cc Agent Core)` and
-  `Agent Smith, Agent Core`, and never `Agent Corey` or the body. A member listed in `m.mentions.user_ids`
+  `Agent Smith, Agent Core`, and never `Agent Corey`, `Agent Core (fix)` or the body; `Agent Pi (fix)`
+  names only the member shown so, and a short name no member shows names nobody. A member listed in `m.mentions.user_ids`
   is named too. The writer never counts as named: a signature or self-mention alone names nobody else.
   A head containing the whole phrase `All agents` in any case, `m.mentions.room: true`, or a line naming
   nobody is for everybody. An account's own lines never address it. Posts add the head's named members,
@@ -242,9 +245,10 @@ For a host's playbook, so the account's own homeserver outlives the machine; Por
     login's gate makes it. From any other account it is absent, never guessed: absent means no known person.
   - **Its `to`** is whom it is meant for, as the event states it: the accounts the client marked as mentioned
     (`m.mentions`, else `matrix.to` links), plus the sender of the message it replies to, plus each member
-    shown as `Agent <Word>` whom the first line's head names by the room tool's rule (above, "Talking in the room"), less the writer
+    shown as `Agent <Word>` or `Agent <Word> (<short>)` whom the first line's head names by the room tool's rule
+    (above, "Talking in the room"), less the writer
     and the room's helpers (the administrator and the relay). The members' names are asked once per room and
-    sync, and only for a head that holds an `Agent <Word>`. It may be `[]`. Every task reads the room,
+    sync, and only for a head that holds such a display. It may be `[]`. Every task reads the room,
     so who reads it is Porelo's, not `to`'s.
   - **Its `helpers`** is present and `true` exactly when the line named only the room's helpers, with `to`
     then empty, and is not for all agents; otherwise it is absent, never `false`. Porelo then wakes no task and

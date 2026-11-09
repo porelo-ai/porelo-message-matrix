@@ -187,6 +187,74 @@ class MeantForTest {
                 .isEmpty();
     }
 
+    /**
+     * Harm guarded: a line for one of two tasks of the same agent wakes the other, or the one it
+     * names never wakes.
+     */
+    @Test
+    void aHeadNamesATaskOnlyByItsWholeDisplay() {
+        final String pi = "@pi:x";
+        final String fix = "@pi-fix:x";
+        final Map<String, String> twoOfOneAgent =
+                Map.of(pi, "Agent Pi", fix, "Agent Pi (fix)", SELF, "Agent Core");
+
+        assertThat(MeantFor.head("Agent Pi (fix): hi", twoOfOneAgent).users())
+                .as("the task shown with its short name, and not its sibling")
+                .containsExactly(fix);
+        assertThat(MeantFor.head("Agent Pi: hi", twoOfOneAgent).users())
+                .as("the task shown by its agent alone, and not its sibling")
+                .containsExactly(pi);
+        assertThat(MeantFor.head("Agent Pi, Agent Pi (fix): hi", twoOfOneAgent).users())
+                .as("both named in one head")
+                .containsExactlyInAnyOrder(pi, fix);
+        assertThat(MeantFor.head("Agent Pi (other): hi", twoOfOneAgent).users())
+                .as("a short name no member shows names nobody")
+                .isEmpty();
+        assertThat(MeantFor.head("Agent Core (cc Agent Pi (fix)): hi", twoOfOneAgent).users())
+                .as("a parenthesis that is no short name leaves the bare name")
+                .containsExactlyInAnyOrder(SELF, fix);
+    }
+
+    /** Harm guarded: a task's name after a word ending in "Agent" never wakes that task. */
+    @ParameterizedTest
+    @ValueSource(strings = {"subAgent Agent Pi (fix): hi", "Agent Agent Pi (fix): hi"})
+    void aNameRightAfterAnotherAgentWordIsStillRead(final String body) {
+        assertThat(MeantFor.head(body, Map.of("@pi-fix:x", "Agent Pi (fix)")).users())
+                .as("the task named after the word")
+                .containsExactly("@pi-fix:x");
+    }
+
+    /**
+     * Harm guarded: a task whose short name holds a digit, capital, dot or dash wakes its sibling.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"mx88-read", "v1.2", "Fix_2"})
+    void aShortNameOfEveryAllowedKindNamesOnlyItsTask(final String shortName) {
+        final String display = "Agent Pi (" + shortName + ")";
+        final Map<String, String> siblings = Map.of("@pi:x", "Agent Pi", "@pi-s:x", display);
+
+        assertThat(MeantFor.head(display + ": hi", siblings).users())
+                .as("only the task shown as " + display)
+                .containsExactly("@pi-s:x");
+    }
+
+    /** Harm guarded: the room tool wakes one task of an agent for its sibling's line. */
+    @Test
+    void theRoomToolReadsALineForOneSiblingAsNotForTheOther() {
+        final Map<String, String> siblings =
+                Map.of("@pi:x", "Agent Pi", "@pi-fix:x", "Agent Pi (fix)", SELF, "Agent Core");
+
+        assertThat(MeantFor.line(event("Agent Pi (fix): hi"), "@pi:x", siblings))
+                .as("the line for the fix task, read by the other")
+                .isFalse();
+        assertThat(MeantFor.line(event("Agent Pi (fix): hi"), "@pi-fix:x", siblings))
+                .as("the line for the fix task, read by it")
+                .isTrue();
+        assertThat(MeantFor.line(event("Agent Pi: hi"), "@pi-fix:x", siblings))
+                .as("the line for the bare task, read by the fix task")
+                .isFalse();
+    }
+
     /** A text event from another room member. */
     private static ObjectNode event(final String body) {
         final ObjectNode event =
