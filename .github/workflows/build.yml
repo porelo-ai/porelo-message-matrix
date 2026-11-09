@@ -128,8 +128,8 @@ jobs:
 
             # The tests start the homeserver from the image homeserver/Dockerfile pins, with podman. A runner without
             # podman, as the host's forge has, gets that image's binary by the same digest, each manifest and layer
-            # checked against its digest, and the tests run it as a task does; the one test that needs a container
-            # then skips. ghcr.io's pull token is anonymous and still kept off the command line.
+            # checked against its digest, and the tests run it as a task does; the tests that need a container then
+            # skip. ghcr.io's pull token is anonymous and still kept off the command line.
             - name: The homeserver where no container starts
               run: |
                   set -euo pipefail
