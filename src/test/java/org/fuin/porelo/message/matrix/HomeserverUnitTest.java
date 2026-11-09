@@ -65,7 +65,11 @@ class HomeserverUnitTest {
                         "TUWUNEL_ROCKSDB_PARALLELISM_THREADS");
         assertThat(HomeserverBounds.PODMAN_FLAGS)
                 .as("the container budgets guarded by both launch paths")
-                .containsExactly("--pids-limit=512", "--memory=1g", "--cpus=2");
+                .containsExactly(
+                        "--pids-limit=512",
+                        "--memory=1g",
+                        "--cpus=2",
+                        "--ulimit=nofile=65536:65536");
         final int pids =
                 Integer.parseInt(
                         HomeserverBounds.PODMAN_FLAGS.stream()

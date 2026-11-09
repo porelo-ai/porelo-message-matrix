@@ -1,6 +1,6 @@
 # MX94 — The Homeserver Holds Its Limits On Any Machine
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - one podman flag in the unit and in the `backup`/`restore` run, and one test against the real
 homeserver; nothing another repository reads.
 
@@ -18,6 +18,26 @@ Two things are still open:
 - **Open files have no limit of the container's own**, so they follow podman's default on whatever host runs it.
 - **No test runs the real homeserver where its uncapped pool would fail.** The test machines have 4 to 16 cores, below
   the limit of 512 processes even without the cap, so removing the cap leaves every test green.
+
+## Plan
+
+- **`HomeserverBounds.PODMAN_FLAGS` gains `--ulimit=nofile=65536:65536`**, which the unit's `ExecStart` and
+  `PodmanUnit.command` for `backup`/`restore` both take; `HomeserverUnitTest` holds the list and that both paths carry
+  it. Measured: a fresh homeserver holds 154 files, one that served a dozen agents for weeks 256; the host's limit
+  passed through today is 524288. RocksDB runs with `max_open_files=-1`, keeping every table file open, and the pinned
+  Tuwunel has no setting to lower it, so the limit sits far above what a host's homeserver can reach: at the limit
+  RocksDB stops writing until a restart.
+- **`HomeserverBoundsIT` starts the pinned image with the unit's flags and settings, the process limit forced to 128
+  and four of the cores the test may run on pinned with `taskset`** (Tuwunel counts the cores it may run on; a container's CPU limit does
+  not change that, and rootless podman has no `cpuset`). Measured on four cores: capped 72 threads, uncapped 138;
+  uncapped, the start fails with `Resource temporarily unavailable`, as on the 32-core host. It is skipped where no
+  container starts and on fewer than four allowed cores, where an uncapped pool fits too. Podman picks the published
+  port, and the test checks that the unit's process limit is the one it forced down.
+- **The test that goes red first:** `HomeserverUnitTest` expecting the open-files flag; `HomeserverBoundsIT` with
+  `TUWUNEL_DB_POOL_MAX_WORKERS` taken out, and with the process limit split into two arguments.
+- **Not done, from the reading:** the IT runs podman without a timeout of its own, as every IT of this repository
+  does through the same pattern, since `podman run -d` returns once the container started; and it keeps its own small
+  process runner beside `Tuwunel`'s private one, which has no `taskset`.
 
 ## Acceptance
 

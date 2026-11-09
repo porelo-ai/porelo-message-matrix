@@ -32,8 +32,8 @@ and the journal says the name is in use.
 
 Two accounts on one machine each get their own homeserver, on their own port.
 
-The container is bounded whatever the machine's size: 512 processes, 1 GiB of memory and 2 CPUs, with
-Tuwunel's database pool and caches capped to fit. So the account's user manager must delegate the `cpu`,
+The container is bounded whatever the machine's size: 512 processes, 1 GiB of memory, 2 CPUs and
+65536 open files, with Tuwunel's database pool and caches capped to fit. So the account's user manager must delegate the `cpu`,
 `memory` and `pids` controllers, as Ubuntu 26.04 does by default; where it does not, podman refuses the
 limits and the homeserver does not start.
 

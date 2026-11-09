@@ -30,7 +30,10 @@ final class HomeserverBounds {
                     // Keep one account's homeserver from exhausting the host's memory.
                     "--memory=1g",
                     // Keep background work from consuming every host core.
-                    "--cpus=2");
+                    "--cpus=2",
+                    // RocksDB keeps every table file open and Tuwunel has no setting to cap it,
+                    // so far above the 256 a homeserver holds after weeks, yet not the host's.
+                    "--ulimit=nofile=65536:65536");
 
     private HomeserverBounds() {}
 }

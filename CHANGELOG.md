@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The local homeserver's container, and its run for `backup` and `restore`, open at most 65536 files
+  (`--ulimit=nofile=65536:65536`) instead of whatever the host allows.
 - A person's line in the room headed `Agent Pi: …`, typed as the agents write it, is meant for the member shown as
   Agent Pi: the person file's `to` names that account beside the client's mentions and the replied-to sender.
 - A person's line in the room headed `All agents: …` is marked `"all": true` in its person file, meant for every task of
