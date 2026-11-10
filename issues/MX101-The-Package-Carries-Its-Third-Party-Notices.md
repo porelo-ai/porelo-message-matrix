@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX101",
   "title": "The Package Carries Its Third-Party Notices",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "S",
   "priority": "Medium",
   "rank": 6,
