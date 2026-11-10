@@ -199,6 +199,7 @@ class GateIT {
                 assertThat(messages.path("chunk").findValuesAsText("body"))
                         .as("sent message is visible")
                         .contains("through the gate");
+                rehearsalSignsInPostsReadsAndLogsOut(listener, room, login);
                 final String bearer = signedIn.body().path("access_token").asText();
                 for (final String[] asked :
                         List.of(
@@ -454,6 +455,40 @@ class GateIT {
                     .as("the expelled account can no longer act")
                     .isEqualTo(401);
         }
+    }
+
+    /**
+     * Harm guarded: a rehearsal on a host that cannot sign its person in through the real gate, or
+     * that says it did without a session that works.
+     */
+    private void rehearsalSignsInPostsReadsAndLogsOut(
+            final Path listener, final String room, final String login) throws IOException {
+        final Path line = Files.writeString(dir.resolve("rehearsal-line"), "rehearsed line");
+        final var out = new java.io.ByteArrayOutputStream();
+        final var err = new java.io.ByteArrayOutputStream();
+        final int exit =
+                RehearsalClient.run(
+                        new String[] {"--socket", listener.toString()},
+                        new java.io.ByteArrayInputStream(
+                                ("sign-in\npost "
+                                                + room
+                                                + " "
+                                                + line
+                                                + "\nread "
+                                                + room
+                                                + "\nlog-out\n")
+                                        .getBytes(StandardCharsets.UTF_8)),
+                        new java.io.PrintStream(out, true, StandardCharsets.UTF_8),
+                        new java.io.PrintStream(err, true, StandardCharsets.UTF_8));
+        final String said = out.toString(StandardCharsets.UTF_8);
+        assertThat(exit).as("the rehearsal's run, stderr: " + err).isZero();
+        assertThat(said)
+                .as("signed in as the host login, its line read back after the earlier one")
+                .containsSubsequence(
+                        "\"user\":\"@" + login + ":",
+                        "\"body\":\"through the gate\"",
+                        "\"body\":\"rehearsed line\"",
+                        "\"step\":\"log-out\",\"whoami\":401");
     }
 
     /** The login tokens the gate keeps, by their hash's name; its lock file is none. */
