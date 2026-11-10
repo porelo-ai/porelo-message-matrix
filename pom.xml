@@ -148,6 +148,45 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <!-- The bill of what the executable is built from, shipped beside it. -->
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>makeBom</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <outputFormat>json</outputFormat>
+                            <outputName>sbom.cdx</outputName>
+                            <includeTestScope>false</includeTestScope>
+                            <!-- The bill goes into the packages; nothing goes to Central, which the plugin
+                                 would otherwise take as a reason to make none. -->
+                            <skipNotDeployed>false</skipNotDeployed>
+                        </configuration>
+                    </plugin>
+                    <!-- The runtime jars compiled into the executable, for its third-party notices. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>notices-classpath</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <outputFile>${project.build.directory}/classpath.txt</outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <!-- The homeserver's unit, with the image the Dockerfile pins filled in. -->
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
@@ -169,28 +208,43 @@
                                     </arguments>
                                 </configuration>
                             </execution>
-                        </executions>
-                    </plugin>
-                    <!-- The bill of what the executable is built from, shipped beside it. -->
-                    <plugin>
-                        <groupId>org.cyclonedx</groupId>
-                        <artifactId>cyclonedx-maven-plugin</artifactId>
-                        <executions>
+                            <!-- The licenses of every jar compiled into the executable and of the JDK it is
+                                 built with, in full, for both packages to ship; refused when a jar's bill
+                                 names no license. After the bill, which the plugins above make first. -->
                             <execution>
+                                <id>third-party-notices</id>
                                 <phase>package</phase>
                                 <goals>
-                                    <goal>makeBom</goal>
+                                    <goal>exec</goal>
                                 </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <includeProjectDependencies>false</includeProjectDependencies>
+                                    <includePluginDependencies>true</includePluginDependencies>
+                                    <executableDependency>
+                                        <groupId>org.fuin.porelo</groupId>
+                                        <artifactId>porelo-release</artifactId>
+                                    </executableDependency>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <classpath/>
+                                        <argument>org.fuin.porelo.release.Main</argument>
+                                        <argument>third-party-notices</argument>
+                                        <argument>${project.build.directory}/classpath.txt</argument>
+                                        <argument>${project.build.directory}/sbom.cdx.json</argument>
+                                        <argument>${java.home}</argument>
+                                        <argument>${project.build.directory}/THIRD-PARTY-NOTICES</argument>
+                                    </arguments>
+                                </configuration>
                             </execution>
                         </executions>
-                        <configuration>
-                            <outputFormat>json</outputFormat>
-                            <outputName>sbom.cdx</outputName>
-                            <includeTestScope>false</includeTestScope>
-                            <!-- The bill goes into the packages; nothing goes to Central, which the plugin
-                                 would otherwise take as a reason to make none. -->
-                            <skipNotDeployed>false</skipNotDeployed>
-                        </configuration>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.fuin.porelo</groupId>
+                                <artifactId>porelo-release</artifactId>
+                                <version>${porelo.buildtools.version}</version>
+                            </dependency>
+                        </dependencies>
                     </plugin>
                     <plugin>
                         <groupId>org.vafer</groupId>
@@ -228,8 +282,20 @@
                                             </mapper>
                                         </data>
                                         <data>
-                                            <src>${project.basedir}/LICENSE</src>
-                                            <dst>copyright</dst>
+                                            <src>${project.build.directory}/THIRD-PARTY-NOTICES</src>
+                                            <type>file</type>
+                                            <missingSrc>fail</missingSrc>
+                                            <mapper>
+                                                <type>perm</type>
+                                                <prefix>${package.doc}</prefix>
+                                                <user>root</user>
+                                                <group>root</group>
+                                                <filemode>644</filemode>
+                                            </mapper>
+                                        </data>
+                                        <!-- Names the notices beside it, as Debian's copyright format has it. -->
+                                        <data>
+                                            <src>${project.basedir}/src/deb/copyright</src>
                                             <type>file</type>
                                             <mapper>
                                                 <type>perm</type>
@@ -342,6 +408,23 @@
                                             </source>
                                             <source>
                                                 <location>${project.basedir}/LICENSE</location>
+                                            </source>
+                                        </sources>
+                                    </mapping>
+                                    <!-- Where an rpm keeps its licenses. The plugin cannot mark it %license; as
+                                         a plain file it is installed even with excluded documentation, as a
+                                         license is. -->
+                                    <mapping>
+                                        <directory>/usr/share/licenses/${transport.name}</directory>
+                                        <filemode>755</filemode>
+                                    </mapping>
+                                    <mapping>
+                                        <directory>/usr/share/licenses/${transport.name}</directory>
+                                        <directoryIncluded>false</directoryIncluded>
+                                        <filemode>644</filemode>
+                                        <sources>
+                                            <source>
+                                                <location>${project.build.directory}/THIRD-PARTY-NOTICES</location>
                                             </source>
                                         </sources>
                                     </mapping>

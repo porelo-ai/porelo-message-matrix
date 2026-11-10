@@ -48,6 +48,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The transport's packages ship the license and notice texts, in full, of everything compiled into its executable
+  (Jackson, with the parser jackson-core embeds, jspecify, and the GraalVM runtime) as `THIRD-PARTY-NOTICES`: in the
+  .deb beside its `copyright`, which names it and now follows Debian's copyright format, in the .rpm under
+  `/usr/share/licenses/porelo-message-transport-matrix/`. The build makes it with porelo-buildtools' generator and
+  refuses a jar whose bill names no license.
 - `members --project P [--login L]` says who is in the project's room: every joined or invited member with the name
   the room shows for it and whether it is a task (with the task's name, and its login on a central homeserver), a
   person, one of the room's helpers or something else, so the window can show who is in and which name reaches a task.

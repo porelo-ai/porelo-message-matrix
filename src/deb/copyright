@@ -1,0 +1,11 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: porelo-message-matrix
+Source: https://github.com/porelo-ai/porelo-message-matrix
+Comment: The licenses and notices of the third-party code compiled into the transport, in full, are in
+ /usr/share/doc/porelo-message-transport-matrix/THIRD-PARTY-NOTICES.
+
+Files: *
+Copyright: Michael Schnell and the Porelo contributors
+License: GPL-3.0-or-later
+ On Debian systems, the full text of the GNU General Public License version 3 can be found in
+ /usr/share/common-licenses/GPL-3.

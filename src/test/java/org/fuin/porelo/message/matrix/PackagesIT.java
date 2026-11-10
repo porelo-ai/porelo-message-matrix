@@ -161,6 +161,47 @@ class PackagesIT {
                         "libz.so.1(ZLIB_" + zlib + ")(64bit)");
     }
 
+    @Test
+    @DisplayName(
+            "Both transport packages ship the licenses of what is compiled into the executable,"
+                    + " and the .deb's copyright names them")
+    void packagesShipTheThirdPartyNotices() throws Exception {
+        assumeTrue(Transport.isNative(), "only a native build makes the packages");
+        final Path deb = newest(TARGET, "porelo-message-transport-matrix_", ".deb");
+        final Path rpm = newest(TARGET.resolve("rpm"), "porelo-message-transport-matrix-", ".rpm");
+        final Path built = TARGET.resolve("THIRD-PARTY-NOTICES");
+        final String notices = Files.readString(built);
+
+        // A section for every runtime jar and for the runtime the image is built with, and the
+        // notice of the parser jackson-core embeds, which only the jar itself carries.
+        assertThat(notices)
+                .containsPattern("(?m)^com\\.fasterxml\\.jackson\\.core:jackson-annotations:")
+                .containsPattern("(?m)^com\\.fasterxml\\.jackson\\.core:jackson-core:")
+                .containsPattern("(?m)^com\\.fasterxml\\.jackson\\.core:jackson-databind:")
+                .containsPattern("(?m)^org\\.jspecify:jspecify:")
+                .containsPattern("(?m)^GraalVM runtime ")
+                .contains("Werner Randelshofer");
+
+        final String doc = "./usr/share/doc/porelo-message-transport-matrix/";
+        assertThat(run("dpkg-deb", "-c", deb.toString()))
+                .contains(doc + "THIRD-PARTY-NOTICES", doc + "copyright");
+        assertThat(extract(deb, doc + "copyright"))
+                .contains("/usr/share/doc/porelo-message-transport-matrix/THIRD-PARTY-NOTICES");
+        assertThat(extract(deb, doc + "THIRD-PARTY-NOTICES")).isEqualTo(notices);
+
+        assertThat(run("rpm", "-qpl", rpm.toString()))
+                .contains(
+                        "/usr/share/licenses/porelo-message-transport-matrix/THIRD-PARTY-NOTICES");
+    }
+
+    /** One file's text out of a .deb, by its path in the data archive. */
+    private static String extract(final Path deb, final String member)
+            throws IOException, InterruptedException {
+        final Path dir = Files.createTempDirectory(TARGET, "deb-");
+        run("dpkg-deb", "-x", deb.toString(), dir.toString());
+        return Files.readString(dir.resolve(member));
+    }
+
     /** The highest version of a symbol prefix in objdump's output, compared number by number. */
     private static String newestVersion(final String symbols, final String prefix) {
         final java.util.regex.Matcher m =
