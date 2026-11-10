@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `send --to <person>` answers only into a direct chat the task is still in: one it left or was taken out of is passed
+  over, where the answer failed with 77 before although another chat was open. A chat whose members the task may not
+  see (403, 404) is passed over too, instead of stopping the send before the other chats were looked at.
 - `send --to <person>` answers in the direct chat the person last wrote in, when they keep more than one open with
   the task; before, the answer went into the oldest, where the person was not waiting for it.
 - The local homeserver's container, and its run for `backup` and `restore`, open at most 65536 files

@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX100",
   "title": "A Task Answers Only Where It Still Is",
-  "state": "Implementing",
+  "state": "Review",
   "size": "S",
   "priority": "Medium",
   "rank": 1,
@@ -16,7 +16,8 @@
 
 **Why this size.** which of a task's direct chats `send --to <person>` may write into, and its tests.
 
-**How it stands.** Implementing (2026-11-10), after [MX102](README.md#mx102) on the coordinator's word (16:39Z).
+**How it stands.** Review (2026-11-10): built after [MX102](README.md#mx102) on the coordinator's word (16:39Z);
+`SendTest` and `DirectTest` green, each new test seen red by a break.
 
 **What must be true.** A task's answer to a person never goes into a direct chat the task itself has left or was taken
 out of, and one chat whose state the task may not read does not stop the answer from reaching another.
@@ -37,3 +38,14 @@ The code reading of [MX98](README.md#mx98) found two ways `Direct.chatWith` stil
   with `m.direct`; a 403 or 404 on a chat's member state skips that chat.
 - **The test that goes red first:** `SendTest` against a scripted homeserver: of two open chats the task left the
   newer, the answer goes into the older; a 403 on the older's member state leaves the newer chosen.
+
+## Plan as built
+
+- `Direct.chatWith` reads the task's `joined_rooms` once, only when `m.direct` names a chat with the person, and passes
+  over each chat the task is not in. The person's membership is read with `exchange`: 403 and 404 pass the chat over,
+  401 is 77, 429 and 5xx are 75, anything else 76, as for the chat's lines.
+- `SendTest`: `aChatTheTaskIsNoLongerInIsNeverWrittenNorRead` (of two chats the task left the newer: the answer goes
+  into the older and nothing is asked of the left one) and `aChatWhoseMembersCannotBeReadIsPassedOver` (403 and 404 on
+  the older's member state: the newer is chosen). The existing direct-chat tests answer `joined_rooms` too.
+- Breaks: without the joined check the first fails; with 403 not passed over the second fails.
+- `doc/transport.md`'s `send` row and the changelog say it.

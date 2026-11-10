@@ -191,23 +191,23 @@ final class Direct {
 
     /**
      * The direct chat between this account and a person, to send into: of the chats in {@code
-     * m.direct} where the person is still joined or invited, the one the person last said a line
-     * in, so the answer comes where they asked, the one remembered later on a tie; when they said
-     * none, the readable one remembered last; when none is open or none can be read, a new one,
-     * invite-only and marked direct, inviting them.
+     * m.direct} this account is still in and the person still joined or invited - one whose members
+     * it may not see passed over - the one the person last said a line in, so the answer comes
+     * where they asked, the one remembered later on a tie; when they said none, the readable one
+     * remembered last; when none is open or none can be read, a new one, invite-only and marked
+     * direct, inviting them.
      */
     static String chatWith(final MatrixClient client, final String self, final String person)
             throws Failure {
         final Set<String> known = rooms(client, self).getOrDefault(person, Set.of());
+        // Only a chat the task is still in: one it left or was taken out of fails the answer.
+        final Set<String> in = known.isEmpty() ? Set.of() : joinedRooms(client);
         final List<String> open = new ArrayList<>();
         for (final String room : known) {
-            final JsonNode member =
-                    client.find(
-                            "/_matrix/client/v3/rooms/"
-                                    + MatrixClient.segment(room)
-                                    + "/state/m.room.member/"
-                                    + MatrixClient.segment(person));
-            final String membership = member == null ? "" : member.path("membership").asText("");
+            if (!in.contains(room)) {
+                continue;
+            }
+            final String membership = membership(client, room, person);
             if ("join".equals(membership) || "invite".equals(membership)) {
                 open.add(room);
             }
@@ -244,6 +244,45 @@ final class Direct {
                 client.post("/_matrix/client/v3/createRoom", request).path("room_id").asText();
         remember(client, self, person, room);
         return room;
+    }
+
+    /** The rooms this account is joined in, read once for a send. */
+    private static Set<String> joinedRooms(final MatrixClient client) throws Failure {
+        final JsonNode rooms = client.get("/_matrix/client/v3/joined_rooms").path("joined_rooms");
+        if (!rooms.isArray()) {
+            throw new Failure(Exit.PROTOCOL, "the homeserver named no joined rooms");
+        }
+        final Set<String> joined = new java.util.HashSet<>();
+        rooms.forEach(room -> joined.add(room.asText()));
+        return joined;
+    }
+
+    /**
+     * The person's membership in a chat; empty when the task may not read it or the chat holds
+     * none, so that chat is passed over and the others are still looked at.
+     */
+    private static String membership(
+            final MatrixClient client, final String room, final String person) throws Failure {
+        final MatrixClient.Answer answer =
+                client.exchange(
+                        "GET",
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(room)
+                                + "/state/m.room.member/"
+                                + MatrixClient.segment(person),
+                        null);
+        final int status = answer.status();
+        if (status == 403 || status == 404) {
+            return "";
+        }
+        if (status != 200 || !answer.body().isObject()) {
+            throw new Failure(
+                    status == 401
+                            ? Exit.NOT_PERMITTED
+                            : status == 429 || status >= 500 ? Exit.TEMPORARY : Exit.PROTOCOL,
+                    "reading who is in the direct chat " + room + " answered " + status);
+        }
+        return answer.body().path("membership").asText("");
     }
 
     /**

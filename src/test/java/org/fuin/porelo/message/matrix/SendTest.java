@@ -436,6 +436,7 @@ class SendTest {
         homeserver
                 .answer(200, "{\"user_id\":\"@t.alice:matrix.test\"}")
                 .answer(200, "{\"@bob:matrix.test\":[\"!d:matrix.test\"]}")
+                .answer(200, "{\"joined_rooms\":[\"!d:matrix.test\"]}")
                 .answer(200, "{\"membership\":\"join\"}")
                 .answer(200, "{\"event_id\":\"$e\"}");
 
@@ -486,6 +487,17 @@ class SendTest {
     private static String chats(final String... rooms) {
         final var answer = MatrixClient.JSON.createObjectNode();
         final var list = answer.putArray(BOB);
+        for (final String room : rooms) {
+            list.add(room + ":matrix.test");
+        }
+        return answer.toString();
+    }
+
+    /** {@code joined_rooms} of the task's account: the chats it is still in. */
+    private static String joined(final String... rooms) {
+        final var answer = MatrixClient.JSON.createObjectNode();
+        final var list = answer.putArray("joined_rooms");
+        list.add("!project:matrix.test");
         for (final String room : rooms) {
             list.add(room + ":matrix.test");
         }
@@ -552,6 +564,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a", "!b"))
                 .answer(200, JOIN)
                 .answer(200, JOIN)
                 .answer(200, page(BOB, inA, BOB, 10L))
@@ -586,6 +599,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a", "!b"))
                 .answer(200, JOIN)
                 .answer(200, JOIN)
                 .answer(200, page(BOB, 300L))
@@ -605,6 +619,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b", "!c"))
+                .answer(200, joined("!a", "!b", "!c"))
                 .answer(200, JOIN)
                 .answer(200, "{\"membership\":\"invite\"}")
                 .answer(200, JOIN)
@@ -625,6 +640,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a", "!b"))
                 .answer(200, JOIN)
                 .answer(200, JOIN)
                 .answer(403, "{\"errcode\":\"M_FORBIDDEN\"}")
@@ -645,6 +661,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b", "!c"))
+                .answer(200, joined("!a", "!b", "!c"))
                 .answer(200, "{\"membership\":\"leave\"}")
                 .answer(200, JOIN)
                 .answer(200, JOIN)
@@ -657,6 +674,45 @@ class SendTest {
         assertThat(read())
                 .as("the left chat's messages are never read")
                 .containsExactly("%21b%3Amatrix.test", "%21c%3Amatrix.test");
+    }
+
+    /**
+     * Harm guarded: an answer written into a chat the task left or was taken out of, failing there
+     * with 77 while another chat with the person is open.
+     */
+    @Test
+    void aChatTheTaskIsNoLongerInIsNeverWrittenNorRead() {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a"))
+                .answer(200, JOIN)
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21a%3Amatrix.test");
+        assertThat(homeserver.requests())
+                .as("nothing asked of the chat the task left")
+                .noneMatch(r -> r.rawPath().contains("%21b%3Amatrix.test"));
+    }
+
+    /**
+     * Harm guarded: one chat whose member state the task may not read stopping the answer before
+     * the other chats with the person are looked at.
+     */
+    @ParameterizedTest
+    @CsvSource({"403, M_FORBIDDEN", "404, M_NOT_FOUND"})
+    void aChatWhoseMembersCannotBeReadIsPassedOver(final int status, final String errcode) {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a", "!b"))
+                .answer(status, "{\"errcode\":\"" + errcode + "\"}")
+                .answer(200, JOIN)
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21b%3Amatrix.test");
     }
 
     /** Harm guarded: a busy, refusing or garbled homeserver taken for a chat nobody wrote in. */
@@ -675,6 +731,7 @@ class SendTest {
         homeserver
                 .answer(200, WHOAMI)
                 .answer(200, chats("!a", "!b"))
+                .answer(200, joined("!a", "!b"))
                 .answer(200, JOIN)
                 .answer(200, JOIN)
                 .answer(200, page(BOB, 100L))
@@ -895,6 +952,7 @@ class SendTest {
         homeserver
                 .answer(200, "{\"user_id\":\"@t.alice:matrix.test\"}")
                 .answer(200, "{\"@bob:matrix.test\":[\"!d:matrix.test\"]}")
+                .answer(200, "{\"joined_rooms\":[\"!d:matrix.test\"]}")
                 .answer(200, "{\"membership\":\"join\"}")
                 .answer(200, "{\"event_id\":\"$e\"}");
         final Path full =
