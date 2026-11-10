@@ -60,7 +60,11 @@ class RehearsalClientTest {
                                                         answer.apply(request)
                                                                 .getBytes(StandardCharsets.UTF_8));
                                     } catch (final IOException ex) {
-                                        return;
+                                        // A client that closed its end, as an interrupted one
+                                        // does, ends only its own request, not the gate.
+                                        if (!server.isOpen()) {
+                                            return;
+                                        }
                                     }
                                 }
                             });
@@ -1171,6 +1175,102 @@ class RehearsalClientTest {
             assertThat(gate.requests)
                     .as("the session logged out")
                     .anyMatch(r -> r.startsWith("POST /_matrix/client/v3/logout"));
+        }
+    }
+
+    /**
+     * The project foo's room behind the gate, found by its alias, with two of bob's tasks in it.
+     */
+    private static Function<String, String> projectRoom(final List<String> posted) {
+        final Function<String, String> silent = silentRoom(posted);
+        return request -> {
+            if (request.startsWith("GET /_matrix/client/v3/directory/room/")) {
+                return request.startsWith(
+                                "GET /_matrix/client/v3/directory/room/"
+                                        + MatrixClient.segment("#porelo-foo:x")
+                                        + " ")
+                        ? json(200, "{\"room_id\":\"!r:x\",\"servers\":[\"x\"]}")
+                        : json(404, "{\"errcode\":\"M_NOT_FOUND\"}");
+            }
+            if (request.contains("/joined_members")) {
+                return json(
+                        200,
+                        "{\"joined\":{\"@bob:x\":{\"display_name\":\"Bob\"},"
+                                + "\"@porelo-foo-pi.bob:x\":{\"display_name\":\"Agent Pi\"},"
+                                + "\"@porelo-foo-core.bob:x\":{\"display_name\":\"Agent Core\"}}}");
+            }
+            return silent.apply(request);
+        };
+    }
+
+    private Run rehearseProject(final Path socket, final String project) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        final int exit =
+                RoomRehearsal.run(
+                        new String[] {
+                            "--socket",
+                            socket.toString(),
+                            "--project",
+                            project,
+                            "--answer-within",
+                            "0",
+                            "--quiet-for",
+                            "0",
+                            "--talk-log",
+                            "sh",
+                            "-c",
+                            "true",
+                            "sh"
+                        },
+                        new PrintStream(out, true, StandardCharsets.UTF_8),
+                        new PrintStream(err, true, StandardCharsets.UTF_8));
+        return new Run(
+                exit, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Harm guarded: a run given only the project rehearsing another room than the project's, or
+     * tasks it did not find in it, or not saying what it found, so its lines cannot be read back.
+     */
+    @Test
+    void aProjectsRunFindsItsRoomAndTasksAndSaysThem() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        try (ScriptedGate gate =
+                new ScriptedGate(socket, projectRoom(new CopyOnWriteArrayList<>()))) {
+            final Run run = rehearseProject(socket, "foo");
+
+            assertThat(run.exit()).as("the run's exit, stderr: " + run.err()).isEqualTo(Exit.DATA);
+            assertThat(run.out())
+                    .as("what it found, then the scenarios")
+                    .contains(
+                            "ROOM !r:x (#porelo-foo:x)\n"
+                                    + "TASK core @porelo-foo-core.bob:x Agent Core\n"
+                                    + "TASK pi @porelo-foo-pi.bob:x Agent Pi\n")
+                    .contains(
+                            "FAIL a head names one task: asked Agent Core in the room, got no"
+                                    + " answer");
+            assertThat(gate.requests.stream().map(r -> r.split(" ")[1]))
+                    .as("joined the room the alias named")
+                    .contains("/_matrix/client/v3/join/" + MatrixClient.segment("!r:x"));
+        }
+    }
+
+    /** Harm guarded: a project with no room on the host failing as anything but its data. */
+    @Test
+    void aProjectWithNoRoomEndsWithItsDataAndLogsOut() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        try (ScriptedGate gate =
+                new ScriptedGate(socket, projectRoom(new CopyOnWriteArrayList<>()))) {
+            final Run run = rehearseProject(socket, "bar");
+
+            assertThat(run.exit()).as("the run's exit, stderr: " + run.err()).isEqualTo(Exit.DATA);
+            assertThat(run.err())
+                    .as("which room")
+                    .contains("FAILED: no room is named #porelo-bar:x");
+            assertThat(gate.requests.stream().map(r -> r.split(" ")[1]))
+                    .as("logged out")
+                    .contains("/_matrix/client/v3/logout");
         }
     }
 }

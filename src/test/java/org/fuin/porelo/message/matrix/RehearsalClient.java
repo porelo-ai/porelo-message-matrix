@@ -57,6 +57,7 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
     private final java.util.Set<String> directs = new java.util.LinkedHashSet<>();
     private String sessionToken = "";
     private String loginToken = "";
+    private String user = "";
     private boolean sayLogOut = true;
 
     /** The longest a step waits for an answer, so a mistyped limit cannot hold the run for days. */
@@ -203,6 +204,7 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
                                     ? " and no session"
                                     : " " + login.errcode()));
         }
+        this.user = user;
         answer("sign-in").put("user", user);
         flush();
     }
@@ -552,6 +554,27 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         }
         invited.forEach(member -> members.add(member.path("state_key").asText()));
         return java.util.Set.copyOf(members);
+    }
+
+    /** The signed-in person's id; empty before the sign-in. */
+    String user() {
+        return user;
+    }
+
+    /** The room the homeserver's directory names by {@code alias}. */
+    String roomNamed(final String alias) throws Failure {
+        final JsonNode named =
+                signedIn().find(CLIENT + "directory/room/" + MatrixClient.segment(alias));
+        final String room = named == null ? "" : named.path("room_id").asText("");
+        if (!room.startsWith("!")) {
+            throw new Failure(Exit.DATA, "no room is named " + alias);
+        }
+        return room;
+    }
+
+    /** The room's joined members, each with the display the room shows for it. */
+    Map<String, String> shown(final String room) throws Failure {
+        return Map.copyOf(displayNames(room));
     }
 
     private Map<String, String> displayNames(final String room) throws Failure {

@@ -201,3 +201,23 @@ with 403. The gate takes the ssh peer's login as who asks, so a page elsewhere, 
 forge's web through the same tunnel, could otherwise read a sign-in answer or register a name of the person's and
 read its token. Room aliases `porelo-<project>` are reserved: no client makes or takes one, and the host's helper keeps a project's room as the administrator (see [the transport](transport.md)). Refusal logs contain only the login, method, path without its query,
 and status. The administrator token is read only for gate operations and is never returned to clients.
+
+## Rehearsing a project's room on a host
+
+Whether a host's tasks answer a person in the project's room as they should is rehearsed from the development machine,
+as one of the host's people, through the gate:
+
+    build/rehearse-busy-room.sh <login on the host> <host> <project>
+
+- **It needs nothing typed in.** As `<login>` it forwards the host's `/run/porelo-matrix/client.sock`, signs in through
+  the gate's sign-in as a browser does, finds the room `#porelo-<project>:<server>` in the homeserver's directory and
+  the project's running tasks among its members: each `@porelo-<project>-<task>.<login>:<server>`, by the name the
+  room shows. A stopped task has left the room and is not among them; two or more must run.
+- **It prints the room and the tasks it found, then one line per scenario**, `OK`, `FAIL` with what was asked and
+  what came back, or `SKIP`, and nothing of the session. Each task's record of what reached it is read with
+  `porelo talk log` on the host.
+- **Its exit is the rehearsal's:** 0 when every scenario held, 65 when one did not or fewer than two tasks run, 75 when
+  the host, its gate or the forward could not be reached, 64 on a wrong call, 70 when the build failed. It closes the
+  forward and leaves its direct chats and its session at the end, on a failure too.
+- **ssh is the caller's**: its config, agent and known hosts decide how `<login>@<host>` is reached. The rehearsal is
+  built from this checkout's tests and ships in no package.

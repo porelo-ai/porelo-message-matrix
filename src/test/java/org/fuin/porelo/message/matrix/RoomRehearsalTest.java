@@ -1489,4 +1489,101 @@ class RoomRehearsalTest {
             java.nio.file.Files.deleteIfExists(pid);
         }
     }
+
+    private static Failure projectRefusal(final String... args) {
+        return catchThrowableOfType(Failure.class, () -> RoomRehearsal.Arguments.parse(args));
+    }
+
+    /**
+     * Harm guarded: a project's rehearsal that also takes a room or tasks given by hand, so the one
+     * call and a hand-typed list could disagree about what is rehearsed.
+     */
+    @Test
+    void aProjectTakesNoRoomOrTaskBesideIt() throws Exception {
+        final String[] project = {"--socket", "/s", "--project", "foo", "--talk-log", "true"};
+        final RoomRehearsal.Arguments given = RoomRehearsal.Arguments.parse(project);
+        assertThat(given.project()).as("the project").isEqualTo("foo");
+        assertThat(given.room()).as("no room yet").isNull();
+        assertThat(given.tasks()).as("no tasks yet").isEmpty();
+        for (final List<String> wrong :
+                List.of(
+                        List.of("--project", "foo", "--room", "!r:x"),
+                        List.of("--project", "foo", "--task", "pi=@pi.bob:x=Agent Pi"),
+                        List.of("--project", "foo", "--project", "foo"),
+                        List.of("--project", "Foo"),
+                        List.of("--project", "-foo"),
+                        List.of("--project", "foo bar"))) {
+            final List<String> args = new ArrayList<>(List.of("--socket", "/s"));
+            args.addAll(wrong);
+            args.addAll(List.of("--talk-log", "true"));
+            final Failure refused = projectRefusal(args.toArray(String[]::new));
+            assertThat(refused).as("refused: " + wrong).isNotNull();
+            assertThat(refused.exitCode()).as("its exit: " + wrong).isEqualTo(Exit.USAGE);
+        }
+    }
+
+    /**
+     * Harm guarded: a rehearsal that takes another person's task, another project's, a helper, a
+     * person or a stopped task's left account for a running task of the project, so a run judges
+     * accounts nobody started for it.
+     */
+    @Test
+    void theRunningTasksAreThisLoginsTasksOfTheProjectInTheRoom() throws Exception {
+        final Map<String, String> joined = new HashMap<>();
+        joined.put("@porelo-foo-pi.bob:x", "Agent Pi");
+        joined.put("@porelo-foo-pi-two.bob:x", "Agent Pi (two)");
+        joined.put("@porelo-foo-core.eve:x", "Agent Core");
+        joined.put("@porelo-bar-core.bob:x", "Agent Core");
+        joined.put("@porelo-foo-core.bob:elsewhere", "Agent Core");
+        joined.put("@porelo-relay-foo.bob:x", "relay");
+        joined.put("@porelo.bob:x", "bob's machine");
+        joined.put("@porelo-foo-.bob:x", "Agent Nameless");
+        joined.put("@bob:x", "Bob");
+
+        assertThat(RoomRehearsal.running(joined, "foo", "@bob:x"))
+                .as("the tasks, by name")
+                .containsExactly(
+                        new RoomRehearsal.Task("pi", "@porelo-foo-pi.bob:x", "Agent Pi"),
+                        new RoomRehearsal.Task(
+                                "pi-two", "@porelo-foo-pi-two.bob:x", "Agent Pi (two)"));
+    }
+
+    /**
+     * Harm guarded: a run over fewer than two tasks, which cannot tell a line for one from a line
+     * for all, or over a task whose display no head can name, passing for a room that behaves.
+     */
+    @Test
+    void tooFewTasksOrAnUnnameableDisplayAreRefused() {
+        final Failure few =
+                catchThrowableOfType(
+                        Failure.class,
+                        () ->
+                                RoomRehearsal.running(
+                                        Map.of("@porelo-foo-pi.bob:x", "Agent Pi"),
+                                        "foo",
+                                        "@bob:x"));
+        assertThat(few).as("one task").isNotNull();
+        assertThat(few.exitCode()).as("its exit").isEqualTo(Exit.DATA);
+        assertThat(few.getMessage())
+                .as("what was found")
+                .isEqualTo(
+                        "the room holds 1 running task of foo for @bob:x, the rehearsal needs two:"
+                                + " [pi]");
+
+        final Failure unnamed =
+                catchThrowableOfType(
+                        Failure.class,
+                        () ->
+                                RoomRehearsal.running(
+                                        Map.of(
+                                                "@porelo-foo-pi.bob:x", "Agent Pi",
+                                                "@porelo-foo-core.bob:x", "core"),
+                                        "foo",
+                                        "@bob:x"));
+        assertThat(unnamed).as("a display no head names").isNotNull();
+        assertThat(unnamed.exitCode()).as("its exit").isEqualTo(Exit.DATA);
+        assertThat(unnamed.getMessage())
+                .as("which")
+                .isEqualTo("the room shows the task core as \"core\", which no head can name");
+    }
 }

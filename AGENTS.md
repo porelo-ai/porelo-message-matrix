@@ -565,7 +565,8 @@ over a Matrix homeserver. Porelo's side of it - the peer table, a task's account
   host before every hand-over, and by the `shared-rules` workflow once a day; the build skips a change to
   documents alone.
 - **Files that cannot be Java, and why:** `mvnw`, the Maven wrapper; `build/lay-certificates.sh`, shell, since it only
-  starts `ssh-keygen` and `ssh` during an agent's move, on a development machine and a host that need no Java for it.
+  starts `ssh-keygen` and `ssh` during an agent's move, on a development machine and a host that need no Java for it. `build/rehearse-busy-room.sh`, shell, since it only opens an ssh forward around the Java rehearsal and closes it
+  again, as one step of a host's rental run.
 - **The homeserver image's pin is moved by hand.** Dependabot moves only the actions; the agent moves the digest
   in the `FROM` line of `homeserver/Dockerfile`, with its changelog line and a VM run. `ghcr.io` gives an image
   no publication date, so the agent reads its `org.opencontainers.image.created` and takes nothing younger

@@ -36,16 +36,11 @@ sequence.
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx102"></a>[MX102](MX102-The-Busy-Room-Rehearsal-Is-One-Call.md) | S | - | build/rehearse-busy-room.sh <login> <host> <project> runs MX99's rehearsal against a host as one call: it finds the project's room and its running tasks itself and keeps the rehearsal's exit |
-
 ## Review
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx102"></a>[MX102](MX102-The-Busy-Room-Rehearsal-Is-One-Call.md) | S | - | build/rehearse-busy-room.sh <login> <host> <project> runs the busy room's rehearsal against a host as one call: it finds the project's room and its running tasks itself and keeps the rehearsal's exit |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx89"></a>[MX89](MX89-A-Test-Person-Signs-In-Through-The-Gate-Unattended.md) | S | - | A rehearsal signs the test person into the project's room through the gate's SSO without a browser, posts, reads and logs out; no login a real host does not offer |
 | <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |

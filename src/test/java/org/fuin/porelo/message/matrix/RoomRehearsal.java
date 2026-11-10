@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -98,6 +99,9 @@ final class RoomRehearsal {
             Pattern.compile(
                     "Agent [\\p{L}\\p{N}_]+(?:-[\\p{L}\\p{N}_]+)*(?: \\([\\p{L}\\p{N}_.-]+\\))?");
 
+    /** A project's name, as the gate's rules read one. */
+    private static final Pattern PROJECT = Pattern.compile("[a-z0-9][a-z0-9._=-]{0,120}");
+
     private static final Pattern TASK_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,127}");
 
     private static final Pattern ACCOUNT =
@@ -179,12 +183,35 @@ final class RoomRehearsal {
             final RehearsalClient client, final Arguments given, final PrintStream out)
             throws Failure {
         client.step("sign-in");
-        client.step("join " + given.room());
+        final String room;
+        final List<Task> tasks;
+        final String project = given.project();
+        if (project == null) {
+            room = java.util.Objects.requireNonNull(given.room());
+            tasks = given.tasks();
+        } else {
+            final String user = client.user();
+            final String alias = "#porelo-" + project + ":" + user.substring(user.indexOf(':') + 1);
+            room = client.roomNamed(alias);
+            tasks = running(client.shown(room), project, user);
+            Arguments.distinct(tasks, given.persons());
+            out.println("ROOM " + room + " (" + alias + ")");
+            tasks.forEach(
+                    task ->
+                            out.println(
+                                    "TASK "
+                                            + task.name()
+                                            + " "
+                                            + task.account()
+                                            + " "
+                                            + task.display()));
+        }
+        client.step("join " + room);
         final boolean held =
                 new RoomRehearsal(
                                 client,
-                                given.room(),
-                                given.tasks(),
+                                room,
+                                tasks,
                                 given.persons(),
                                 command(given.talkLog(), Duration.ofSeconds(60)),
                                 given.answerWithin(),
@@ -199,6 +226,63 @@ final class RoomRehearsal {
         }
         client.step("log-out");
         return held ? Exit.OK : Exit.DATA;
+    }
+
+    /**
+     * The project's running tasks of the signed-in person among the room's joined members, by name:
+     * each {@code @porelo-<project>-<task>.<login>:<server>} of the person's login and server, as
+     * {@code members} reads a task, with the display the room shows. A stopped task has left the
+     * room and is not among them.
+     *
+     * @param joined each joined member and the display the room shows for it
+     * @param project the project
+     * @param user the signed-in person
+     */
+    static List<Task> running(
+            final Map<String, String> joined, final String project, final String user)
+            throws Failure {
+        final int colon = user.indexOf(':');
+        final String suffix = "." + user.substring(1, colon) + user.substring(colon);
+        final String prefix = "@porelo-" + project + "-";
+        final List<Task> tasks = new ArrayList<>();
+        for (final Map.Entry<String, String> member : new java.util.TreeMap<>(joined).entrySet()) {
+            final String id = member.getKey();
+            if (!id.startsWith(prefix)
+                    || !id.endsWith(suffix)
+                    || id.length() <= prefix.length() + suffix.length()) {
+                continue;
+            }
+            final String name = id.substring(prefix.length(), id.length() - suffix.length());
+            if (!TASK_NAME.matcher(name).matches() || !ACCOUNT.matcher(id).matches()) {
+                continue;
+            }
+            if (!DISPLAY.matcher(member.getValue()).matches()) {
+                throw new Failure(
+                        Exit.DATA,
+                        "the room shows the task "
+                                + name
+                                + " as \""
+                                + member.getValue().replaceAll("\\p{Cc}+", " ")
+                                + "\", which no head can name");
+            }
+            tasks.add(new Task(name, id, member.getValue()));
+        }
+        tasks.sort(java.util.Comparator.comparing(Task::name));
+        if (tasks.size() < 2) {
+            throw new Failure(
+                    Exit.DATA,
+                    "the room holds "
+                            + tasks.size()
+                            + " running task"
+                            + (tasks.size() == 1 ? "" : "s")
+                            + " of "
+                            + project
+                            + " for "
+                            + user
+                            + ", the rehearsal needs two: "
+                            + tasks.stream().map(Task::name).toList());
+        }
+        return List.copyOf(tasks);
     }
 
     /** Every scenario, in order; false when any did not hold or the run stopped on a repeat. */
@@ -776,7 +860,8 @@ final class RoomRehearsal {
     /** The command line, read whole before anything is asked of the host. */
     record Arguments(
             Path socket,
-            String room,
+            @Nullable String room,
+            @Nullable String project,
             List<Task> tasks,
             Set<String> persons,
             List<String> talkLog,
@@ -786,6 +871,7 @@ final class RoomRehearsal {
         static Arguments parse(final String[] args) throws Failure {
             Path socket = null;
             String room = null;
+            String project = null;
             final List<Task> tasks = new ArrayList<>();
             final Set<String> persons = new java.util.LinkedHashSet<>();
             final List<String> talkLog = new ArrayList<>();
@@ -797,6 +883,7 @@ final class RoomRehearsal {
                 switch (args[i]) {
                     case "--socket" -> socket = Path.of(once(socket, args, ++i));
                     case "--room" -> room = once(room, args, ++i);
+                    case "--project" -> project = once(project, args, ++i);
                     case "--task" -> tasks.add(Task.parse(value(args, ++i)));
                     case "--person" -> {
                         final String person = value(args, ++i);
@@ -822,21 +909,28 @@ final class RoomRehearsal {
                     default -> throw new Failure(Exit.USAGE, "unknown argument " + args[i]);
                 }
             }
-            if (socket == null
-                    || room == null
-                    || !room.startsWith("!")
-                    || tasks.size() < 2
-                    || talkLog.isEmpty()) {
+            final boolean byHand =
+                    project == null && room != null && room.startsWith("!") && tasks.size() >= 2;
+            final boolean byProject =
+                    project != null
+                            && PROJECT.matcher(project).matches()
+                            && room == null
+                            && tasks.isEmpty();
+            if (socket == null || !(byHand || byProject) || talkLog.isEmpty()) {
                 throw new Failure(
                         Exit.USAGE,
-                        "usage: RoomRehearsal --socket <path> --room <!room-id> [--answer-within <s>]"
-                                + " [--quiet-for <s>] --task <task>=<@account>=<display> (two or more)"
-                                + " [--person <@account>...] --talk-log <command...>");
+                        "usage: RoomRehearsal --socket <path> (--room <!room-id> --task"
+                                + " <task>=<@account>=<display> (two or more) | --project <project>)"
+                                + " [--answer-within <s>] [--quiet-for <s>] [--person <@account>...]"
+                                + " --talk-log <command...>");
             }
-            distinct(tasks, persons);
+            if (byHand) {
+                distinct(tasks, persons);
+            }
             return new Arguments(
                     socket,
                     room,
+                    project,
                     tasks,
                     persons,
                     talkLog,
@@ -848,8 +942,7 @@ final class RoomRehearsal {
          * No task named twice by name, account or display, no person who is a task, and every
          * account on one server.
          */
-        private static void distinct(final List<Task> tasks, final Set<String> persons)
-                throws Failure {
+        static void distinct(final List<Task> tasks, final Set<String> persons) throws Failure {
             final Set<String> servers = new java.util.HashSet<>();
             tasks.forEach(
                     task -> servers.add(task.account().substring(task.account().indexOf(':'))));
