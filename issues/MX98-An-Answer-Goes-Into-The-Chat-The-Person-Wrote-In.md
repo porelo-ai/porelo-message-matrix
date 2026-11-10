@@ -1,6 +1,6 @@
 # MX98 — An Answer Goes Into The Chat The Person Wrote In
 
-**Status:** Backlog.
+**Status:** Implementing.
 **Size:** S - which of a task's direct chats `send --to <person>` writes into, and its tests; no change to Porelo.
 
 **What must be true.** A task's answer to a person's direct line goes into the chat the person wrote that line in, so
