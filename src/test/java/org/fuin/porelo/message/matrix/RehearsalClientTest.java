@@ -1250,9 +1250,11 @@ class RehearsalClientTest {
                     .contains(
                             "FAIL a head names one task: asked Agent Core in the room, got no"
                                     + " answer");
-            assertThat(gate.requests.stream().map(r -> r.split(" ")[1]))
-                    .as("joined the room the alias named")
-                    .contains("/_matrix/client/v3/join/" + MatrixClient.segment("!r:x"));
+            final List<String> asked = gate.requests.stream().map(r -> r.split(" ")[1]).toList();
+            assertThat(asked.indexOf("/_matrix/client/v3/join/" + MatrixClient.segment("!r:x")))
+                    .as("joined the room the alias named, before reading who is in it")
+                    .isBetween(
+                            0, asked.indexOf("/_matrix/client/v3/rooms/%21r%3Ax/joined_members"));
         }
     }
 

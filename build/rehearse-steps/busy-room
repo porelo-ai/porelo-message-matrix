@@ -64,4 +64,6 @@ PATH="$work/bin:$PATH" timeout --kill-after=10 $((left - 60)) \
     "$work/matrix/build/rehearse-busy-room.sh" "$REHEARSAL_PERSON" "$REHEARSAL_HOST" "$REHEARSAL_PROJECT"
 status=$?
 echo "busy-room: the rehearsal ended $status"
+# 77 is the run's SKIP, but from the rehearsal it is a refusal by the gate or the homeserver: a failure.
+[ "$status" -ne 77 ] || exit 1
 exit "$status"

@@ -74,3 +74,16 @@ hand-run, not a step.
   going as the person by the run's agent and key alone, and ends with the rehearsal's exit; 77 (SKIP) with less than
   30 min to the hard stop. Its first dry run found the forward's socket under a long `TMPDIR` too long for ssh; the
   script now keeps it under `$XDG_RUNTIME_DIR` or `/tmp`.
+
+## Read
+
+One reading by gemini-4-argon-high of both commits (its first try ran 15 min with no answer), reds only:
+
+- **Fixed:** a person only invited to the room may not read its members, so the project's run now joins before it
+  reads them (the client test checks the order).
+- **Fixed:** the rehearsal ends 77 on a refusal (401, 403), which the run's hook reads as SKIP; the step ends 1 then.
+- **Left, said here:** on SIGINT or SIGTERM the JVM ends without logging the person out or leaving a direct chat, and
+  the forward dies with it. In the run that is the hard stop's kill, and the rental is deleted after it; the rule for
+  test scripts (17:45Z) asks no more.
+- **Yellows, noted:** two discovered tasks sharing a display end 64, not 65; the step's `timeout` ends 124, not 75; the
+  script's login check is wider than `Login.valid`; the ssh wrapper keeps the user's own ssh configuration.

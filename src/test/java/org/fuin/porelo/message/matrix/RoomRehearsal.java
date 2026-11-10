@@ -193,6 +193,8 @@ final class RoomRehearsal {
             final String user = client.user();
             final String alias = "#porelo-" + project + ":" + user.substring(user.indexOf(':') + 1);
             room = client.roomNamed(alias);
+            // Joined first: a person only invited may not read who is in the room.
+            client.step("join " + room);
             tasks = running(client.shown(room), project, user);
             Arguments.distinct(tasks, given.persons());
             out.println("ROOM " + room + " (" + alias + ")");
@@ -206,7 +208,9 @@ final class RoomRehearsal {
                                             + " "
                                             + task.display()));
         }
-        client.step("join " + room);
+        if (project == null) {
+            client.step("join " + room);
+        }
         final boolean held =
                 new RoomRehearsal(
                                 client,
