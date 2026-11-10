@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX99",
   "title": "The Rehearsal Judges A Busy Room Right",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "M",
   "priority": "Medium",
   "rank": 2,

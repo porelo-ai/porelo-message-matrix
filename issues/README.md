@@ -32,11 +32,16 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
-| <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 | <a id="mx101"></a>[MX101](MX101-The-Package-Carries-Its-Third-Party-Notices.md) | S | - | The transport's .deb and .rpm carry THIRD-PARTY-NOTICES with the full license and notice texts of everything compiled into its native image, from porelo-buildtools' generator |
+
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
 
 ## Review
 
