@@ -83,8 +83,18 @@ class RoomRehearsalTest {
                     line.text().contains(":")
                             ? line.text().substring(0, line.text().indexOf(':'))
                             : "";
+            if (line.mentions().contains("@room") || head.contains("All agents")) {
+                return TASKS;
+            }
+            final List<RoomRehearsal.Task> pilled =
+                    TASKS.stream().filter(t -> line.mentions().contains(t.account())).toList();
+            if (!pilled.isEmpty()) {
+                return pilled;
+            }
             final List<RoomRehearsal.Task> named =
-                    TASKS.stream().filter(task -> head.equals(task.display())).toList();
+                    TASKS.stream()
+                            .filter(task -> List.of(head.split(", ")).contains(task.display()))
+                            .toList();
             return named.isEmpty() ? TASKS : named;
         }
 
@@ -96,7 +106,7 @@ class RoomRehearsalTest {
         final List<String> left = new ArrayList<>();
 
         @Override
-        public void leave(final String room) {
+        public void leave(final String room) throws Failure {
             left.add(room);
         }
 
@@ -141,7 +151,7 @@ class RoomRehearsalTest {
         }
 
         @Override
-        public List<JsonNode> messages(final String room) {
+        public List<JsonNode> messages(final String room, final String back) {
             if (++reads > lag) {
                 pending.forEach(Runnable::run);
                 pending.clear();
@@ -173,6 +183,11 @@ class RoomRehearsalTest {
     }
 
     private static Outcome rehearse(final FakeRoom room, final List<RoomRehearsal.Task> tasks) {
+        return rehearse(room, tasks, Set.of());
+    }
+
+    private static Outcome rehearse(
+            final FakeRoom room, final List<RoomRehearsal.Task> tasks, final Set<String> persons) {
         final long[] now = {0};
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final boolean held =
@@ -180,6 +195,7 @@ class RoomRehearsalTest {
                                 room,
                                 "!room:x",
                                 tasks,
+                                persons,
                                 room::talkLog,
                                 Duration.ofSeconds(10),
                                 Duration.ofSeconds(4),
@@ -201,7 +217,7 @@ class RoomRehearsalTest {
         assertThat(outcome.held()).as("the run, said: " + outcome.said()).isTrue();
         assertThat(outcome.said().lines())
                 .as("one OK line per scenario")
-                .hasSize(9)
+                .hasSize(10)
                 .allMatch(line -> line.startsWith("OK   "));
         assertThat(outcome.said())
                 .as("each display named whole beside the other")
@@ -367,13 +383,20 @@ class RoomRehearsalTest {
     }
 
     /**
-     * Harm guarded: a helper that writes into the room unnoticed, where only persons and tasks do.
+     * Harm guarded: a helper that writes into the room unnoticed, where only persons, tasks and the
+     * relay answering for a local agent do.
      */
     @Test
-    void aHelpersLineFails() {
+    void aHelpersLineSinceTheRunBeganFails() {
         final FakeRoom room = new FakeRoom();
-        room.members.add("@porelo-relay-demo.bob:x");
-        room.add("!room:x", "@porelo-relay-demo.bob:x", "a line");
+        room.members.add("@porelo.bob:x");
+        room.answering =
+                line -> {
+                    if (line.text().startsWith("order one")) {
+                        room.add("!room:x", "@porelo.bob:x", "a line");
+                    }
+                    return FakeRoom.woken(line);
+                };
 
         final Outcome outcome = rehearse(room);
 
@@ -381,7 +404,305 @@ class RoomRehearsalTest {
                 .as("the helper's line")
                 .contains(
                         "FAIL the room reads in order, with no stranger: read lines of accounts no"
-                                + " task or person holds: [@porelo-relay-demo.bob:x]");
+                                + " task or person holds: [@porelo.bob:x]");
+    }
+
+    /**
+     * Harm guarded: a busy room failed for what it held before the run, for its other persons, or
+     * for the login's relay writing a local agent's signed line.
+     */
+    @Test
+    void aBusyRoomHolds() {
+        final FakeRoom room = new FakeRoom();
+        room.add("!room:x", "@retired.bob:x", "a retired task's old line");
+        room.add("!room:x", "@ada:x", "an earlier line of another person");
+        room.members.addAll(Set.of("@ada:x", "@porelo-relay-demo.bob:x"));
+        room.answering =
+                line -> {
+                    if (line.text().startsWith("order one")) {
+                        room.add("!room:x", "@ada:x", "a line of hers meanwhile");
+                        room.rooms
+                                .get("!room:x")
+                                .add(
+                                        MatrixClient.JSON
+                                                .createObjectNode()
+                                                .put("type", "m.room.message")
+                                                .put("event_id", "$signed")
+                                                .put("sender", "@porelo-relay-demo.bob:x")
+                                                .set(
+                                                        "content",
+                                                        MatrixClient.JSON
+                                                                .createObjectNode()
+                                                                .put("msgtype", "m.text")
+                                                                .put("body", "a local agent's line")
+                                                                .put(Send.MESSAGE_FIELD, "{}")
+                                                                .put(Send.SIGNATURE_FIELD, "s")));
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room, TASKS, Set.of("@ada:x"));
+
+        assertThat(outcome.held()).as("the run, said: " + outcome.said()).isTrue();
+    }
+
+    /** Harm guarded: another person's line in the room passed without being named. */
+    @Test
+    void aPersonNotNamedWhoWritesDuringTheRunFails() {
+        final FakeRoom room = new FakeRoom();
+        room.members.add("@ada:x");
+        room.answering =
+                line -> {
+                    if (line.text().startsWith("order one")) {
+                        room.add("!room:x", "@ada:x", "a line of hers");
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .as("the person not named")
+                .contains("read lines of accounts no task or person holds: [@ada:x]");
+    }
+
+    /** Harm guarded: another login's helper in the room passed as one of the room's own. */
+    @Test
+    void anotherLoginsHelperIsAStranger() {
+        final FakeRoom room = new FakeRoom();
+        room.members.addAll(
+                Set.of("@porelo.eve:x", "@porelo-relay-demo.eve:x", "@porelo-relay-.bob:x"));
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .as("the other login's helpers")
+                .contains(
+                        "read members no task, person or helper is: [@porelo-relay-.bob:x,"
+                                + " @porelo-relay-demo.eve:x, @porelo.eve:x]");
+    }
+
+    /** Harm guarded: a pill dropped on the way, so the line wakes every task, reported as held. */
+    @Test
+    void aPillThatWakesEveryTaskFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering = line -> FakeRoom.woken(new Line(line.text(), List.of(), line.directTo()));
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .as("the pill's line")
+                .contains(
+                        "FAIL a pill alone names one task: asked Agent Pi alone, got answers"
+                                + " within 4 s from Agent Pi-Two, Agent Core");
+    }
+
+    /** Harm guarded: a line read back twice taken for lines in order. */
+    @Test
+    void aLineReadTwiceFails() {
+        final FakeRoom room =
+                new FakeRoom() {
+                    @Override
+                    public List<JsonNode> messages(final String in, final String back) {
+                        final List<JsonNode> read = new ArrayList<>(super.messages(in, back));
+                        if (!read.isEmpty()
+                                && read.getLast()
+                                        .path("content")
+                                        .path("body")
+                                        .asText()
+                                        .startsWith("order two")) {
+                            read.add(read.getLast());
+                        }
+                        return read;
+                    }
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .as("the line read twice")
+                .containsPattern(
+                        "FAIL the room reads in order, with no stranger: posted \\$e\\d+ then");
+    }
+
+    /**
+     * Harm guarded: a run that fails one way for every line goes on to the end, since each failure
+     * names its own event.
+     */
+    @Test
+    void theSameFailureForAnotherLineStopsTheRun() {
+        final FakeRoom room = new FakeRoom();
+        room.delivering = (task, line) -> task != CORE;
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said().lines().filter(l -> l.startsWith("FAIL ")))
+                .as("one failure, then its repeat")
+                .hasSize(2);
+        assertThat(outcome.said().strip()).endsWith("STOP the same failure twice in a row");
+    }
+
+    /** Harm guarded: a line for every task waiting once per task, so a run takes hours. */
+    @Test
+    void aLineForEveryTaskWaitsOnce() {
+        final FakeRoom room = new FakeRoom();
+        final long[] now = {0};
+        final long[] asked = {-1};
+        room.answering =
+                line -> {
+                    final boolean forAll =
+                            line.text().contains("All agents")
+                                    || line.mentions().contains("@room")
+                                    || (line.text().startsWith("answer with")
+                                            && line.mentions().isEmpty());
+                    if (forAll && asked[0] < 0) {
+                        asked[0] = now[0];
+                    }
+                    return forAll ? List.of() : FakeRoom.woken(line);
+                };
+
+        new RoomRehearsal(
+                        room,
+                        "!room:x",
+                        TASKS,
+                        Set.of(),
+                        room::talkLog,
+                        Duration.ofSeconds(10),
+                        Duration.ofSeconds(4),
+                        () -> now[0],
+                        () -> now[0] += Duration.ofSeconds(2).toNanos(),
+                        new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8))
+                .runAll();
+
+        assertThat(Duration.ofNanos(now[0] - asked[0]))
+                .as("two lines for every task waited, then stopped: one answer time each")
+                .isLessThanOrEqualTo(Duration.ofSeconds(24));
+    }
+
+    /** Harm guarded: the chat a direct step opened left open when its step fails. */
+    @Test
+    void theDirectChatIsLeftWhenItsStepFails() {
+        final FakeRoom room = new FakeRoom();
+        room.delivering = (task, line) -> line.directTo().isEmpty();
+
+        rehearse(room);
+
+        assertThat(room.left).as("the chat the failed step opened").containsExactly("!dm:x");
+    }
+
+    /** Harm guarded: the chat a direct step opened left open when its step throws. */
+    @Test
+    void theDirectChatIsLeftWhenItsStepThrows() {
+        final FakeRoom room = new FakeRoom();
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final long[] now = {0};
+
+        new RoomRehearsal(
+                        room,
+                        "!room:x",
+                        TASKS,
+                        Set.of(),
+                        task -> {
+                            if (room.rooms.containsKey("!dm:x")) {
+                                throw new Failure(Exit.TEMPORARY, "talk log of " + task + " down");
+                            }
+                            return room.talkLog(task);
+                        },
+                        Duration.ofSeconds(10),
+                        Duration.ofSeconds(4),
+                        () -> now[0],
+                        () -> now[0] += Duration.ofSeconds(2).toNanos(),
+                        new PrintStream(out, true, StandardCharsets.UTF_8))
+                .runAll();
+
+        assertThat(room.left).as("the chat the step opened").containsExactly("!dm:x");
+        assertThat(out.toString(StandardCharsets.UTF_8))
+                .as("what the step said")
+                .contains("FAIL a direct chat reaches one task: talk log of pi down");
+    }
+
+    /** Harm guarded: an interrupted wait going on, or ending the run without a failure said. */
+    @Test
+    void anInterruptedPauseIsAFailure() {
+        Thread.currentThread().interrupt();
+        try {
+            final Failure stopped = catchThrowableOfType(Failure.class, RoomRehearsal::sleep);
+
+            assertThat(stopped).as("the stop").isNotNull();
+            assertThat(stopped.exitCode()).as("its exit").isEqualTo(Exit.TEMPORARY);
+            assertThat(Thread.currentThread().isInterrupted()).as("the interrupt kept").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    /** Harm guarded: a task named twice, so the rehearsal judges it against itself. */
+    @Test
+    void aTaskNamedTwiceIsRefused() {
+        for (final String second :
+                List.of(
+                        "pi=@pi-other.bob:x=Agent Other",
+                        "other=@pi.bob:x=Agent Other",
+                        "other=@other.bob:x=Agent Pi")) {
+            final Failure refused =
+                    catchThrowableOfType(
+                            Failure.class,
+                            () ->
+                                    RoomRehearsal.Arguments.parse(
+                                            new String[] {
+                                                "--socket",
+                                                "/s",
+                                                "--room",
+                                                "!r:x",
+                                                "--task",
+                                                "pi=@pi.bob:x=Agent Pi",
+                                                "--task",
+                                                second,
+                                                "--talk-log",
+                                                "true"
+                                            }));
+            assertThat(refused).as("refused: " + second).isNotNull();
+            assertThat(refused.exitCode()).as("the refusal of " + second).isEqualTo(Exit.USAGE);
+        }
+        final Failure person =
+                catchThrowableOfType(
+                        Failure.class,
+                        () ->
+                                RoomRehearsal.Arguments.parse(
+                                        new String[] {
+                                            "--socket",
+                                            "/s",
+                                            "--room",
+                                            "!r:x",
+                                            "--task",
+                                            "pi=@pi.bob:x=Agent Pi",
+                                            "--task",
+                                            "core=@core.bob:x=Agent Core",
+                                            "--person",
+                                            "@pi.bob:x",
+                                            "--talk-log",
+                                            "true"
+                                        }));
+        assertThat(person).as("a task named as a person").isNotNull();
+    }
+
+    /** Harm guarded: one task given twice judged as two, a head named beside itself. */
+    @Test
+    void tasksCompareByValue() {
+        final FakeRoom room = new FakeRoom();
+        final List<RoomRehearsal.Task> twice =
+                List.of(
+                        PI,
+                        new RoomRehearsal.Task(PI.name(), PI.account(), PI.display()),
+                        PI_TWO,
+                        CORE);
+
+        final Outcome outcome = rehearse(room, twice, Set.of());
+
+        assertThat(outcome.held()).as("the run, said: " + outcome.said()).isTrue();
+        assertThat(outcome.said())
+                .as("no head named beside itself")
+                .doesNotContain("Agent Pi whole, beside Agent Pi\n");
     }
 
     /** Harm guarded: lines read back in another order than they were sent. */
@@ -390,8 +711,8 @@ class RoomRehearsalTest {
         final FakeRoom room =
                 new FakeRoom() {
                     @Override
-                    public List<JsonNode> messages(final String in) {
-                        final List<JsonNode> read = new ArrayList<>(super.messages(in));
+                    public List<JsonNode> messages(final String in, final String back) {
+                        final List<JsonNode> read = new ArrayList<>(super.messages(in, back));
                         if (read.size() >= 2
                                 && read.getLast()
                                         .path("content")
@@ -507,5 +828,665 @@ class RoomRehearsalTest {
                         Duration.ofSeconds(15));
 
         assertThat(log.of("pi").strip()).as("the last line").endsWith("pi");
+    }
+
+    /** A line of {@code sender} with {@code content} added to the room. */
+    private static void line(
+            final FakeRoom room, final String sender, final String id, final JsonNode content) {
+        room.rooms
+                .computeIfAbsent("!room:x", r -> new ArrayList<>())
+                .add(
+                        MatrixClient.JSON
+                                .createObjectNode()
+                                .put("type", "m.room.message")
+                                .put("event_id", id)
+                                .put("sender", sender)
+                                .set("content", content));
+    }
+
+    private static com.fasterxml.jackson.databind.node.ObjectNode text(final String body) {
+        return MatrixClient.JSON.createObjectNode().put("msgtype", "m.text").put("body", body);
+    }
+
+    /**
+     * Harm guarded: a room where "All agents" or @room is lost on the way passes, since a line that
+     * names nobody wakes every task anyway.
+     */
+    @Test
+    void aLineForAllThatWakesOnlyTheTaskNamedFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line ->
+                        FakeRoom.woken(
+                                new Line(
+                                        line.text().replace("All agents", "x"),
+                                        line.mentions().stream()
+                                                .filter(m -> !m.equals("@room"))
+                                                .toList(),
+                                        line.directTo()));
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .as("the lines for all, their heads naming one task")
+                .contains(
+                        "FAIL All agents: wakes every task: asked every task, got no answer within"
+                                + " 10 s from Agent Pi-Two, Agent Core")
+                .contains(
+                        "FAIL @room wakes every task: asked every task, got no answer within"
+                                + " 10 s from Agent Pi-Two, Agent Core");
+    }
+
+    /** Harm guarded: a relay's unsigned line passed as a local agent's. */
+    @Test
+    void aRelaysUnsignedLineFails() {
+        final FakeRoom room = new FakeRoom();
+        room.members.add("@porelo-relay-demo.bob:x");
+        room.answering =
+                line -> {
+                    if (line.text().startsWith("order one")) {
+                        room.add("!room:x", "@porelo-relay-demo.bob:x", "unsigned");
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains(
+                        "read lines of accounts no task or person holds: [@porelo-relay-demo.bob:x]");
+    }
+
+    /** Harm guarded: a second person's own helpers failed as strangers. */
+    @Test
+    void aNamedPersonsHelpersHold() {
+        final FakeRoom room = new FakeRoom();
+        room.members.addAll(Set.of("@ada:x", "@porelo.ada:x", "@porelo-relay-demo.ada:x"));
+
+        final Outcome outcome = rehearse(room, TASKS, Set.of("@ada:x"));
+
+        assertThat(outcome.held()).as("the run, said: " + outcome.said()).isTrue();
+    }
+
+    /** Harm guarded: an account that is no task answering a line meant for one task, unnoticed. */
+    @Test
+    void anAccountNoTaskHoldsAnsweringALineFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line -> {
+                    final java.util.regex.Matcher asked = ASKED.matcher(line.text());
+                    if (asked.find()) {
+                        room.add("!room:x", "@retired.bob:x", "done " + asked.group(1));
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains(
+                        "FAIL a head names one task: asked Agent Pi alone, got answers within 4 s"
+                                + " from @retired.bob:x");
+    }
+
+    /** Harm guarded: a task answering one line twice reported as answering it. */
+    @Test
+    void aTaskAnsweringTwiceFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line -> {
+                    final List<RoomRehearsal.Task> woken = FakeRoom.woken(line);
+                    return woken.size() == 1 ? List.of(woken.getFirst(), woken.getFirst()) : woken;
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains("FAIL a head names one task: asked Agent Pi once, it answered 2 times");
+    }
+
+    /**
+     * Harm guarded: another task's answer missed because its poll took the line late, after the
+     * quiet time had passed.
+     */
+    @Test
+    void anotherTasksLateAnswerIsWaitedFor() {
+        final FakeRoom room = new FakeRoom();
+        room.delivering = (task, line) -> task != CORE || !line.directTo().isEmpty();
+        final int[] asked = {0};
+        final Outcome outcome =
+                rehearseWith(
+                        room,
+                        task -> {
+                            if (task.equals("core") && ++asked[0] >= 3) {
+                                // Core's poll takes every line now, and answers the one named.
+                                for (final JsonNode line : List.copyOf(room.rooms.get("!room:x"))) {
+                                    final String id =
+                                            RoomRehearsal.messageId(line.path("event_id").asText());
+                                    final java.util.regex.Matcher said =
+                                            ASKED.matcher(
+                                                    line.path("content").path("body").asText());
+                                    if (room.logs
+                                                    .computeIfAbsent("core", n -> new HashSet<>())
+                                                    .add(id)
+                                            && said.find()) {
+                                        room.add(
+                                                "!room:x", CORE.account(), "done " + said.group(1));
+                                    }
+                                }
+                            }
+                            return room.talkLog(task);
+                        });
+
+        assertThat(outcome.said())
+                .contains(
+                        "FAIL a head names one task: asked Agent Pi alone, got answers within 4 s"
+                                + " from Agent Core");
+    }
+
+    /** Harm guarded: an edit, a thread's line or a redacted line taken for the task's answer. */
+    @Test
+    void onlyANewTextLineAnswers() {
+        for (final String kind : List.of("m.replace", "m.thread", "redacted")) {
+            final FakeRoom room = new FakeRoom();
+            room.answering =
+                    line -> {
+                        final java.util.regex.Matcher asked = ASKED.matcher(line.text());
+                        if (line.text().startsWith("Agent Pi:") && asked.find()) {
+                            final var content =
+                                    kind.equals("redacted")
+                                            ? MatrixClient.JSON.createObjectNode()
+                                            : text("done " + asked.group(1));
+                            if (!kind.equals("redacted")) {
+                                content.putObject("m.relates_to")
+                                        .put("rel_type", kind)
+                                        .put("event_id", "$older");
+                            }
+                            line(room, PI.account(), "$" + kind, content);
+                            return List.of();
+                        }
+                        return FakeRoom.woken(line);
+                    };
+
+            final Outcome outcome = rehearse(room);
+
+            assertThat(outcome.said())
+                    .as(kind)
+                    .contains(
+                            "FAIL a head names one task: asked Agent Pi in the room, got no answer");
+        }
+    }
+
+    /** Harm guarded: a direct line answered aloud in the project's room, unnoticed. */
+    @Test
+    void aDirectLineAnsweredInTheRoomFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line -> {
+                    if (!line.directTo().isEmpty()) {
+                        final java.util.regex.Matcher asked = ASKED.matcher(line.text());
+                        if (asked.find()) {
+                            room.add("!room:x", PI.account(), "done " + asked.group(1));
+                        }
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains(
+                        "FAIL a direct chat reaches one task: asked Agent Pi directly, the room got"
+                                + " its answer from [@pi.bob:x]");
+    }
+
+    /** Harm guarded: an interrupted run going on through the scenarios left. */
+    @Test
+    void anInterruptStopsTheRun() {
+        final FakeRoom room = new FakeRoom();
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            new RoomRehearsal(
+                            room,
+                            "!room:x",
+                            TASKS,
+                            Set.of(),
+                            room::talkLog,
+                            Duration.ofSeconds(10),
+                            Duration.ofSeconds(4),
+                            () -> 0L,
+                            () -> {
+                                Thread.currentThread().interrupt();
+                                throw new Failure(Exit.TEMPORARY, "interrupted while waiting");
+                            },
+                            new PrintStream(out, true, StandardCharsets.UTF_8))
+                    .runAll();
+        } finally {
+            Thread.interrupted();
+        }
+
+        assertThat(out.toString(StandardCharsets.UTF_8).lines())
+                .as("one failure, then the stop")
+                .containsExactly(
+                        "FAIL a head names one task: interrupted while waiting",
+                        "STOP interrupted");
+    }
+
+    /** Harm guarded: a failure printing the session's token, or spilling over several lines. */
+    @Test
+    void aFailureIsOneLineWithNothingOfTheSession() {
+        final FakeRoom room =
+                new FakeRoom() {
+                    @Override
+                    public String scrub(final String text) {
+                        return text.replace("syt_secret", "<token>");
+                    }
+                };
+
+        final Outcome outcome =
+                rehearseWith(
+                        room,
+                        task -> {
+                            throw new Failure(
+                                    Exit.TEMPORARY, "talk log said\nBearer syt_secret\nand more");
+                        });
+
+        assertThat(outcome.said())
+                .contains("FAIL a head names one task: talk log said Bearer <token> and more\n")
+                .doesNotContain("syt_secret");
+    }
+
+    private static Outcome rehearseWith(final FakeRoom room, final RoomRehearsal.TalkLog log) {
+        final long[] now = {0};
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final boolean held =
+                new RoomRehearsal(
+                                room,
+                                "!room:x",
+                                TASKS,
+                                Set.of(),
+                                log,
+                                Duration.ofSeconds(10),
+                                Duration.ofSeconds(4),
+                                () -> now[0],
+                                () -> now[0] += Duration.ofSeconds(2).toNanos(),
+                                new PrintStream(out, true, StandardCharsets.UTF_8))
+                        .runAll();
+        return new Outcome(held, out.toString(StandardCharsets.UTF_8));
+    }
+
+    private static Failure refusal(final String... extra) {
+        final List<String> args =
+                new ArrayList<>(
+                        List.of(
+                                "--socket",
+                                "/s",
+                                "--room",
+                                "!r:x",
+                                "--task",
+                                "pi=@pi.bob:x=Agent Pi",
+                                "--task",
+                                "core=@core.bob:x=Agent Core"));
+        args.addAll(List.of(extra));
+        args.addAll(List.of("--talk-log", "true"));
+        return catchThrowableOfType(
+                Failure.class, () -> RoomRehearsal.Arguments.parse(args.toArray(String[]::new)));
+    }
+
+    /**
+     * Harm guarded: an argument given twice silently replacing the first, or a display or person
+     * the room cannot hold, so a room that behaves fails.
+     */
+    @Test
+    void argumentsTheRunCannotUseAreRefused() {
+        for (final List<String> extra :
+                List.of(
+                        List.of("--room", "!other:x"),
+                        List.of("--socket", "/t"),
+                        List.of("--answer-within", "5", "--answer-within", "6"),
+                        List.of("--quiet-for", "5", "--quiet-for", "6"),
+                        List.of("--person", "@ada:x", "--person", "@ada:x"),
+                        List.of("--person", "@porelo.bob:x"),
+                        List.of("--person", "@porelo:x"),
+                        List.of("--person", "@pi.bob:x"),
+                        List.of("--person", "@ada:elsewhere"),
+                        List.of("--task", "x=@x.bob:x=Agent: X"),
+                        List.of("--task", "x=@x.bob:x= Agent X"),
+                        List.of("--task", "x=@x.bob:x=Agent X\u200b"),
+                        List.of("--task", "x=@x.bob:x=Pi"))) {
+            final Failure refused = refusal(extra.toArray(String[]::new));
+            assertThat(refused).as("refused: " + extra).isNotNull();
+            assertThat(refused.exitCode()).as("its exit: " + extra).isEqualTo(Exit.USAGE);
+        }
+        assertThat(refusal("--person", "@ada:x", "--task", "x=@x.bob:x=Agent X (short)"))
+                .as("a person and a display with its short name")
+                .isNull();
+    }
+
+    /**
+     * Harm guarded: a line for every task answered twice by one, or by an account no task holds.
+     */
+    @Test
+    void aLineForEveryTaskAnsweredTwiceOrByAStrangerFails() {
+        for (final boolean stranger : List.of(false, true)) {
+            final FakeRoom room = new FakeRoom();
+            room.answering =
+                    line -> {
+                        final List<RoomRehearsal.Task> woken = FakeRoom.woken(line);
+                        if (woken.size() > 1) {
+                            final java.util.regex.Matcher asked = ASKED.matcher(line.text());
+                            if (asked.find()) {
+                                room.add(
+                                        "!room:x",
+                                        stranger ? "@retired.bob:x" : CORE.account(),
+                                        "done " + asked.group(1));
+                            }
+                        }
+                        return woken;
+                    };
+
+            final Outcome outcome = rehearse(room);
+
+            assertThat(outcome.said())
+                    .as(stranger ? "a stranger" : "twice")
+                    .contains(
+                            stranger
+                                    ? "FAIL All agents: wakes every task: asked every task,"
+                                            + " answered by no task asked: [@retired.bob:x]"
+                                    : "FAIL All agents: wakes every task: asked every task,"
+                                            + " answered twice by Agent Core");
+        }
+    }
+
+    /** Harm guarded: a direct line answered twice, or by someone else in the chat, held. */
+    @Test
+    void aDirectLineAnsweredTwiceFails() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line -> {
+                    final List<RoomRehearsal.Task> woken = FakeRoom.woken(line);
+                    return line.directTo().isEmpty()
+                            ? woken
+                            : List.of(woken.getFirst(), woken.getFirst());
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains(
+                        "FAIL a direct chat reaches one task: asked Agent Pi directly, answered"
+                                + " twice by Agent Pi");
+    }
+
+    /** Harm guarded: the room's history holding the nonce's letters failing a direct line. */
+    @Test
+    void aDirectLinesNonceInTheRoomsHistoryDoesNotCount() {
+        final FakeRoom room = new FakeRoom();
+        room.answering =
+                line -> {
+                    if (!line.directTo().isEmpty()) {
+                        // Written before the run's first line, as an old line of the room.
+                        final java.util.regex.Matcher asked = ASKED.matcher(line.text());
+                        asked.find();
+                        room.rooms
+                                .get("!room:x")
+                                .addFirst(
+                                        MatrixClient.JSON
+                                                .createObjectNode()
+                                                .put("type", "m.room.message")
+                                                .put("event_id", "$old")
+                                                .put("sender", "@ada:x")
+                                                .set("content", text("an old " + asked.group(1))));
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said()).contains("OK   a direct chat reaches one task");
+    }
+
+    /** Harm guarded: a relay's line with empty signature fields passed as signed. */
+    @Test
+    void aRelaysLineWithEmptySignatureFieldsFails() {
+        final FakeRoom room = new FakeRoom();
+        room.members.add("@porelo-relay-demo.bob:x");
+        room.answering =
+                line -> {
+                    if (line.text().startsWith("order one")) {
+                        line(
+                                room,
+                                "@porelo-relay-demo.bob:x",
+                                "$empty",
+                                text("signed?")
+                                        .put(Send.MESSAGE_FIELD, "")
+                                        .put(Send.SIGNATURE_FIELD, ""));
+                    }
+                    return FakeRoom.woken(line);
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .contains(
+                        "read lines of accounts no task or person holds: [@porelo-relay-demo.bob:x]");
+    }
+
+    /** Harm guarded: the room's helpers failed on a server whose name holds a dot. */
+    @Test
+    void aServerNameWithADotHoldsItsHelpers() {
+        final java.util.function.UnaryOperator<String> dotted = id -> id.replace(":x", ":foo.org");
+        final List<RoomRehearsal.Task> tasks =
+                TASKS.stream()
+                        .map(
+                                task ->
+                                        new RoomRehearsal.Task(
+                                                task.name(),
+                                                dotted.apply(task.account()),
+                                                task.display()))
+                        .toList();
+        final FakeRoom room = new FakeRoom();
+        final RoomRehearsal.Room onDotted =
+                new RoomRehearsal.Room() {
+                    @Override
+                    public String say(final String in, final String text, final List<String> m) {
+                        return room.say(
+                                in,
+                                text,
+                                m.stream().map(id -> id.replace(":foo.org", ":x")).toList());
+                    }
+
+                    @Override
+                    public RoomRehearsal.Posted direct(final String user, final String text) {
+                        return room.direct(user.replace(":foo.org", ":x"), text);
+                    }
+
+                    @Override
+                    public void leave(final String in) throws Failure {
+                        room.leave(in);
+                    }
+
+                    @Override
+                    public List<JsonNode> messages(final String in, final String back) {
+                        return room.messages(in, back).stream()
+                                .map(
+                                        m ->
+                                                (JsonNode)
+                                                        ((com.fasterxml.jackson.databind.node
+                                                                                .ObjectNode)
+                                                                        m.deepCopy())
+                                                                .put(
+                                                                        "sender",
+                                                                        dotted.apply(
+                                                                                m.path("sender")
+                                                                                        .asText())))
+                                .toList();
+                    }
+
+                    @Override
+                    public Set<String> members(final String in) {
+                        final Set<String> members = new HashSet<>();
+                        room.members(in).forEach(id -> members.add(dotted.apply(id)));
+                        members.addAll(
+                                Set.of(
+                                        "@ada:foo.org",
+                                        "@porelo:foo.org",
+                                        "@porelo.bob:foo.org",
+                                        "@porelo.ada:foo.org",
+                                        "@porelo-relay-demo.ada:foo.org"));
+                        return members;
+                    }
+                };
+        final long[] now = {0};
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        final boolean held =
+                new RoomRehearsal(
+                                onDotted,
+                                "!room:x",
+                                tasks,
+                                Set.of("@ada:foo.org"),
+                                room::talkLog,
+                                Duration.ofSeconds(10),
+                                Duration.ofSeconds(4),
+                                () -> now[0],
+                                () -> now[0] += Duration.ofSeconds(2).toNanos(),
+                                new PrintStream(out, true, StandardCharsets.UTF_8))
+                        .runAll();
+
+        assertThat(held).as("the run, said: " + out.toString(StandardCharsets.UTF_8)).isTrue();
+    }
+
+    /** Harm guarded: two lines answered with one event id taken for two in order. */
+    @Test
+    void twoLinesWithOneIdFail() {
+        final FakeRoom room =
+                new FakeRoom() {
+                    @Override
+                    public String say(final String in, final String text, final List<String> m) {
+                        if (text.startsWith("order two")) {
+                            return rooms.get(in).getLast().path("event_id").asText();
+                        }
+                        return super.say(in, text, m);
+                    }
+                };
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .containsPattern("FAIL the room reads in order, with no stranger: posted");
+    }
+
+    /** Harm guarded: a direct chat left open when the thread was interrupted during its step. */
+    @Test
+    void theDirectChatIsLeftWhenTheStepIsInterrupted() {
+        final FakeRoom room =
+                new FakeRoom() {
+                    @Override
+                    public void leave(final String in) throws Failure {
+                        if (!Thread.currentThread().isInterrupted()) {
+                            super.leave(in);
+                        }
+                    }
+                };
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final long[] now = {0};
+        try {
+            new RoomRehearsal(
+                            room,
+                            "!room:x",
+                            TASKS,
+                            Set.of(),
+                            task -> {
+                                if (room.rooms.containsKey("!dm:x")) {
+                                    Thread.currentThread().interrupt();
+                                    throw new Failure(Exit.TEMPORARY, "interrupted");
+                                }
+                                return room.talkLog(task);
+                            },
+                            Duration.ofSeconds(10),
+                            Duration.ofSeconds(4),
+                            () -> now[0],
+                            () -> now[0] += Duration.ofSeconds(2).toNanos(),
+                            new PrintStream(out, true, StandardCharsets.UTF_8))
+                    .runAll();
+
+            assertThat(Thread.currentThread().isInterrupted()).as("the interrupt kept").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+
+        assertThat(room.left).as("the chat left").containsExactly("!dm:x");
+        assertThat(out.toString(StandardCharsets.UTF_8)).endsWith("STOP interrupted\n");
+    }
+
+    /** Harm guarded: a login named porelo-something taken for a helper and refused as a person. */
+    @Test
+    void aPersonsLoginIsTheLoginRule() {
+        assertThat(refusal("--person", "@porelo2:x")).as("a login like any other").isNull();
+        assertThat(refusal("--person", "@porelo-x:x")).as("Porelo's own").isNotNull();
+    }
+
+    /** Harm guarded: the leave's failure hiding why the direct step failed. */
+    @Test
+    void aFailedDirectStepSaysItsOwnFailureWhenTheLeaveFailsToo() {
+        final FakeRoom room =
+                new FakeRoom() {
+                    @Override
+                    public void leave(final String in) throws Failure {
+                        throw new Failure(Exit.TEMPORARY, "leave refused");
+                    }
+                };
+        room.delivering = (task, line) -> line.directTo().isEmpty();
+
+        final Outcome outcome = rehearse(room);
+
+        assertThat(outcome.said())
+                .containsPattern(
+                        "FAIL a direct chat reaches one task: posted --matrix-person-[0-9a-f-]{36}"
+                                + "\\.json, talk log lacks it")
+                .doesNotContain("leave refused");
+    }
+
+    /** Harm guarded: a talk log left running on the host side when the run is interrupted. */
+    @Test
+    @Timeout(20)
+    void anInterruptedTalkLogIsEnded() throws Exception {
+        final java.nio.file.Path pid = java.nio.file.Files.createTempFile("talk-log", ".pid");
+        try {
+            final RoomRehearsal.TalkLog log =
+                    RoomRehearsal.command(
+                            List.of("sh", "-c", "echo $$ > " + pid + "; exec sleep 30", "sh"),
+                            Duration.ofSeconds(15));
+            final Thread caller = Thread.currentThread();
+            Thread.ofVirtual()
+                    .start(
+                            () -> {
+                                try {
+                                    while (java.nio.file.Files.size(pid) == 0) {
+                                        Thread.sleep(20);
+                                    }
+                                    Thread.sleep(100);
+                                } catch (final Exception ex) {
+                                    return;
+                                }
+                                caller.interrupt();
+                            });
+
+            final Failure stopped = catchThrowableOfType(Failure.class, () -> log.of("pi"));
+            Thread.interrupted();
+
+            assertThat(stopped).as("the stop").isNotNull();
+            final long id = Long.parseLong(java.nio.file.Files.readString(pid).strip());
+            final var process = ProcessHandle.of(id);
+            if (process.isPresent()) {
+                process.get().onExit().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            assertThat(ProcessHandle.of(id).map(ProcessHandle::isAlive).orElse(false))
+                    .as("the talk log ended")
+                    .isFalse();
+        } finally {
+            java.nio.file.Files.deleteIfExists(pid);
+        }
     }
 }

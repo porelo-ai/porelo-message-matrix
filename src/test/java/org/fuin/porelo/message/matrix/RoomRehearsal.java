@@ -22,11 +22,12 @@ import org.jspecify.annotations.Nullable;
  * in the room. Ships in no package.
  *
  * <p>Run with the test classpath as {@code RoomRehearsal --socket <path> --room <!room-id>
- * [--answer-within <s>] [--quiet-for <s>] --task <task>=<@account>=<display> ... --talk-log
- * <command...>}; the task's name is appended to the {@code talk log} command, which runs on the
- * host as the person (for instance {@code ssh <person>@<host> porelo talk log}). One line per
- * scenario, {@code OK} or {@code FAIL}, with what was asked and what came back; exit 0 only when
- * every scenario held.
+ * [--answer-within <s>] [--quiet-for <s>] --task <task>=<@account>=<display> ... [--person
+ * <@account> ...] --talk-log <command...>}; the task's name is appended to the {@code talk log}
+ * command, which runs on the host as the person (for instance {@code ssh <person>@<host> porelo
+ * talk log}). {@code --person} names a further person of the room, whose lines and membership are
+ * no stranger's. One line per scenario, {@code OK} or {@code FAIL}, with what was asked and what
+ * came back; exit 0 only when every scenario held.
  */
 final class RoomRehearsal {
 
@@ -39,11 +40,19 @@ final class RoomRehearsal {
         /** Opens an unencrypted direct chat with {@code user} and posts {@code text} there. */
         Posted direct(String user, String text) throws Failure;
 
-        /** The room's text messages, oldest first. */
-        List<JsonNode> messages(String room) throws Failure;
+        /**
+         * The room's text messages, oldest first, read back until {@code back} is among them, or to
+         * the room's start when it is null.
+         */
+        List<JsonNode> messages(String room, @Nullable String back) throws Failure;
 
-        /** The accounts joined to the room. */
+        /** The accounts joined to the room or invited to it. */
         Set<String> members(String room) throws Failure;
+
+        /** {@code text} with nothing of the person's session in it, as the run may print it. */
+        default String scrub(final String text) {
+            return text;
+        }
 
         /** Leaves the room, as a person closes a chat. */
         default void leave(final String room) throws Failure {}
@@ -51,6 +60,12 @@ final class RoomRehearsal {
 
     /** A line posted, and the room it went to. */
     record Posted(String room, String event) {}
+
+    /** Waits between two reads of the room. */
+    @FunctionalInterface
+    interface Pause {
+        void run() throws Failure;
+    }
 
     /** The record a task keeps of what reached it, as {@code porelo talk log} prints it. */
     @FunctionalInterface
@@ -67,16 +82,21 @@ final class RoomRehearsal {
             if (parts.length != 3
                     || !TASK_NAME.matcher(parts[0]).matches()
                     || !ACCOUNT.matcher(parts[1]).matches()
-                    || parts[2].isBlank()
-                    || parts[2].chars().anyMatch(Character::isISOControl)) {
+                    || !DISPLAY.matcher(parts[2]).matches()) {
                 throw new Failure(
                         Exit.USAGE,
                         "--task takes <task>=<@account>=<display>, the task named by"
-                                + " [a-z0-9][a-z0-9._-]*");
+                                + " [a-z0-9][a-z0-9._-]*, the display as the room shows a task"
+                                + " (Agent <Name> or Agent <Name> (<short>))");
             }
             return new Task(parts[0], parts[1], parts[2]);
         }
     }
+
+    /** A task's display as porelo reads it in a head, so a line naming it names it alone. */
+    private static final Pattern DISPLAY =
+            Pattern.compile(
+                    "Agent [\\p{L}\\p{N}_]+(?:-[\\p{L}\\p{N}_]+)*(?: \\([\\p{L}\\p{N}_.-]+\\))?");
 
     private static final Pattern TASK_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,127}");
 
@@ -87,31 +107,39 @@ final class RoomRehearsal {
 
     private static final long POLL_NANOS = TimeUnit.SECONDS.toNanos(2);
 
+    /** A Matrix event id, or a talk log's name for one: what differs between two runs of a step. */
+    private static final Pattern EVENT =
+            Pattern.compile("\\$[A-Za-z0-9._~+/=:-]+|--matrix-person-[0-9a-f-]{36}\\.json");
+
     private final Room room;
     private final String roomId;
     private final List<Task> tasks;
+    private final Set<String> persons;
     private final TalkLog talkLog;
     private final Duration answerWithin;
     private final Duration quietFor;
     private final LongSupplier clock;
-    private final Runnable pause;
+    private final Pause pause;
     private final PrintStream out;
     private @Nullable String lastFailure;
+    private @Nullable String firstLine;
     private boolean held = true;
 
     RoomRehearsal(
             final Room room,
             final String roomId,
             final List<Task> tasks,
+            final Set<String> persons,
             final TalkLog talkLog,
             final Duration answerWithin,
             final Duration quietFor,
             final LongSupplier clock,
-            final Runnable pause,
+            final Pause pause,
             final PrintStream out) {
         this.room = room;
         this.roomId = roomId;
         this.tasks = List.copyOf(tasks);
+        this.persons = Set.copyOf(persons);
         this.talkLog = talkLog;
         this.answerWithin = answerWithin;
         this.quietFor = quietFor;
@@ -133,26 +161,44 @@ final class RoomRehearsal {
         try {
             final Arguments given = Arguments.parse(args);
             try (RehearsalClient client = new RehearsalClient(given.socket(), out)) {
-                client.step("sign-in");
-                final boolean held =
-                        new RoomRehearsal(
-                                        client,
-                                        given.room(),
-                                        given.tasks(),
-                                        command(given.talkLog(), Duration.ofSeconds(60)),
-                                        given.answerWithin(),
-                                        given.quietFor(),
-                                        System::nanoTime,
-                                        RoomRehearsal::sleep,
-                                        out)
-                                .runAll();
-                client.step("log-out");
-                return held ? Exit.OK : Exit.DATA;
+                try {
+                    return rehearse(client, given, out);
+                } catch (final Failure ex) {
+                    err.println(
+                            "FAILED: " + client.scrub(ex.getMessage()).replaceAll("\\p{Cc}+", " "));
+                    return ex.exitCode();
+                }
             }
         } catch (final Failure ex) {
-            err.println("FAILED: " + ex.getMessage());
+            err.println("FAILED: " + String.valueOf(ex.getMessage()).replaceAll("\\p{Cc}+", " "));
             return ex.exitCode();
         }
+    }
+
+    private static int rehearse(
+            final RehearsalClient client, final Arguments given, final PrintStream out)
+            throws Failure {
+        client.step("sign-in");
+        client.step("join " + given.room());
+        final boolean held =
+                new RoomRehearsal(
+                                client,
+                                given.room(),
+                                given.tasks(),
+                                given.persons(),
+                                command(given.talkLog(), Duration.ofSeconds(60)),
+                                given.answerWithin(),
+                                given.quietFor(),
+                                System::nanoTime,
+                                RoomRehearsal::sleep,
+                                out)
+                        .runAll();
+        if (Thread.currentThread().isInterrupted()) {
+            // close() logs out with the interrupt set aside; a step would fail on it first.
+            return Exit.TEMPORARY;
+        }
+        client.step("log-out");
+        return held ? Exit.OK : Exit.DATA;
     }
 
     /** Every scenario, in order; false when any did not hold or the run stopped on a repeat. */
@@ -177,10 +223,14 @@ final class RoomRehearsal {
                                         first.display() + ": " + ask(nonce),
                                         List.of(first.account()),
                                         nonce)));
+        scenarios.add(
+                new Scenario(
+                        "a pill alone names one task",
+                        nonce -> named(first, ask(nonce), List.of(first.account()), nonce)));
         boolean prefixed = false;
         for (final Task longer : tasks) {
             for (final Task shorter : tasks) {
-                if (longer != shorter && longer.display().startsWith(shorter.display())) {
+                if (!longer.equals(shorter) && longer.display().startsWith(shorter.display())) {
                     prefixed = true;
                     for (final Task meant : List.of(longer, shorter)) {
                         scenarios.add(
@@ -188,7 +238,8 @@ final class RoomRehearsal {
                                         "a head names "
                                                 + meant.display()
                                                 + " whole, beside "
-                                                + (meant == longer ? shorter : longer).display(),
+                                                + (meant.equals(longer) ? shorter : longer)
+                                                        .display(),
                                         nonce ->
                                                 named(
                                                         meant,
@@ -202,11 +253,19 @@ final class RoomRehearsal {
         scenarios.add(
                 new Scenario(
                         "All agents: wakes every task",
-                        nonce -> every("All agents: " + ask(nonce), List.of(), nonce)));
+                        nonce ->
+                                every(
+                                        first.display() + ", All agents: " + ask(nonce),
+                                        List.of(),
+                                        nonce)));
         scenarios.add(
                 new Scenario(
                         "@room wakes every task",
-                        nonce -> every("@room " + ask(nonce), List.of("@room"), nonce)));
+                        nonce ->
+                                every(
+                                        first.display() + ": @room " + ask(nonce),
+                                        List.of("@room"),
+                                        nonce)));
         scenarios.add(
                 new Scenario(
                         "a line naming nobody wakes every task",
@@ -248,10 +307,17 @@ final class RoomRehearsal {
             lastFailure = null;
             return true;
         }
+        // One line per scenario, and nothing of the session even when the homeserver echoed it.
+        failure = room.scrub(failure).replaceAll("\\p{Cc}+", " ");
         out.println("FAIL " + scenario.name() + ": " + failure);
         held = false;
-        final boolean repeated = failure.equals(lastFailure);
-        lastFailure = failure;
+        if (Thread.currentThread().isInterrupted()) {
+            out.println("STOP interrupted");
+            return false;
+        }
+        final String kind = EVENT.matcher(failure).replaceAll("<event>");
+        final boolean repeated = kind.equals(lastFailure);
+        lastFailure = kind;
         if (repeated) {
             out.println("STOP the same failure twice in a row");
         }
@@ -267,12 +333,17 @@ final class RoomRehearsal {
     private @Nullable String named(
             final Task task, final String text, final List<String> mentions, final String nonce)
             throws Failure {
-        final String event = room.say(roomId, text, mentions);
+        final String event = say(text, mentions);
         if (awaitAnswer(roomId, event, task, nonce) == null) {
             return "asked "
                     + task.display()
                     + " in the room, got no answer within "
                     + seconds(answerWithin);
+        }
+        // Every task has the line before the quiet time starts, so a late poll's answer is seen.
+        final String lacking = undelivered(event, tasks);
+        if (lacking != null) {
+            return lacking;
         }
         final List<String> others = answeredWithin(roomId, event, task, nonce);
         if (!others.isEmpty()) {
@@ -283,37 +354,100 @@ final class RoomRehearsal {
                     + " from "
                     + String.join(", ", others);
         }
-        return undelivered(event, tasks);
+        final long answers = answers(room.messages(roomId, event), event, task, nonce);
+        return answers == 1
+                ? null
+                : "asked " + task.display() + " once, it answered " + answers + " times";
     }
 
-    /** Every task answers the line, and every task's record shows it delivered. */
+    /**
+     * Every task answers the line within one answer time, and every task's record shows it
+     * delivered.
+     */
     private @Nullable String every(
             final String text, final List<String> mentions, final String nonce) throws Failure {
-        final String event = room.say(roomId, text, mentions);
-        final List<String> silent = new ArrayList<>();
-        for (final Task task : tasks) {
-            if (awaitAnswer(roomId, event, task, nonce) == null) {
-                silent.add(task.display());
+        final String event = say(text, mentions);
+        final List<Task> silent = new ArrayList<>(tasks);
+        final long deadline = clock.getAsLong() + answerWithin.toNanos();
+        List<JsonNode> messages;
+        while (true) {
+            final List<JsonNode> read = room.messages(roomId, event);
+            messages = read;
+            silent.removeIf(task -> answer(read, event, task, nonce) != null);
+            if (silent.isEmpty() || clock.getAsLong() - deadline >= 0) {
+                break;
             }
+            pause.run();
         }
         if (!silent.isEmpty()) {
             return "asked every task, got no answer within "
                     + seconds(answerWithin)
                     + " from "
-                    + String.join(", ", silent);
+                    + String.join(", ", silent.stream().map(Task::display).toList());
         }
-        return undelivered(event, tasks);
+        final String wrong = onceEach(answersTo(messages, event, nonce), tasks);
+        return wrong != null ? "asked every task, " + wrong : undelivered(event, tasks);
+    }
+
+    /** Null when each of {@code these} answered once and nobody else answered, else who did not. */
+    private static @Nullable String onceEach(final List<JsonNode> answers, final List<Task> these) {
+        final List<String> twice = new ArrayList<>();
+        final List<String> strangers = new ArrayList<>();
+        for (final Task task : these) {
+            if (answers.stream()
+                            .filter(a -> a.path("sender").asText().equals(task.account()))
+                            .count()
+                    > 1) {
+                twice.add(task.display());
+            }
+        }
+        for (final JsonNode answer : answers) {
+            final String sender = answer.path("sender").asText();
+            if (these.stream().noneMatch(task -> task.account().equals(sender))
+                    && !strangers.contains(sender)) {
+                strangers.add(sender);
+            }
+        }
+        if (!twice.isEmpty()) {
+            return "answered twice by " + String.join(", ", twice);
+        }
+        return strangers.isEmpty() ? null : "answered by no task asked: " + strangers;
+    }
+
+    /** Posts a line in the project's room, the first of them marking where the run began. */
+    private String say(final String text, final List<String> mentions) throws Failure {
+        final String event = room.say(roomId, text, mentions);
+        if (firstLine == null) {
+            firstLine = event;
+        }
+        return event;
     }
 
     /** {@code task} answers in the direct chat, and only its record has the line. */
     private @Nullable String direct(final Task task, final String nonce) throws Failure {
         final Posted posted =
                 room.direct(task.account(), "Only for " + task.display() + ": " + ask(nonce));
+        boolean held = false;
         try {
-            return directAnswered(task, nonce, posted);
+            final String failure = directAnswered(task, nonce, posted);
+            held = failure == null;
+            return failure;
         } finally {
-            // Closed as a person closes it, so no later run's answer goes into this chat.
-            room.leave(posted.room());
+            // Closed as a person closes it, so no later run's answer goes into this chat; an
+            // interrupt would stop the leave before it reached the homeserver.
+            final boolean interrupted = Thread.interrupted();
+            try {
+                room.leave(posted.room());
+            } catch (final Failure ex) {
+                // A step that failed reports its own failure, not the leave's.
+                if (held) {
+                    throw ex;
+                }
+            } finally {
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
     }
 
@@ -332,9 +466,31 @@ final class RoomRehearsal {
         // Another task's poll may come later than the answer; it is read once the quiet time
         // passed.
         waitOut(quietFor);
+        final String wrong =
+                onceEach(
+                        answersTo(
+                                room.messages(posted.room(), posted.event()),
+                                posted.event(),
+                                nonce),
+                        List.of(task));
+        if (wrong != null) {
+            return "asked " + task.display() + " directly, " + wrong;
+        }
+        if (firstLine != null) {
+            final List<String> aloud =
+                    answersTo(room.messages(roomId, firstLine), firstLine, nonce).stream()
+                            .map(m -> m.path("sender").asText())
+                            .toList();
+            if (!aloud.isEmpty()) {
+                return "asked "
+                        + task.display()
+                        + " directly, the room got its answer from "
+                        + aloud;
+            }
+        }
         final String id = messageId(posted.event());
         for (final Task other : tasks) {
-            if (other != task && delivered(talkLog.of(other.name()), id)) {
+            if (!other.equals(task) && delivered(talkLog.of(other.name()), id)) {
                 return "asked "
                         + task.display()
                         + " directly, talk log of "
@@ -347,45 +503,68 @@ final class RoomRehearsal {
     }
 
     /**
-     * The posted lines in the order they were sent; every sender a task or the person, every member
-     * one of them or a helper of the room on the person's server, which reads but never writes.
+     * The posted lines in the order they were sent, each once; since the run's first line every
+     * sender a task, a person of the room or a relay of a person's login with a local agent's
+     * signed line, and every member one of them or a helper of a person's login.
      */
     private @Nullable String readsInOrder(final String nonce) throws Failure {
-        final String one = room.say(roomId, "order one " + nonce, List.of());
+        final String one = say("order one " + nonce, List.of());
         final String two = room.say(roomId, "order two " + nonce, List.of());
-        final List<JsonNode> messages = room.messages(roomId);
+        final String since = firstLine == null ? one : firstLine;
+        final List<JsonNode> messages = room.messages(roomId, since);
         final List<String> ids = messages.stream().map(m -> m.path("event_id").asText()).toList();
-        if (ids.indexOf(one) < 0 || ids.indexOf(two) < ids.indexOf(one)) {
+        if (ids.indexOf(since) < 0
+                || ids.indexOf(one) < 0
+                || ids.indexOf(two) <= ids.indexOf(one)
+                || new java.util.HashSet<>(ids).size() != ids.size()) {
             return "posted " + one + " then " + two + ", read " + ids;
         }
         final String person = messages.get(ids.indexOf(one)).path("sender").asText();
-        final Set<String> known = new java.util.HashSet<>(Set.of(person));
+        final String server = person.substring(person.indexOf(':') + 1);
+        final Set<String> known = new java.util.HashSet<>(persons);
+        known.add(person);
         tasks.forEach(task -> known.add(task.account()));
+        final Set<String> logins = new java.util.HashSet<>();
+        persons.forEach(id -> logins.add(id.substring(1, id.indexOf(':'))));
+        logins.add(person.substring(1, person.indexOf(':')));
         final Set<String> senders = new java.util.TreeSet<>();
-        messages.forEach(m -> senders.add(m.path("sender").asText()));
-        senders.removeAll(known);
+        for (final JsonNode line : messages.subList(ids.indexOf(since), messages.size())) {
+            final String sender = line.path("sender").asText();
+            if (!known.contains(sender)
+                    && !(signed(line) && logins.stream().anyMatch(l -> relay(sender, server, l)))) {
+                senders.add(sender);
+            }
+        }
         if (!senders.isEmpty()) {
             return "read lines of accounts no task or person holds: " + senders;
         }
-        final String server = person.substring(person.indexOf(':') + 1);
         final Set<String> strangers = new java.util.TreeSet<>(room.members(roomId));
         strangers.removeAll(known);
-        strangers.removeIf(id -> helper(id, server));
+        strangers.removeIf(id -> logins.stream().anyMatch(l -> helper(id, server, l)));
         return strangers.isEmpty()
                 ? null
                 : "read members no task, person or helper is: " + strangers;
     }
 
-    /** The room's own accounts, as the transport names them: its maker, a login's, a relay. */
-    private static boolean helper(final String id, final String server) {
-        final String suffix = ":" + server;
-        if (!id.startsWith("@") || !id.endsWith(suffix)) {
-            return false;
-        }
-        final String local = id.substring(1, id.length() - suffix.length());
-        return "porelo".equals(local)
-                || local.startsWith("porelo.")
-                || local.startsWith("porelo-relay-");
+    /** The room's own accounts of the person's login, as the transport names them. */
+    private static boolean helper(final String id, final String server, final String login) {
+        return id.equals("@porelo:" + server)
+                || id.equals("@porelo." + login + ":" + server)
+                || relay(id, server, login);
+    }
+
+    /** A line a local agent signed, as the relay writes it into the room. */
+    private static boolean signed(final JsonNode line) {
+        return !line.path("content").path(Send.MESSAGE_FIELD).asText("").isEmpty()
+                && !line.path("content").path(Send.SIGNATURE_FIELD).asText("").isEmpty();
+    }
+
+    /** A relay of a login, which writes a local agent's signed line into the room. */
+    private static boolean relay(final String id, final String server, final String login) {
+        final String suffix = "." + login + ":" + server;
+        return id.startsWith("@porelo-relay-")
+                && id.endsWith(suffix)
+                && id.length() > "@porelo-relay-".length() + suffix.length();
     }
 
     /**
@@ -446,7 +625,7 @@ final class RoomRehearsal {
             throws Failure {
         final long deadline = clock.getAsLong() + answerWithin.toNanos();
         while (true) {
-            final JsonNode answer = answer(room.messages(in), line, task, nonce);
+            final JsonNode answer = answer(room.messages(in, line), line, task, nonce);
             if (answer != null || clock.getAsLong() - deadline >= 0) {
                 return answer;
             }
@@ -456,16 +635,36 @@ final class RoomRehearsal {
 
     private static @Nullable JsonNode answer(
             final List<JsonNode> messages, final String line, final Task task, final String nonce) {
+        return answersTo(messages, line, nonce).stream()
+                .filter(event -> event.path("sender").asText().equals(task.account()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static long answers(
+            final List<JsonNode> messages, final String line, final Task task, final String nonce) {
+        return answersTo(messages, line, nonce).stream()
+                .filter(event -> event.path("sender").asText().equals(task.account()))
+                .count();
+    }
+
+    /**
+     * The lines after {@code line} that carry the nonce, each a new text of the room's timeline: an
+     * edit, a thread's line or a redacted one answers nothing.
+     */
+    private static List<JsonNode> answersTo(
+            final List<JsonNode> messages, final String line, final String nonce) {
+        final List<JsonNode> answers = new ArrayList<>();
         boolean after = false;
         for (final JsonNode event : messages) {
-            if (after
-                    && event.path("sender").asText().equals(task.account())
-                    && event.path("content").path("body").asText("").contains(nonce)) {
-                return event;
+            if (after && RehearsalClient.plainText(event)) {
+                if (event.path("content").path("body").asText("").contains(nonce)) {
+                    answers.add(event);
+                }
             }
             after |= event.path("event_id").asText("").equals(line);
         }
-        return null;
+        return answers;
     }
 
     /** The other tasks that answered the line within the quiet time, read at its end. */
@@ -473,15 +672,23 @@ final class RoomRehearsal {
             final String in, final String line, final Task asked, final String nonce)
             throws Failure {
         waitOut(quietFor);
-        final List<JsonNode> messages = room.messages(in);
-        return tasks.stream()
-                .filter(task -> task != asked)
-                .filter(task -> answer(messages, line, task, nonce) != null)
-                .map(Task::display)
-                .toList();
+        final List<String> others = new ArrayList<>();
+        for (final JsonNode answer : answersTo(room.messages(in, line), line, nonce)) {
+            final String sender = answer.path("sender").asText();
+            final String shown =
+                    tasks.stream()
+                            .filter(task -> task.account().equals(sender))
+                            .map(Task::display)
+                            .findFirst()
+                            .orElse(sender);
+            if (!sender.equals(asked.account()) && !others.contains(shown)) {
+                others.add(shown);
+            }
+        }
+        return others;
     }
 
-    private void waitOut(final Duration window) {
+    private void waitOut(final Duration window) throws Failure {
         final long end = clock.getAsLong() + window.toNanos();
         while (clock.getAsLong() - end < 0) {
             pause.run();
@@ -496,12 +703,12 @@ final class RoomRehearsal {
         return duration.toSeconds() + " s";
     }
 
-    private static void sleep() {
+    static void sleep() throws Failure {
         try {
             Thread.sleep(Duration.ofNanos(POLL_NANOS));
         } catch (final InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("interrupted while waiting for an answer", ex);
+            throw new Failure(Exit.TEMPORARY, "interrupted while waiting for an answer", ex);
         }
     }
 
@@ -511,9 +718,10 @@ final class RoomRehearsal {
             final List<String> argv = new ArrayList<>(prefix);
             argv.add(task);
             Path said = null;
+            Process process = null;
             try {
                 said = Files.createTempFile("talk-log", ".txt");
-                final Process process =
+                process =
                         new ProcessBuilder(argv)
                                 .redirectErrorStream(true)
                                 .redirectOutput(said.toFile())
@@ -547,6 +755,9 @@ final class RoomRehearsal {
                 throw new Failure(
                         Exit.TEMPORARY, "talk log of " + task + ": " + ex.getMessage(), ex);
             } catch (final InterruptedException ex) {
+                if (process != null) {
+                    process.destroyForcibly();
+                }
                 Thread.currentThread().interrupt();
                 throw new Failure(Exit.TEMPORARY, "interrupted during talk log of " + task, ex);
             } finally {
@@ -567,6 +778,7 @@ final class RoomRehearsal {
             Path socket,
             String room,
             List<Task> tasks,
+            Set<String> persons,
             List<String> talkLog,
             Duration answerWithin,
             Duration quietFor) {
@@ -575,16 +787,34 @@ final class RoomRehearsal {
             Path socket = null;
             String room = null;
             final List<Task> tasks = new ArrayList<>();
+            final Set<String> persons = new java.util.LinkedHashSet<>();
             final List<String> talkLog = new ArrayList<>();
             long answer = 300;
             long quiet = 60;
+            boolean answerGiven = false;
+            boolean quietGiven = false;
             for (int i = 0; i < args.length; i++) {
                 switch (args[i]) {
-                    case "--socket" -> socket = Path.of(value(args, ++i));
-                    case "--room" -> room = value(args, ++i);
+                    case "--socket" -> socket = Path.of(once(socket, args, ++i));
+                    case "--room" -> room = once(room, args, ++i);
                     case "--task" -> tasks.add(Task.parse(value(args, ++i)));
-                    case "--answer-within" -> answer = bounded(value(args, ++i));
-                    case "--quiet-for" -> quiet = bounded(value(args, ++i));
+                    case "--person" -> {
+                        final String person = value(args, ++i);
+                        if (!ACCOUNT.matcher(person).matches()
+                                || !Login.valid(person.substring(1, person.indexOf(':')))
+                                || !persons.add(person)) {
+                            throw new Failure(
+                                    Exit.USAGE, "--person takes an @account, each once: " + person);
+                        }
+                    }
+                    case "--answer-within" -> {
+                        answer = bounded(once(answerGiven ? "" : null, args, ++i));
+                        answerGiven = true;
+                    }
+                    case "--quiet-for" -> {
+                        quiet = bounded(once(quietGiven ? "" : null, args, ++i));
+                        quietGiven = true;
+                    }
                     case "--talk-log" -> {
                         talkLog.addAll(List.of(args).subList(i + 1, args.length));
                         i = args.length;
@@ -601,15 +831,56 @@ final class RoomRehearsal {
                         Exit.USAGE,
                         "usage: RoomRehearsal --socket <path> --room <!room-id> [--answer-within <s>]"
                                 + " [--quiet-for <s>] --task <task>=<@account>=<display> (two or more)"
-                                + " --talk-log <command...>");
+                                + " [--person <@account>...] --talk-log <command...>");
             }
+            distinct(tasks, persons);
             return new Arguments(
                     socket,
                     room,
                     tasks,
+                    persons,
                     talkLog,
                     Duration.ofSeconds(answer),
                     Duration.ofSeconds(quiet));
+        }
+
+        /**
+         * No task named twice by name, account or display, no person who is a task, and every
+         * account on one server.
+         */
+        private static void distinct(final List<Task> tasks, final Set<String> persons)
+                throws Failure {
+            final Set<String> servers = new java.util.HashSet<>();
+            tasks.forEach(
+                    task -> servers.add(task.account().substring(task.account().indexOf(':'))));
+            persons.forEach(person -> servers.add(person.substring(person.indexOf(':'))));
+            if (servers.size() != 1) {
+                throw new Failure(Exit.USAGE, "--task and --person name accounts of one server");
+            }
+            final Set<String> names = new java.util.HashSet<>();
+            final Set<String> accounts = new java.util.HashSet<>(persons);
+            final Set<String> displays = new java.util.HashSet<>();
+            for (final Task task : tasks) {
+                if (!names.add(task.name())
+                        || !accounts.add(task.account())
+                        || !displays.add(task.display())) {
+                    throw new Failure(
+                            Exit.USAGE,
+                            "--task names "
+                                    + task.name()
+                                    + " a second time, by its name, account or display, or"
+                                    + " as a --person");
+                }
+            }
+        }
+
+        /** The option's value, refused when the option was given before. */
+        private static String once(final @Nullable Object before, final String[] args, final int i)
+                throws Failure {
+            if (before != null) {
+                throw new Failure(Exit.USAGE, args[i - 1] + " is given once");
+            }
+            return value(args, i);
         }
 
         private static String value(final String[] args, final int i) throws Failure {

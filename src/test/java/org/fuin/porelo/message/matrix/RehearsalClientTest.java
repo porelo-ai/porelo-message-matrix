@@ -231,7 +231,9 @@ class RehearsalClientTest {
             final Run run = run(socket, "sign-in\npost !r:x " + dir.resolve("missing") + "\n");
 
             assertThat(run.exit()).as("the run's exit").isEqualTo(Exit.DATA);
-            assertThat(run.err()).as("the failed step").startsWith("FAILED: post !r:x ");
+            assertThat(run.err())
+                    .as("the failed step, by its keyword")
+                    .startsWith("FAILED: post: cannot read ");
             assertThat(gate.requests)
                     .as("the session logged out after the failure")
                     .anyMatch(
@@ -533,6 +535,642 @@ class RehearsalClientTest {
 
             assertThat(run.exit()).as("the run's exit").isEqualTo(Exit.USAGE);
             assertThat(run.err()).as("the refusal").contains("seconds must be 0 to 3600");
+        }
+    }
+
+    /** A page of {@code events}, newest first, and the token of the next older page, if any. */
+    private static String page(final List<String> events, final String end) {
+        return "{\"chunk\":["
+                + String.join(",", events)
+                + "]"
+                + (end.isEmpty() ? "" : ",\"end\":\"" + end + "\"")
+                + "}";
+    }
+
+    /**
+     * Harm guarded: a line hidden behind a page of later events, so its answer is never seen, and
+     * other events than messages crowding the page.
+     */
+    @Test
+    void aReadPagesBackToTheLineAndAsksOnlyForMessages() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("wake"), "Agent Pi: are you there?");
+        final List<String> later = new java.util.ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            later.add(event("$x" + i, "@ada:x"));
+        }
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                                return json(200, "{\"event_id\":\"$line\"}");
+                            }
+                            if (request.contains("/messages?") && request.contains("from=t2")) {
+                                return json(200, page(List.of(event("$old", "@pi:x")), ""));
+                            }
+                            if (request.contains("/messages?") && request.contains("from=t1")) {
+                                return json(
+                                        200,
+                                        page(
+                                                List.of(
+                                                        event("$a", "@pi:x"),
+                                                        event("$line", "@bob:x")),
+                                                "t2"));
+                            }
+                            if (request.contains("/messages?")) {
+                                return json(200, page(later, "t1"));
+                            }
+                            return signing.apply(request);
+                        })) {
+            final Run run =
+                    run(
+                            socket,
+                            "sign-in\npost !r:x " + line + "\nwait-answer !r:x @pi:x 0\nlog-out\n");
+
+            assertThat(run.exit()).as("answered, stderr: " + run.err()).isZero();
+            assertThat(run.out())
+                    .as("the answer behind the later page")
+                    .contains("\"step\":\"wait-answer\",\"room\":\"!r:x\",\"event\":\"$a\"");
+            assertThat(gate.requests)
+                    .as("each read asks for messages only, and stops at the line")
+                    .filteredOn(r -> r.contains("/messages?"))
+                    .hasSize(2)
+                    .allMatch(
+                            r ->
+                                    r.contains(
+                                            "&filter="
+                                                    + MatrixClient.segment(
+                                                            "{\"types\":[\"m.room.message\"]}")));
+        }
+    }
+
+    /** Harm guarded: a line the room does not hold waited on as if it might still be answered. */
+    @Test
+    void aLineTheRoomDoesNotHoldFailsTheWait() throws Exception {
+        final Run run = waitFor("[" + event("$a1", "@pi:x") + "]");
+
+        assertThat(run.exit()).as("the line is not in the room").isEqualTo(Exit.DATA);
+        assertThat(run.err()).as("what was read").contains("$line not in it");
+    }
+
+    /** Harm guarded: a room's lines given as many answers, unlike every other step's one. */
+    @Test
+    void aReadAnswersOneLineWithTheRoomsMessages() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Function<String, String> room =
+                roomGate("[" + event("$b", "@pi:x") + "," + event("$a", "@bob:x") + "]");
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request ->
+                                request.contains("/joined_members")
+                                        ? json(
+                                                200,
+                                                "{\"joined\":{\"@pi:x\":{\"display_name\":"
+                                                        + "\"Agent Pi\"},\"@bob:x\":{}}}")
+                                        : room.apply(request))) {
+            final Run run = run(socket, "sign-in\nread !r:x\nlog-out\n");
+
+            assertThat(run.exit()).as("the run's exit, stderr: " + run.err()).isZero();
+            assertThat(run.out().lines().filter(l -> l.contains("\"step\":\"read\"")))
+                    .as("one answer, the messages oldest first")
+                    .containsExactly(
+                            "{\"step\":\"read\",\"room\":\"!r:x\",\"messages\":["
+                                    + "{\"event\":\"$a\",\"sender\":\"@bob:x\",\"display\":"
+                                    + "\"@bob:x\",\"body\":\"from @bob:x\"},"
+                                    + "{\"event\":\"$b\",\"sender\":\"@pi:x\",\"display\":"
+                                    + "\"Agent Pi\",\"body\":\"from @pi:x\"}]}");
+        }
+    }
+
+    /** Harm guarded: a join answered without its room taken for one. */
+    @Test
+    void aJoinNamesTheRoomOrFails() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        final String[] answer = {"{\"room_id\":\"!r:x\"}"};
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request ->
+                                request.startsWith("POST /_matrix/client/v3/join/")
+                                        ? json(200, answer[0])
+                                        : signing.apply(request))) {
+            final Run joined = run(socket, "sign-in\njoin #r:x\nlog-out\n");
+            assertThat(joined.out())
+                    .as("the room joined")
+                    .contains("{\"step\":\"join\",\"room\":\"!r:x\"}");
+            assertThat(gate.requests)
+                    .as("the room asked for")
+                    .anyMatch(
+                            r ->
+                                    r.startsWith(
+                                            "POST /_matrix/client/v3/join/"
+                                                    + MatrixClient.segment("#r:x")
+                                                    + " "));
+
+            answer[0] = "{}";
+            final Run refused = run(socket, "sign-in\njoin #r:x\n");
+            assertThat(refused.exit()).as("no room in the answer").isEqualTo(Exit.PROTOCOL);
+            assertThat(refused.err()).contains("join answered with no room_id");
+        }
+    }
+
+    /** Harm guarded: a direct chat opened other than as an unencrypted chat with that member. */
+    @Test
+    void aDirectChatIsOneUnencryptedChatWithTheMember() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("line"), "only for you");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.startsWith("POST /_matrix/client/v3/createRoom")) {
+                                return json(200, "{\"room_id\":\"!dm:x\"}");
+                            }
+                            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                                return json(200, "{\"event_id\":\"$d\"}");
+                            }
+                            if (request.contains("/leave")) {
+                                return json(200, "{}");
+                            }
+                            return signing.apply(request);
+                        })) {
+            final Run run = run(socket, "sign-in\ndirect @pi:x " + line + "\nlog-out\n");
+
+            assertThat(run.out())
+                    .as("the chat and the line")
+                    .contains("{\"step\":\"direct\",\"room\":\"!dm:x\",\"event\":\"$d\"}");
+            final String create =
+                    gate.requests.stream()
+                            .filter(r -> r.startsWith("POST /_matrix/client/v3/createRoom"))
+                            .findFirst()
+                            .orElseThrow();
+            final var body =
+                    MatrixClient.JSON.readTree(create.substring(create.indexOf("\r\n\r\n") + 4));
+            assertThat(body.path("is_direct").asBoolean()).as("direct").isTrue();
+            assertThat(body.path("preset").asText()).isEqualTo("trusted_private_chat");
+            assertThat(body.path("invite").toString()).isEqualTo("[\"@pi:x\"]");
+            assertThat(body.has("initial_state")).as("no encryption asked").isFalse();
+        }
+    }
+
+    /** Harm guarded: a room's members read wrong, so a stranger passes or a member is missed. */
+    @Test
+    void theMembersAreTheJoinedOnes() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                        new ScriptedGate(
+                                socket,
+                                request -> {
+                                    if (request.contains("/joined_members")) {
+                                        return json(
+                                                200, "{\"joined\":{\"@pi:x\":{},\"@bob:x\":{}}}");
+                                    }
+                                    if (request.contains("/members?membership=invite")) {
+                                        return json(
+                                                200,
+                                                "{\"chunk\":[{\"type\":\"m.room.member\","
+                                                        + "\"state_key\":\"@eve:x\"}]}");
+                                    }
+                                    return signing.apply(request);
+                                });
+                RehearsalClient client =
+                        new RehearsalClient(
+                                socket,
+                                new PrintStream(
+                                        new ByteArrayOutputStream(),
+                                        true,
+                                        StandardCharsets.UTF_8))) {
+            client.step("sign-in");
+
+            assertThat(client.members("!r:x"))
+                    .as("the joined and the invited")
+                    .containsExactlyInAnyOrder("@pi:x", "@bob:x", "@eve:x");
+            assertThat(gate.requests)
+                    .anyMatch(
+                            r ->
+                                    r.startsWith(
+                                            "GET /_matrix/client/v3/rooms/"
+                                                    + MatrixClient.segment("!r:x")
+                                                    + "/joined_members "));
+        }
+    }
+
+    /** Harm guarded: a run interrupted while it waits leaves the person's session open. */
+    @Test
+    void anInterruptedRunStillLogsOut() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        try (ScriptedGate gate = new ScriptedGate(socket, signingGate(SIGNED_IN))) {
+            final RehearsalClient client =
+                    new RehearsalClient(
+                            socket,
+                            new PrintStream(
+                                    new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+            client.step("sign-in");
+            Thread.currentThread().interrupt();
+            try {
+                client.close();
+
+                assertThat(Thread.currentThread().isInterrupted())
+                        .as("the interrupt given back")
+                        .isTrue();
+            } finally {
+                Thread.interrupted();
+            }
+            assertThat(gate.requests)
+                    .as("the session logged out")
+                    .anyMatch(
+                            r ->
+                                    r.startsWith("POST /_matrix/client/v3/logout")
+                                            && r.contains("Bearer " + SESSION));
+        }
+    }
+
+    /** Harm guarded: steps ending with the session open, and a logout that failed said nowhere. */
+    @Test
+    void stepsEndingSignedInLogOutAndFailWhenThatFails() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        try (ScriptedGate gate = new ScriptedGate(socket, signingGate(SIGNED_IN))) {
+            final Run run = run(socket, "sign-in\n");
+
+            assertThat(run.exit()).as("logged out, stderr: " + run.err()).isZero();
+            assertThat(run.out()).as("no step asked for, none said").doesNotContain("log-out");
+            assertThat(gate.requests)
+                    .as("the session logged out")
+                    .anyMatch(r -> r.startsWith("POST /_matrix/client/v3/logout"));
+        }
+        final Path held = dir.resolve("held.sock");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        held,
+                        request ->
+                                request.startsWith("GET /_matrix/client/v3/account/whoami")
+                                        ? json(200, "{\"user_id\":\"@bob:x\"}")
+                                        : signing.apply(request))) {
+            final Run run = run(held, "sign-in\n");
+
+            assertThat(run.exit()).as("the session survived").isEqualTo(Exit.PROTOCOL);
+            assertThat(run.err())
+                    .as("what failed")
+                    .contains("FAILED: log-out at the end of the steps: logged out, but whoami");
+        }
+    }
+
+    /**
+     * A project's room behind the gate where the person's lines arrive and no task answers; it
+     * joins the person only when asked.
+     */
+    private static Function<String, String> silentRoom(final List<String> posted) {
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        return request -> {
+            if (request.startsWith("POST /_matrix/client/v3/join/")) {
+                return json(200, "{\"room_id\":\"!r:x\"}");
+            }
+            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                posted.addFirst(event("$p" + posted.size(), "@bob:x"));
+                return json(200, "{\"event_id\":\"$p" + (posted.size() - 1) + "\"}");
+            }
+            if (request.contains("/messages?")) {
+                return json(200, page(posted, ""));
+            }
+            if (request.contains("/joined_members")) {
+                return json(200, "{\"joined\":{\"@bob:x\":{}}}");
+            }
+            return signing.apply(request);
+        };
+    }
+
+    private Run rehearse(final Path socket, final String... tasks) {
+        return rehearseWithin(socket, "0", tasks);
+    }
+
+    private Run rehearseWithin(
+            final Path socket, final String answerWithin, final String... tasks) {
+        final List<String> args =
+                new java.util.ArrayList<>(
+                        List.of(
+                                "--socket",
+                                socket.toString(),
+                                "--room",
+                                "!r:x",
+                                "--answer-within",
+                                answerWithin,
+                                "--quiet-for",
+                                "0"));
+        for (final String task : tasks) {
+            args.add("--task");
+            args.add(task);
+        }
+        args.addAll(List.of("--talk-log", "sh", "-c", "true", "sh"));
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        final int exit =
+                RoomRehearsal.run(
+                        args.toArray(String[]::new),
+                        new PrintStream(out, true, StandardCharsets.UTF_8),
+                        new PrintStream(err, true, StandardCharsets.UTF_8));
+        return new Run(
+                exit, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Harm guarded: a failed rehearsal ending 0, a room the person was only invited to failed
+     * instead of joined, or the session left open after the run.
+     */
+    @Test
+    void aRehearsalJoinsFirstAndEndsLoggedOutWithTheExitOfItsFailure() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final List<String> posted = new CopyOnWriteArrayList<>();
+        try (ScriptedGate gate = new ScriptedGate(socket, silentRoom(posted))) {
+            final Run run =
+                    rehearse(socket, "pi=@pi.bob:x=Agent Pi", "core=@core.bob:x=Agent Core");
+
+            assertThat(run.exit()).as("the run's exit, stderr: " + run.err()).isEqualTo(Exit.DATA);
+            assertThat(run.out())
+                    .as("the failure and the stop")
+                    .contains(
+                            "FAIL a head names one task: asked Agent Pi in the room, got no answer")
+                    .contains("STOP the same failure twice in a row")
+                    .contains("\"step\":\"log-out\"");
+            final List<String> asked = gate.requests.stream().map(r -> r.split(" ")[1]).toList();
+            assertThat(asked.indexOf("/_matrix/client/v3/join/" + MatrixClient.segment("!r:x")))
+                    .as("joined before the first line")
+                    .isBetween(
+                            0,
+                            asked.indexOf(
+                                    asked.stream()
+                                            .filter(a -> a.contains("/send/"))
+                                            .findFirst()
+                                            .orElseThrow()));
+            assertThat(run.all()).as("no token in what the run says").doesNotContain(SESSION);
+        }
+    }
+
+    /** Harm guarded: a rehearsal judging a task against itself, after asking the host anything. */
+    @Test
+    void aRehearsalWithATaskNamedTwiceAsksNothing() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        try (ScriptedGate gate =
+                new ScriptedGate(socket, silentRoom(new CopyOnWriteArrayList<>()))) {
+            final Run run = rehearse(socket, "pi=@pi.bob:x=Agent Pi", "pi=@pi.bob:x=Agent Pi");
+
+            assertThat(run.exit()).as("the run's exit").isEqualTo(Exit.USAGE);
+            assertThat(run.err()).as("the refusal").contains("--task names pi a second time");
+            assertThat(gate.requests).as("nothing asked of the gate").isEmpty();
+        }
+    }
+
+    /** Harm guarded: a homeserver that echoes the session's token getting it printed. */
+    @Test
+    void aFailureEchoingTheTokenPrintsNoneOfIt() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("line"), "hello");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request ->
+                                request.startsWith("PUT /_matrix/client/v3/rooms/")
+                                        ? json(
+                                                400,
+                                                "{\"errcode\":\"M_UNKNOWN\",\"error\":\"bad Bearer "
+                                                        + SESSION
+                                                        + " and "
+                                                        + LOGIN_TOKEN
+                                                        + "\"}")
+                                        : signing.apply(request))) {
+            final Run run = run(socket, "sign-in\npost !r:x " + line + "\n");
+
+            assertThat(run.exit()).as("the run's exit").isNotZero();
+            assertThat(run.err()).as("the failure").contains("<token>");
+            assertThat(run.all())
+                    .as("no token in what the run says")
+                    .doesNotContain(SESSION)
+                    .doesNotContain(LOGIN_TOKEN);
+        }
+    }
+
+    /** Harm guarded: a homeserver naming the same page as the next one holding a read for ever. */
+    @Test
+    @org.junit.jupiter.api.Timeout(20)
+    void aPageNamingItselfAsTheNextEndsTheRead() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("wake"), "Agent Pi: are you there?");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                                return json(200, "{\"event_id\":\"$line\"}");
+                            }
+                            if (request.contains("/messages?")) {
+                                return json(200, page(List.of(event("$a", "@pi:x")), "t1"));
+                            }
+                            return signing.apply(request);
+                        })) {
+            final Run run =
+                    run(socket, "sign-in\npost !r:x " + line + "\nwait-answer !r:x @pi:x 0\n");
+
+            assertThat(run.exit()).as("the read ended").isEqualTo(Exit.DATA);
+            assertThat(gate.requests)
+                    .as("the page asked twice, not again")
+                    .filteredOn(r -> r.contains("/messages?"))
+                    .hasSize(2);
+        }
+    }
+
+    /** Harm guarded: a direct chat the steps did not leave stays open after the run. */
+    @Test
+    void aDirectChatLeftOpenByTheStepsIsLeftAtTheLogOut() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("line"), "only for you");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.startsWith("POST /_matrix/client/v3/createRoom")) {
+                                return json(200, "{\"room_id\":\"!dm:x\"}");
+                            }
+                            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                                return json(200, "{\"event_id\":\"$d\"}");
+                            }
+                            if (request.contains("/leave")) {
+                                return json(200, "{}");
+                            }
+                            return signing.apply(request);
+                        })) {
+            final Run run = run(socket, "sign-in\ndirect @pi:x " + line + "\n");
+
+            assertThat(run.exit()).as("the run's exit, stderr: " + run.err()).isZero();
+            final List<String> paths = gate.requests.stream().map(r -> r.split(" ")[1]).toList();
+            assertThat(paths)
+                    .as("the chat left before the logout")
+                    .containsSubsequence(
+                            "/_matrix/client/v3/rooms/" + MatrixClient.segment("!dm:x") + "/leave",
+                            "/_matrix/client/v3/logout");
+        }
+    }
+
+    /** Harm guarded: a read showing an edit, a thread's line or a redacted line as a line. */
+    @Test
+    void aReadShowsOnlyNewTextLines() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final String edit =
+                "{\"type\":\"m.room.message\",\"event_id\":\"$e\",\"sender\":\"@pi:x\","
+                        + "\"content\":{\"msgtype\":\"m.text\",\"body\":\"* fixed\","
+                        + "\"m.relates_to\":{\"rel_type\":\"m.replace\",\"event_id\":\"$a\"}}}";
+        final String redacted =
+                "{\"type\":\"m.room.message\",\"event_id\":\"$r\",\"sender\":\"@pi:x\","
+                        + "\"content\":{}}";
+        final String thread =
+                "{\"type\":\"m.room.message\",\"event_id\":\"$t\",\"sender\":\"@pi:x\","
+                        + "\"content\":{\"msgtype\":\"m.text\",\"body\":\"aside\","
+                        + "\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$a\"}}}";
+        final String empty =
+                "{\"type\":\"m.room.message\",\"event_id\":\"$n\",\"sender\":\"@pi:x\","
+                        + "\"content\":{\"msgtype\":\"m.text\"}}";
+        final Function<String, String> room =
+                roomGate(
+                        "["
+                                + edit
+                                + ","
+                                + redacted
+                                + ","
+                                + thread
+                                + ","
+                                + empty
+                                + ","
+                                + event("$a", "@bob:x")
+                                + "]");
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request ->
+                                request.contains("/joined_members")
+                                        ? json(200, "{\"joined\":{}}")
+                                        : room.apply(request))) {
+            final Run run = run(socket, "sign-in\nread !r:x\nlog-out\n");
+
+            assertThat(run.out())
+                    .as("only the new line")
+                    .contains("\"messages\":[{\"event\":\"$a\"")
+                    .doesNotContain("$e")
+                    .doesNotContain("$r")
+                    .doesNotContain("$t")
+                    .doesNotContain("$n");
+        }
+    }
+
+    /** Harm guarded: a direct chat left open when a later step fails. */
+    @Test
+    void aDirectChatIsLeftWhenALaterStepFails() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Path line = Files.writeString(dir.resolve("line"), "only for you");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.startsWith("POST /_matrix/client/v3/createRoom")) {
+                                return json(200, "{\"room_id\":\"!dm:x\"}");
+                            }
+                            if (request.startsWith("PUT /_matrix/client/v3/rooms/")) {
+                                return json(200, "{\"event_id\":\"$d\"}");
+                            }
+                            if (request.contains("/leave")) {
+                                return json(200, "{}");
+                            }
+                            return signing.apply(request);
+                        })) {
+            final Run run =
+                    run(
+                            socket,
+                            "sign-in\ndirect @pi:x "
+                                    + line
+                                    + "\npost !r:x "
+                                    + dir.resolve("missing")
+                                    + "\n");
+
+            assertThat(run.exit()).as("the later step failed").isEqualTo(Exit.DATA);
+            final List<String> paths = gate.requests.stream().map(r -> r.split(" ")[1]).toList();
+            assertThat(paths)
+                    .as("the chat left before the logout")
+                    .containsSubsequence(
+                            "/_matrix/client/v3/rooms/" + MatrixClient.segment("!dm:x") + "/leave",
+                            "/_matrix/client/v3/logout");
+        }
+    }
+
+    /** Harm guarded: a rehearsal printing the session's token when a step's answer echoes it. */
+    @Test
+    void aRehearsalsFailurePrintsNoToken() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final Function<String, String> signing = signingGate(SIGNED_IN);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request ->
+                                request.startsWith("POST /_matrix/client/v3/join/")
+                                        ? json(
+                                                403,
+                                                "{\"errcode\":\"M_FORBIDDEN\",\"error\":\"no, "
+                                                        + SESSION
+                                                        + "\"}")
+                                        : signing.apply(request))) {
+            final Run run =
+                    rehearse(socket, "pi=@pi.bob:x=Agent Pi", "core=@core.bob:x=Agent Core");
+
+            assertThat(run.exit()).as("the run's exit").isNotZero();
+            assertThat(run.err()).as("the failure").startsWith("FAILED: ").contains("<token>");
+            assertThat(run.all()).as("no token").doesNotContain(SESSION);
+        }
+    }
+
+    /** Harm guarded: an interrupted rehearsal failing at its log-out and leaving the session. */
+    @Test
+    @org.junit.jupiter.api.Timeout(30)
+    void anInterruptedRehearsalStopsAndLogsOut() throws Exception {
+        final Path socket = dir.resolve("gate.sock");
+        final List<String> posted = new CopyOnWriteArrayList<>();
+        final Thread caller = Thread.currentThread();
+        final Function<String, String> room = silentRoom(posted);
+        try (ScriptedGate gate =
+                new ScriptedGate(
+                        socket,
+                        request -> {
+                            if (request.contains("/messages?")) {
+                                caller.interrupt();
+                            }
+                            return room.apply(request);
+                        })) {
+            final Run run;
+            try {
+                run =
+                        rehearseWithin(
+                                socket,
+                                "30",
+                                "pi=@pi.bob:x=Agent Pi",
+                                "core=@core.bob:x=Agent Core");
+            } finally {
+                Thread.interrupted();
+            }
+
+            assertThat(run.exit())
+                    .as("the run's exit, said: " + run.all())
+                    .isEqualTo(Exit.TEMPORARY);
+            assertThat(run.out()).as("the stop").contains("STOP interrupted");
+            assertThat(run.err()).as("no failed log-out").isEmpty();
+            assertThat(gate.requests)
+                    .as("the session logged out")
+                    .anyMatch(r -> r.startsWith("POST /_matrix/client/v3/logout"));
         }
     }
 }

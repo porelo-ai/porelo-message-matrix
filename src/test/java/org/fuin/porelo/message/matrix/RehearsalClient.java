@@ -41,11 +41,23 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
 
     private static final Duration POLL = Duration.ofSeconds(2);
 
+    /** Only the room's messages are read back, so other events never crowd a line out. */
+    private static final String MESSAGES_ONLY = "{\"types\":[\"m.room.message\"]}";
+
+    private static final int PAGE = 100;
+
+    /** How many pages a read goes back at most, so a room's long history cannot hold the run. */
+    static final int PAGES = 100;
+
     private final MatrixClient gate;
     private final PrintStream out;
     private final LongSupplier clock;
     private @Nullable MatrixClient session;
     private final Map<String, String> lastPosted = new HashMap<>();
+    private final java.util.Set<String> directs = new java.util.LinkedHashSet<>();
+    private String sessionToken = "";
+    private String loginToken = "";
+    private boolean sayLogOut = true;
 
     /** The longest a step waits for an answer, so a mistyped limit cannot hold the run for days. */
     static final long LONGEST_WAIT_SECONDS = 3600;
@@ -95,19 +107,36 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
                 BufferedReader steps =
                         new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             for (String line = steps.readLine(); line != null; line = steps.readLine()) {
-                step = line.strip();
-                if (!step.isEmpty() && !step.startsWith("#")) {
-                    client.step(step);
+                final String given = line.strip();
+                // A line is named by its keyword only: its rest may be anything a caller typed.
+                step = given.split("\\s+")[0];
+                if (!given.isEmpty() && !given.startsWith("#")) {
+                    try {
+                        client.step(given);
+                    } catch (final Failure ex) {
+                        throw new Failure(ex.exitCode(), client.scrub(ex.getMessage()), ex);
+                    }
                 }
+            }
+            step = "log-out at the end of the steps";
+            try {
+                client.endSession();
+            } catch (final Failure ex) {
+                throw new Failure(ex.exitCode(), client.scrub(ex.getMessage()), ex);
             }
             return Exit.OK;
         } catch (final Failure ex) {
-            err.println("FAILED: " + step + ": " + ex.getMessage());
+            err.println("FAILED: " + step + ": " + said(ex.getMessage()));
             return ex.exitCode();
         } catch (final IOException ex) {
-            err.println("FAILED: " + step + ": standard input: " + ex.getMessage());
+            err.println("FAILED: " + step + ": standard input: " + said(ex.getMessage()));
             return Exit.TEMPORARY;
         }
+    }
+
+    /** What a failure says, on one line. */
+    private static String said(final @Nullable String text) {
+        return String.valueOf(text).replaceAll("\\p{Cc}+", " ");
     }
 
     void step(final String line) throws Failure {
@@ -142,6 +171,7 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         final String location = header(redirect.raw(), "Location");
         final String token =
                 redirect.statusCode() == 302 && location != null ? loginToken(location) : null;
+        loginToken = token == null ? "" : token;
         if (token == null || token.isEmpty()) {
             throw new Failure(
                     Exit.PROTOCOL,
@@ -162,6 +192,7 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         if (!access.isEmpty()) {
             // Kept before it is judged, so that a session issued with a wrong answer is logged out.
             session = gate.as(access);
+            sessionToken = access;
         }
         if (login.status() != 200 || access.isEmpty() || user.isEmpty()) {
             throw new Failure(
@@ -178,16 +209,20 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
 
     private void join(final String[] words) throws Failure {
         arguments(words, 1);
-        final String room =
+        answer("join").put("room", join(words[1]));
+        flush();
+    }
+
+    private String join(final String room) throws Failure {
+        final String joined =
                 signedIn()
                         .post(
-                                CLIENT + "join/" + MatrixClient.segment(words[1]),
+                                CLIENT + "join/" + MatrixClient.segment(room),
                                 MatrixClient.JSON.createObjectNode())
                         .path("room_id")
                         .asText("");
-        required(room, "join", "room_id");
-        answer("join").put("room", room);
-        flush();
+        required(joined, "join", "room_id");
+        return joined;
     }
 
     /**
@@ -223,14 +258,21 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         return event;
     }
 
-    /** Every member's text in the room, oldest first, with who sent it and as whom they show. */
+    /**
+     * Every member's text in the room, oldest first, with who sent it and as whom they show, as one
+     * answer.
+     */
     private void read(final String[] words) throws Failure {
         arguments(words, 1);
         final Map<String, String> names = displayNames(words[1]);
-        for (final JsonNode event : messages(words[1])) {
+        final ObjectNode answer = answer("read").put("room", words[1]);
+        final var read = answer.putArray("messages");
+        for (final JsonNode event : messages(words[1], null)) {
+            if (!plainText(event)) {
+                continue;
+            }
             final String sender = event.path("sender").asText();
-            answer("read")
-                    .put("room", words[1])
+            read.addObject()
                     .put("event", event.path("event_id").asText())
                     .put("sender", sender)
                     .put("display", names.getOrDefault(sender, sender))
@@ -258,14 +300,15 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         final String room =
                 signedIn().post(CLIENT + "createRoom", request).path("room_id").asText("");
         required(room, "createRoom", "room_id");
+        directs.add(room);
         try {
             return new RoomRehearsal.Posted(room, say(room, text, List.of()));
-        } catch (final Failure failure) {
+        } catch (final Failure | RuntimeException failure) {
             // Not left open, so no later answer of the task goes into it.
             try {
                 leave(room);
             } catch (final Failure ignored) {
-                // The line's failure is what the run reports.
+                // The line's failure is what the run reports; close() tries the leave again.
             }
             throw failure;
         }
@@ -293,7 +336,7 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
         }
         final long deadline = clock.getAsLong() + Duration.ofSeconds(seconds).toNanos();
         while (true) {
-            final JsonNode answer = answerAfter(messages(room), line, words[2]);
+            final JsonNode answer = answerAfter(messages(room, line), line, words[2]);
             if (answer != null) {
                 answer("wait-answer")
                         .put("room", room)
@@ -323,15 +366,25 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
             final List<JsonNode> events, final String line, final String sender) {
         boolean after = false;
         for (final JsonNode event : events) {
-            // A redacted message has no text, and says nothing back.
-            if (after
-                    && event.path("sender").asText().equals(sender)
-                    && !event.path("content").path("body").asText("").isEmpty()) {
+            if (after && event.path("sender").asText().equals(sender) && plainText(event)) {
                 return event;
             }
             after |= event.path("event_id").asText("").equals(line);
         }
         return null;
+    }
+
+    /**
+     * A new text line of the room's timeline: not redacted (no text left), not an edit of an older
+     * one, not a line of a thread.
+     */
+    static boolean plainText(final JsonNode event) {
+        final JsonNode content = event.path("content");
+        final String relation = content.path("m.relates_to").path("rel_type").asText("");
+        return "m.text".equals(content.path("msgtype").asText())
+                && !content.path("body").asText("").isEmpty()
+                && !relation.equals("m.replace")
+                && !relation.equals("m.thread");
     }
 
     /** {@code joined}: the rooms the person is in, so chats an earlier run left can go. */
@@ -353,51 +406,125 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
 
     private void logOut(final String[] words) throws Failure {
         arguments(words, 0);
+        logOut();
+    }
+
+    /** Logs a session the steps left open out, checked as the step checks it, said by no line. */
+    void endSession() throws Failure {
+        if (session != null) {
+            sayLogOut = false;
+            logOut();
+        }
+    }
+
+    private void logOut() throws Failure {
         final MatrixClient signedIn = signedIn();
+        // A chat this session opened and did not leave would take a later run's answer.
+        for (final String room : List.copyOf(directs)) {
+            leave(room);
+        }
         signedIn.post(CLIENT + "logout", MatrixClient.JSON.createObjectNode());
         final int after = signedIn.exchange("GET", CLIENT + "account/whoami", null).status();
         if (after != 401) {
             throw new Failure(Exit.PROTOCOL, "logged out, but whoami answered " + after);
         }
         session = null;
-        answer("log-out").put("whoami", after);
-        flush();
+        if (sayLogOut) {
+            answer("log-out").put("whoami", after);
+            flush();
+        }
     }
 
-    /** Logs a session still open out, so a failed run leaves none behind. */
+    /**
+     * Logs a session still open out, so a failed or interrupted run leaves none behind: an
+     * interrupt would close the socket before the logout reached the gate, so it waits until after.
+     */
     @Override
     public void close() {
         final MatrixClient open = session;
-        session = null;
         if (open != null) {
+            final boolean interrupted = Thread.interrupted();
             try {
+                for (final String room : List.copyOf(directs)) {
+                    try {
+                        leave(room);
+                    } catch (final Failure | RuntimeException ex) {
+                        // The logout still follows; the chat stays, as a person's would.
+                    }
+                }
+                session = null;
                 open.exchange("POST", CLIENT + "logout", MatrixClient.JSON.createObjectNode());
             } catch (final Failure ex) {
                 // The run already failed or ended; an unreachable gate keeps the session's expiry.
+            } finally {
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }
 
     @Override
-    public List<JsonNode> messages(final String room) throws Failure {
-        final JsonNode chunk =
-                signedIn()
-                        .get(
-                                CLIENT
-                                        + "rooms/"
-                                        + MatrixClient.segment(room)
-                                        + "/messages?dir=b&limit=200")
-                        .path("chunk");
-        if (!chunk.isArray()) {
-            throw new Failure(Exit.PROTOCOL, "the room's messages came with no chunk");
-        }
-        final List<JsonNode> events = new ArrayList<>();
-        for (final JsonNode event : chunk) {
-            if (event.path("type").asText().equals("m.room.message")) {
-                events.addFirst(event);
+    public String scrub(final String text) {
+        String scrubbed = text;
+        for (final String token : List.of(sessionToken, loginToken)) {
+            if (!token.isEmpty()) {
+                scrubbed = scrubbed.replace(token, "<token>");
             }
         }
-        return events;
+        return scrubbed;
+    }
+
+    @Override
+    public List<JsonNode> messages(final String room, final @Nullable String back) throws Failure {
+        final List<JsonNode> events = new ArrayList<>();
+        String from = "";
+        for (int page = 0; page < PAGES; page++) {
+            final JsonNode answer =
+                    signedIn()
+                            .get(
+                                    CLIENT
+                                            + "rooms/"
+                                            + MatrixClient.segment(room)
+                                            + "/messages?dir=b&limit="
+                                            + PAGE
+                                            + "&filter="
+                                            + MatrixClient.segment(MESSAGES_ONLY)
+                                            + (from.isEmpty()
+                                                    ? ""
+                                                    : "&from=" + MatrixClient.segment(from)));
+            final JsonNode chunk = answer.path("chunk");
+            if (!chunk.isArray()) {
+                throw new Failure(Exit.PROTOCOL, "the room's messages came with no chunk");
+            }
+            boolean reached = false;
+            for (final JsonNode event : chunk) {
+                if (event.path("type").asText().equals("m.room.message")) {
+                    events.addFirst(event);
+                }
+                reached |= back != null && back.equals(event.path("event_id").asText());
+            }
+            final String end = answer.path("end").asText("");
+            // A page that names itself as the next would be read again for ever.
+            final boolean start = chunk.isEmpty() || end.isEmpty() || end.equals(from);
+            from = end;
+            if (reached || start) {
+                if (back != null && !reached) {
+                    throw new Failure(
+                            Exit.DATA,
+                            "read " + room + " back to its start, " + back + " not in it");
+                }
+                return events;
+            }
+        }
+        throw new Failure(
+                Exit.DATA,
+                "read "
+                        + PAGES * PAGE
+                        + " events of "
+                        + room
+                        + " back"
+                        + (back == null ? ", not to its start" : " without " + back));
     }
 
     @Override
@@ -406,11 +533,25 @@ final class RehearsalClient implements AutoCloseable, RoomRehearsal.Room {
                 .post(
                         CLIENT + "rooms/" + MatrixClient.segment(room) + "/leave",
                         MatrixClient.JSON.createObjectNode());
+        directs.remove(room);
     }
 
     @Override
     public java.util.Set<String> members(final String room) throws Failure {
-        return java.util.Set.copyOf(displayNames(room).keySet());
+        final java.util.Set<String> members = new java.util.HashSet<>(displayNames(room).keySet());
+        final JsonNode invited =
+                signedIn()
+                        .get(
+                                CLIENT
+                                        + "rooms/"
+                                        + MatrixClient.segment(room)
+                                        + "/members?membership=invite")
+                        .path("chunk");
+        if (!invited.isArray()) {
+            throw new Failure(Exit.PROTOCOL, "the room's invited came with no chunk");
+        }
+        invited.forEach(member -> members.add(member.path("state_key").asText()));
+        return java.util.Set.copyOf(members);
     }
 
     private Map<String, String> displayNames(final String room) throws Failure {
