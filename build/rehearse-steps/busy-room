@@ -1,0 +1,67 @@
+#!/bin/sh
+# The busy-room step of porelo-host's rented-host run (build/rehearse-move.sh, build/rehearse-steps/busy-room there): the
+# project's room on the host rehearsed as the test person, after the `tasks` step started its tasks. Kept here, in
+# porelo-message-matrix, and copied into porelo-host as it is.
+# It runs this repository's build/rehearse-busy-room.sh from a worktree of origin/main of the checkout
+# REHEARSAL_MATRIX_CHECKOUT (default ~/git/porelo-message-matrix), with ssh as the person alone: the run's agent, the
+# run's pinned host key, no other key. Its exit is the rehearsal's, so 0 only when every scenario held; 77 (SKIP)
+# when too little time is left before the hard stop to wait for the tasks' answers.
+set -u
+for name in REHEARSAL_HOST REHEARSAL_PERSON REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS REHEARSAL_PROJECT \
+    REHEARSAL_DEADLINE; do
+    eval "value=\${$name:-}"
+    # shellcheck disable=SC2154 # set by the eval above
+    [ -n "$value" ] || {
+        echo "$name is not given"
+        exit 2
+    }
+done
+left=$((REHEARSAL_DEADLINE - $(date +%s)))
+# Ten scenarios, each waiting up to five minutes for an answer and a minute of quiet: about 20 min when the tasks answer.
+if [ "$left" -lt 1800 ]; then
+    echo "only $((left / 60)) min left before the hard stop; the busy room needs 30"
+    exit 77
+fi
+checkout=${REHEARSAL_MATRIX_CHECKOUT:-$HOME/git/porelo-message-matrix}
+git -C "$checkout" rev-parse --git-dir >/dev/null 2>&1 || {
+    echo "no porelo-message-matrix checkout at $checkout; set REHEARSAL_MATRIX_CHECKOUT"
+    exit 2
+}
+
+work=$(mktemp -d) || exit 2
+# shellcheck disable=SC2329 # run by the EXIT trap
+end() {
+    git -C "$checkout" worktree remove --force "$work/matrix" 2>/dev/null
+    rm -rf "$work"
+}
+trap end EXIT
+trap 'exit 75' INT TERM HUP
+
+# Main as the forge has it, else as the checkout last fetched it, said in the log.
+ref=FETCH_HEAD
+git -C "$checkout" fetch -q origin main </dev/null 2>/dev/null || {
+    echo "busy-room: main could not be fetched; taking the checkout's origin/main"
+    ref=origin/main
+}
+git -C "$checkout" worktree add -q --detach "$work/matrix" "$ref" || exit 2
+echo "busy-room: porelo-message-matrix $(git -C "$work/matrix" rev-parse --short HEAD)"
+
+# Every ssh the rehearsal opens - the forward and each task's talk log - goes as the person, by the run's agent and key.
+mkdir "$work/bin"
+cat >"$work/bin/ssh" <<'EOF'
+#!/bin/sh
+exec /usr/bin/ssh -o "IdentityAgent=$REHEARSAL_PERSON_AGENT" -o IdentityFile=none \
+    -o "UserKnownHostsFile=$REHEARSAL_KNOWN_HOSTS" -o StrictHostKeyChecking=yes "$@"
+EOF
+chmod 700 "$work/bin/ssh"
+export REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS
+[ -n "${JAVA_HOME:-}" ] || [ ! -d "$HOME/.porelo/jdk/graalvm-25.4.4.1.1" ] ||
+    export JAVA_HOME="$HOME/.porelo/jdk/graalvm-25.4.4.1.1"
+# The development machine's Maven cache, offline: the rehearsal needs nothing it does not hold.
+export MAVEN_ARGS="${MAVEN_ARGS:--o -Daether.enhancedLocalRepository.split=true -Daether.enhancedLocalRepository.localPrefix=installed/matrix}"
+
+PATH="$work/bin:$PATH" timeout --kill-after=10 $((left - 60)) \
+    "$work/matrix/build/rehearse-busy-room.sh" "$REHEARSAL_PERSON" "$REHEARSAL_HOST" "$REHEARSAL_PROJECT"
+status=$?
+echo "busy-room: the rehearsal ended $status"
+exit "$status"

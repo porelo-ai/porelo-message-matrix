@@ -68,3 +68,9 @@ hand-run, not a step.
 - **Found on the way:** `RehearsalClientTest`'s stand-in gate ended on a client that closed its end first, as an
   interrupted one does, so `anInterruptedRehearsalStopsAndLogsOut` waited out its 30 s for the logout about one run in
   ten. The gate now ends only that request; 25 runs in a row green.
+- **The run's step**, `build/rehearse-steps/busy-room`, is written to porelo-host's step hook (Agent Machines, 17:54Z)
+  and copied there as it is: it reads the host, the person, the project, the person's agent, the pinned known hosts and
+  the hard stop from the environment, takes a worktree of this repository's main, runs the one call with every ssh
+  going as the person by the run's agent and key alone, and ends with the rehearsal's exit; 77 (SKIP) with less than
+  30 min to the hard stop. Its first dry run found the forward's socket under a long `TMPDIR` too long for ssh; the
+  script now keeps it under `$XDG_RUNTIME_DIR` or `/tmp`.

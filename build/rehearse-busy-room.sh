@@ -30,7 +30,8 @@ wait=${REHEARSE_FORWARD_WAIT:-30}
 fits '[0-9]{1,3}' "$wait" || usage "REHEARSE_FORWARD_WAIT is seconds: $wait"
 
 cd "$(dirname "$0")/.." || exit 70
-work=$(mktemp -d) || exit 70
+# A Unix socket's path holds about 100 bytes, so the forward's lies under a short directory, not a long TMPDIR.
+work=$(mktemp -d -p "${XDG_RUNTIME_DIR:-/tmp}" rbr.XXXXXX) || exit 70
 forward=
 # shellcheck disable=SC2329 # run by the EXIT trap
 end() {
