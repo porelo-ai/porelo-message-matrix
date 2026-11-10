@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX100",
   "title": "A Task Answers Only Where It Still Is",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "S",
   "priority": "Medium",
   "rank": 1,
@@ -15,6 +15,8 @@
 ```
 
 **Why this size.** which of a task's direct chats `send --to <person>` may write into, and its tests.
+
+**How it stands.** Implementing (2026-11-10), after [MX102](README.md#mx102) on the coordinator's word (16:39Z).
 
 **What must be true.** A task's answer to a person never goes into a direct chat the task itself has left or was taken
 out of, and one chat whose state the task may not read does not stop the answer from reaching another.
