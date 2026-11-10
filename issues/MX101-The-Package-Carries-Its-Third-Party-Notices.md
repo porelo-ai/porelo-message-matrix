@@ -16,8 +16,9 @@
 
 **Why this size.** the generator's call in the build, two package entries and the copyright text, and the package
 test's check; the generator itself is porelo-buildtools'.
-**How it stands.** Filed on the coordinator's order of 2026-11-10 (the operator's word, 12:12Z): one generator for all.
-It waits on that generator being on porelo-buildtools' main; nothing is built before.
+**How it stands.** Backlog (operator, 2026-11-10), built after [MX99](README.md#mx99). Filed on the coordinator's
+order of 2026-11-10 (the operator's word, 12:12Z): one generator for all. The generator is published (porelo-buildtools
+BT63, `porelo-release third-party-notices`).
 
 **What must be true.** Whoever installs `porelo-message-matrix` finds the license and notice texts of every
 third-party part compiled into the transport: `/usr/share/doc/porelo-message-matrix/THIRD-PARTY-NOTICES` in the
