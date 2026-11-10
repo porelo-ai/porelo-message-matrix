@@ -180,14 +180,26 @@ final class Direct {
         return false;
     }
 
+    /** How many of the person's newest lines in a chat are read to find one that counts. */
+    static final int PAGE = 10;
+
+    /** A chat the task cannot read: never chosen. */
+    private static final long UNREADABLE = Long.MIN_VALUE;
+
+    /** A chat the person has said no line in among {@link #PAGE}: chosen only failing others. */
+    private static final long NO_LINE = Long.MIN_VALUE + 1;
+
     /**
-     * The direct chat between this account and a person, to send into: the one in {@code m.direct}
-     * where the person is still joined or invited, or a new one, invite-only and marked direct,
-     * inviting them.
+     * The direct chat between this account and a person, to send into: of the chats in {@code
+     * m.direct} where the person is still joined or invited, the one the person last said a line
+     * in, so the answer comes where they asked, the one remembered later on a tie; when they said
+     * none, the readable one remembered last; when none is open or none can be read, a new one,
+     * invite-only and marked direct, inviting them.
      */
     static String chatWith(final MatrixClient client, final String self, final String person)
             throws Failure {
         final Set<String> known = rooms(client, self).getOrDefault(person, Set.of());
+        final List<String> open = new ArrayList<>();
         for (final String room : known) {
             final JsonNode member =
                     client.find(
@@ -197,8 +209,23 @@ final class Direct {
                                     + MatrixClient.segment(person));
             final String membership = member == null ? "" : member.path("membership").asText("");
             if ("join".equals(membership) || "invite".equals(membership)) {
-                return room;
+                open.add(room);
             }
+        }
+        if (open.size() == 1) {
+            return open.getFirst();
+        }
+        @Nullable String chosen = null;
+        long newest = UNREADABLE;
+        for (final String room : open) {
+            final long said = lastLine(client, room, person);
+            if (said != UNREADABLE && said >= newest) {
+                newest = said;
+                chosen = room;
+            }
+        }
+        if (chosen != null) {
+            return chosen;
         }
         final ObjectNode request =
                 MatrixClient.JSON
@@ -217,6 +244,57 @@ final class Direct {
                 client.post("/_matrix/client/v3/createRoom", request).path("room_id").asText();
         remember(client, self, person, room);
         return room;
+    }
+
+    /**
+     * When the person last said a line in a chat, by the homeserver's clock: a text the task would
+     * be handed, never an edit, a line taken back or their joining; {@link #NO_LINE} when none is
+     * among their newest {@link #PAGE} messages, {@link #UNREADABLE} when the chat cannot be read.
+     */
+    private static long lastLine(final MatrixClient client, final String room, final String person)
+            throws Failure {
+        final ObjectNode filter = MatrixClient.JSON.createObjectNode();
+        filter.putArray("types").add("m.room.message");
+        filter.putArray("senders").add(person);
+        final MatrixClient.Answer answer =
+                client.exchange(
+                        "GET",
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(room)
+                                + "/messages?dir=b&limit="
+                                + PAGE
+                                + "&filter="
+                                + MatrixClient.segment(filter.toString()),
+                        null);
+        final int status = answer.status();
+        if (status == 403 || status == 404) {
+            return UNREADABLE;
+        }
+        if (status != 200 || !answer.body().path("chunk").isArray()) {
+            throw new Failure(
+                    status == 401
+                            ? Exit.NOT_PERMITTED
+                            : status == 429 || status >= 500 ? Exit.TEMPORARY : Exit.PROTOCOL,
+                    "reading the direct chat "
+                            + room
+                            + " answered "
+                            + status
+                            + (status == 200 ? " without its messages" : " " + answer.errcode()));
+        }
+        for (final JsonNode event : answer.body().path("chunk")) {
+            final JsonNode content = event.path("content");
+            final String type = content.path("msgtype").asText("");
+            if ("m.room.message".equals(event.path("type").asText())
+                    && person.equals(event.path("sender").asText())
+                    && ("m.text".equals(type) || "m.emote".equals(type))
+                    && content.path("body").isTextual()
+                    && !"m.replace".equals(content.path("m.relates_to").path("rel_type").asText(""))
+                    && event.path("origin_server_ts").isIntegralNumber()) {
+                // Newest first: the first that counts is the last said.
+                return event.path("origin_server_ts").asLong();
+            }
+        }
+        return NO_LINE;
     }
 
     /** Whether a room is one of this account's direct chats, and with whom. */

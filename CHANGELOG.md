@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `send --to <person>` answers in the direct chat the person last wrote in, when they keep more than one open with
+  the task; before, the answer went into the oldest, where the person was not waiting for it.
 - The local homeserver's container, and its run for `backup` and `restore`, open at most 65536 files
   (`--ulimit=nofile=65536:65536`) instead of whatever the host allows.
 - A person's line in the room headed `Agent Pi: …`, typed as the agents write it, is meant for the member shown as

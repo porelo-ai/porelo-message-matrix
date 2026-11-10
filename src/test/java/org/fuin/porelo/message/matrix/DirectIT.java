@@ -223,4 +223,44 @@ class DirectIT {
                         "the chats they are invited to, opened by the first message and used by the second")
                 .hasSize(1);
     }
+
+    @Test
+    @DisplayName("with two chats open, send --to a person writes into the one they last wrote in")
+    void theAnswerGoesWhereThePersonLastWrote() throws IOException, InterruptedException, Failure {
+        final String older = tuwunel.openDirect(alice, task);
+        assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
+        final String newer = tuwunel.openDirect(alice, task);
+        assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(tuwunel.membership(alice, newer, task.userId())).isEqualTo("join");
+
+        tuwunel.sayContent(alice, older, text("asked long ago"));
+        // The homeserver stamps each line to the millisecond: two in one would tie.
+        Thread.sleep(20);
+        tuwunel.sayContent(alice, newer, text("asked now"));
+        assertThat(sendTo(alice.userId(), "{\"answer\":1}")).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(answers(newer)).as("into the chat asked in").containsExactly("{\"answer\":1}");
+        assertThat(answers(older)).as("not into the older one").isEmpty();
+
+        Thread.sleep(20);
+        tuwunel.sayContent(alice, older, text("asked again, here"));
+        assertThat(sendTo(alice.userId(), "{\"answer\":2}")).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(answers(older))
+                .as("into the older chat, asked in last")
+                .containsExactly("{\"answer\":2}");
+        assertThat(answers(newer))
+                .as("still only the first answer")
+                .containsExactly("{\"answer\":1}");
+    }
+
+    /** The task's lines in a chat, as the person reads them. */
+    private List<String> answers(final String chat) throws IOException, InterruptedException {
+        final List<String> found = new ArrayList<>();
+        for (final JsonNode event : tuwunel.messages(alice, chat)) {
+            if (task.userId().equals(event.path("sender").asText())
+                    && event.path("content").has(Send.MESSAGE_FIELD)) {
+                found.add(event.path("content").path(Send.MESSAGE_FIELD).asText());
+            }
+        }
+        return found;
+    }
 }

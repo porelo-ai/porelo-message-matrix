@@ -1,6 +1,6 @@
 # MX98 — An Answer Goes Into The Chat The Person Wrote In
 
-**Status:** Implementing.
+**Status:** Review.
 **Size:** S - which of a task's direct chats `send --to <person>` writes into, and its tests; no change to Porelo.
 
 **What must be true.** A task's answer to a person's direct line goes into the chat the person wrote that line in, so
@@ -30,3 +30,12 @@ answer that went elsewhere.
 ## Acceptance
 
 - The rehearsal's direct-chat step holds on a host while the person keeps an older chat with the task open.
+
+## Read
+
+- The code reading (Antigravity CLI, gemini-4-argon-high, eight findings) is taken: a chat the task cannot read is never
+  chosen, and with none readable a new one opens; only the person's own text lines count, read with a filter of their
+  messages, newest first, ten at most; a tie goes to the chat remembered later; 401 is 77, 429 and 5xx 75, any other
+  answer or one without its messages 76; the tests read which chats were asked and how, and `DirectIT` keeps its two
+  lines a moment apart. Left for [MX100](README.md#mx100), as it was so before: a chat the task itself was taken out
+  of, and a 403 on a chat's member state.

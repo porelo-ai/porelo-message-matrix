@@ -7,6 +7,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx89"></a>[MX89](MX89-A-Test-Person-Signs-In-Through-The-Gate-Unattended.md) | S | - | A rehearsal signs the test person into the project's room through the gate's SSO without a browser, posts, reads and logs out; no login a real host does not offer |
 | <a id="mx90"></a>[MX90](MX90-The-Rooms-Scenarios-Are-Rehearsed-On-A-Host.md) | S | [MX89](README.md#mx89) | A rehearsal proves on a host that a person's line reaches exactly the tasks meant (a head, `All agents:`, `@room`, nobody, a direct chat) and that the task's answer comes back |
 | <a id="mx91"></a>[MX91](MX91-The-Rehearsal-Says-A-Wake-Was-Answered.md) | XS | [MX89](README.md#mx89) | The rehearsal tells the move check a wake was answered only after it saw the task's answer in the room |
@@ -42,7 +43,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 
 ## Backlog
 

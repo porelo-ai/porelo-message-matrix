@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -456,6 +457,231 @@ class SendTest {
         assertThat(homeserver.requests().getLast().rawPath())
                 .as("into the chat with the person")
                 .startsWith("/_matrix/client/v3/rooms/%21d%3Amatrix.test/send/");
+    }
+
+    /** A page of a room's messages, newest first: each pair is a sender and its time. */
+    private static String page(final Object... senderAndTime) {
+        final var answer = MatrixClient.JSON.createObjectNode();
+        final var chunk = answer.putArray("chunk");
+        for (int i = 0; i < senderAndTime.length; i += 2) {
+            final var event =
+                    chunk.addObject()
+                            .put("type", "m.room.message")
+                            .put("sender", (String) senderAndTime[i])
+                            .put("origin_server_ts", (Long) senderAndTime[i + 1]);
+            event.putObject("content").put("msgtype", "m.text").put("body", "a line");
+        }
+        return answer.toString();
+    }
+
+    private static final String WHOAMI = "{\"user_id\":\"@t.alice:matrix.test\"}";
+
+    private static final String JOIN = "{\"membership\":\"join\"}";
+
+    private static final String BOB = "@bob:matrix.test";
+
+    private static final String TASK = "@t.alice:matrix.test";
+
+    /** {@code m.direct} with these chats with Bob, oldest first. */
+    private static String chats(final String... rooms) {
+        final var answer = MatrixClient.JSON.createObjectNode();
+        final var list = answer.putArray(BOB);
+        for (final String room : rooms) {
+            list.add(room + ":matrix.test");
+        }
+        return answer.toString();
+    }
+
+    private int sendToBob() {
+        return send(
+                Map.of(
+                        Config.HOMESERVER,
+                        homeserver.url(),
+                        Config.ACCESS_TOKEN,
+                        TOKEN,
+                        Config.LOGIN,
+                        "alice"),
+                message.toString(),
+                signature.toString(),
+                "--to",
+                BOB);
+    }
+
+    private String sentInto() {
+        final String path = homeserver.requests().getLast().rawPath();
+        assertThat(path).contains("/send/m.room.message/");
+        return path.substring("/_matrix/client/v3/rooms/".length(), path.indexOf("/send/"));
+    }
+
+    /** The chats whose messages were read, in order. */
+    private List<String> read() {
+        return homeserver.requests().stream()
+                .filter(r -> r.rawPath().endsWith("/messages"))
+                .map(
+                        r -> {
+                            assertThat(r.query())
+                                    .as("newest first, only the person's lines")
+                                    .startsWith("dir=b&limit=")
+                                    .contains(
+                                            "&filter="
+                                                    + MatrixClient.segment(
+                                                            "{\"types\":[\"m.room.message\"],"
+                                                                    + "\"senders\":[\""
+                                                                    + BOB
+                                                                    + "\"]}"));
+                            return r.rawPath()
+                                    .substring(
+                                            "/_matrix/client/v3/rooms/".length(),
+                                            r.rawPath().indexOf("/messages"));
+                        })
+                .toList();
+    }
+
+    /**
+     * Harm guarded: a person waits in the chat they wrote in for an answer that went into an older
+     * chat with the task they still keep open.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "100, 200, %21b%3Amatrix.test",
+        "300, 200, %21a%3Amatrix.test",
+        "200, 200, %21b%3Amatrix.test"
+    })
+    void theAnswerGoesIntoTheChatThePersonLastWroteIn(
+            final long inA, final long inB, final String expected) {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, JOIN)
+                .answer(200, JOIN)
+                .answer(200, page(BOB, inA, BOB, 10L))
+                .answer(200, page(BOB, inB, BOB, 20L))
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo(expected);
+        assertThat(read()).containsExactly("%21a%3Amatrix.test", "%21b%3Amatrix.test");
+    }
+
+    /**
+     * Harm guarded: the person's joining, an edit of an old line or a line they took back is taken
+     * for where they asked last; none is handed to the task as a line either.
+     */
+    @Test
+    void onlyALineThePersonSaysCounts() {
+        final String old =
+                "{\"chunk\":[{\"type\":\"m.room.member\",\"sender\":\"@bob:matrix.test\","
+                        + "\"origin_server_ts\":999,\"content\":{\"membership\":\"join\"}},"
+                        + "{\"type\":\"m.room.message\",\"sender\":\"@bob:matrix.test\","
+                        + "\"origin_server_ts\":500,\"content\":{\"msgtype\":\"m.text\","
+                        + "\"body\":\"* fixed\",\"m.relates_to\":{\"rel_type\":\"m.replace\"}}},"
+                        + "{\"type\":\"m.room.message\",\"sender\":\"@bob:matrix.test\","
+                        + "\"origin_server_ts\":400,\"content\":{}},"
+                        + "{\"type\":\"m.room.message\",\"sender\":\"@bob:matrix.test\","
+                        + "\"origin_server_ts\":350,\"content\":{\"msgtype\":\"m.image\","
+                        + "\"body\":\"a.png\"}},"
+                        + "{\"type\":\"m.room.message\",\"sender\":\"@t.alice:matrix.test\","
+                        + "\"origin_server_ts\":900,\"content\":{\"msgtype\":\"m.text\","
+                        + "\"body\":\"x\"}}]}";
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, JOIN)
+                .answer(200, JOIN)
+                .answer(200, page(BOB, 300L))
+                .answer(200, old)
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21a%3Amatrix.test");
+    }
+
+    /**
+     * Harm guarded: with no line of the person's to go by, the answer goes to the oldest chat, or
+     * into one the task cannot read, where it fails.
+     */
+    @Test
+    void withNoLineOfThePersonsTheAnswerGoesIntoTheReadableChatRememberedLast() {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b", "!c"))
+                .answer(200, JOIN)
+                .answer(200, "{\"membership\":\"invite\"}")
+                .answer(200, JOIN)
+                .answer(200, page(TASK, 900L))
+                .answer(200, "{\"chunk\":[]}")
+                .answer(403, "{\"errcode\":\"M_FORBIDDEN\"}")
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21b%3Amatrix.test");
+    }
+
+    /**
+     * Harm guarded: an answer written into chats the task cannot read, never reaching the person.
+     */
+    @Test
+    void whenNoOpenChatCanBeReadANewOneIsOpened() {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, JOIN)
+                .answer(200, JOIN)
+                .answer(403, "{\"errcode\":\"M_FORBIDDEN\"}")
+                .answer(404, "{\"errcode\":\"M_NOT_FOUND\"}")
+                .answer(200, "{\"room_id\":\"!n:matrix.test\"}")
+                .answer(200, chats("!a", "!b"))
+                .answer(200, "{}")
+                .answer(200, chats("!a", "!b", "!n"))
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21n%3Amatrix.test");
+    }
+
+    /** Harm guarded: an answer written into a chat the person has left, where nobody reads it. */
+    @Test
+    void aChatThePersonLeftIsNeverWrittenNorRead() {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b", "!c"))
+                .answer(200, "{\"membership\":\"leave\"}")
+                .answer(200, JOIN)
+                .answer(200, JOIN)
+                .answer(200, page(BOB, 100L))
+                .answer(200, page(TASK, 900L))
+                .answer(200, "{\"event_id\":\"$e\"}");
+
+        assertThat(sendToBob()).as("sent: %s", stderr()).isEqualTo(Exit.OK);
+        assertThat(sentInto()).isEqualTo("%21b%3Amatrix.test");
+        assertThat(read())
+                .as("the left chat's messages are never read")
+                .containsExactly("%21b%3Amatrix.test", "%21c%3Amatrix.test");
+    }
+
+    /** Harm guarded: a busy, refusing or garbled homeserver taken for a chat nobody wrote in. */
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "429 | {\"errcode\":\"M_LIMIT_EXCEEDED\"} | 75",
+                "503 | {\"errcode\":\"M_UNKNOWN\"} | 75",
+                "401 | {\"errcode\":\"M_UNKNOWN_TOKEN\"} | 77",
+                "400 | {\"errcode\":\"M_BAD_JSON\"} | 76",
+                "200 | {} | 76",
+                "200 | {\"chunk\":[ | 76"
+            })
+    void anUnclearChatStopsTheSendUnsent(final int status, final String body, final int exit) {
+        homeserver
+                .answer(200, WHOAMI)
+                .answer(200, chats("!a", "!b"))
+                .answer(200, JOIN)
+                .answer(200, JOIN)
+                .answer(200, page(BOB, 100L))
+                .answer(status, body);
+
+        assertThat(sendToBob()).as(this::stderr).isEqualTo(exit);
+        assertThat(homeserver.requests()).noneMatch(r -> r.rawPath().contains("/send/"));
     }
 
     /** Harm guarded: a central send blames the person for a homeserver that named nobody. */
