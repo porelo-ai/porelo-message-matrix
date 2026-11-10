@@ -1,7 +1,20 @@
 # MX38 — A Room Shows No Helper
 
-**Status:** Accepted.
-**Size:** XL - every lifecycle verb, both polls, a registration, a migration and the host's own way; splits into the parts below.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX38",
+  "title": "A Room Shows No Helper",
+  "state": "Accepted",
+  "size": "XL",
+  "priority": "Medium",
+  "rank": 2,
+  "blockedBy": [],
+  "covers": "A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller"
+}
+```
+
+**Why this size.** every lifecycle verb, both polls, a registration, a migration and the host's own way; splits into the parts below.
 
 **What must be true.** A person in the project's room, on the account's own homeserver and on a host behind its gate,
 sees only the people and the tasks among its members, never Porelo's administrator or a relay; tasks are enrolled and retired, people joined, and the room read for Porelo as

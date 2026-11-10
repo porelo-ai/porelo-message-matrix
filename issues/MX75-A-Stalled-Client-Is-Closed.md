@@ -1,7 +1,20 @@
 # MX75 — A Stalled Client Is Closed
 
-**Status:** Review.
-**Size:** S - the limit as an argument to `serve`, the watch saying it fired, tests over a socket.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX75",
+  "title": "A Stalled Client Is Closed",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 25,
+  "blockedBy": [],
+  "covers": "A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops"
+}
+```
+
+**Why this size.** the limit as an argument to `serve`, the watch saying it fired, tests over a socket.
 
 **What must be true.** A client that stops halfway through a request loses its connection to the gate once the idle limit
 has passed, and one that finishes in time keeps it. Whoever removes the idle watch, or lets it fire on a request that

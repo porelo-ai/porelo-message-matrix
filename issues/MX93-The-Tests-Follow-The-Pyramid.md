@@ -1,7 +1,20 @@
 # MX93 — The Tests Follow The Pyramid
 
-**Status:** Accepted.
-**Size:** L - five fixes in this repository's tests and a few seams in the code they test (one M, three S, one XS, one
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX93",
+  "title": "The Tests Follow The Pyramid",
+  "state": "Accepted",
+  "size": "L",
+  "priority": "Medium",
+  "rank": 1,
+  "blockedBy": [],
+  "covers": "Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there"
+}
+```
+
+**Why this size.** five fixes in this repository's tests and a few seams in the code they test (one M, three S, one XS, one
 S for the split); no contract changes, but more than a few days of work in all.
 
 **What must be true.** Every flow of the transport - its verbs' states, choices, limits and failure paths - is proven

@@ -1,7 +1,20 @@
 # MX74 — Small Refusals Are Held By Tests
 
-**Status:** Review.
-**Size:** S - single cases in test classes that exist.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX74",
+  "title": "Small Refusals Are Held By Tests",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 31,
+  "blockedBy": [],
+  "covers": "The smaller refusals, each cheap to hold, fail a unit test if removed"
+}
+```
+
+**Why this size.** single cases in test classes that exist.
 
 **What must be true.** The smaller refusals, each cheap to hold, fail a unit test if removed.
 

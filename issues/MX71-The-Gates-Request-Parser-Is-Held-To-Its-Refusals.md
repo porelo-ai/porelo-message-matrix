@@ -1,7 +1,20 @@
 # MX71 — The Gate's Request Parser Is Held To Its Refusals
 
-**Status:** Review.
-**Size:** S - table cases over one class's reading of a request.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX71",
+  "title": "The Gate's Request Parser Is Held To Its Refusals",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 28,
+  "blockedBy": [],
+  "covers": "A request that could read differently to the gate and the homeserver fails a unit test if it ever passes"
+}
+```
+
+**Why this size.** table cases over one class's reading of a request.
 
 **What must be true.** A request the gate's parser must refuse, one that could read differently to the gate and to the homeserver, fails a unit test if it ever passes.
 

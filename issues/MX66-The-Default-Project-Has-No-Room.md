@@ -1,7 +1,20 @@
 # MX66 — The Default Project Has No Room
 
-**Status:** Review.
-**Size:** S - one refusal where the lifecycle's options are read, its tests, the contract's table.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX66",
+  "title": "The Default Project Has No Room",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 21,
+  "blockedBy": [],
+  "covers": "The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared"
+}
+```
+
+**Why this size.** one refusal where the lifecycle's options are read, its tests, the contract's table.
 
 **What must be true.** A task of the project `default` never joins a room, whatever the machine or host has and whatever
 settings reach the transport: the transport makes no room for `default`, makes no account in one, and admits nobody to

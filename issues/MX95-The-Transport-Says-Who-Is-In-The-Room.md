@@ -1,7 +1,20 @@
 # MX95 — The Transport Says Who Is In The Room
 
-**Status:** Review.
-**Size:** M - one new verb, its contract in `doc/transport.md`, which Porelo reads, and its tests on both homeserver
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX95",
+  "title": "The Transport Says Who Is In The Room",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 6,
+  "blockedBy": [],
+  "covers": "`members --project P` tells Porelo who is joined or invited in a project's room, each with the name the room shows and whether a task, a person or a helper, so the window can say who is in"
+}
+```
+
+**Why this size.** one new verb, its contract in `doc/transport.md`, which Porelo reads, and its tests on both homeserver
 kinds.
 
 **What must be true.** Porelo can ask the transport who is in a project's room - every joined and invited member, each

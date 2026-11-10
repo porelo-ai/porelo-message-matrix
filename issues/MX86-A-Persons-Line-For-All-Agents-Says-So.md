@@ -1,7 +1,20 @@
 # MX86 — A Person's Line For All Agents Says So
 
-**Status:** Review; blocked by [MX85](README.md#mx85).
-**Size:** S - one field in the person file, set in `Person`, its tests and the contract; Porelo reads it.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX86",
+  "title": "A Person's Line For All Agents Says So",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 10,
+  "blockedBy": ["MX85"],
+  "covers": "A person's line headed `All agents: …` is marked `\"all\": true` in its person file, so Porelo hands it to every task of the project"
+}
+```
+
+**Why this size.** one field in the person file, set in `Person`, its tests and the contract; Porelo reads it.
 
 **What must be true.** A person who writes `All agents: …` in the project's room gets a person file marked
 `"all": true`, so Porelo hands it to every task of the project and wakes each.

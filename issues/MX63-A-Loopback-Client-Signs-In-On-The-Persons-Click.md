@@ -1,8 +1,21 @@
 # MX63 — A Loopback Client Signs In On The Person's Click
 
-**Status:** Idea.
-**Severity:** Low - without it, desktop clients that take the SSO callback on a loopback port of their own, such as
-nheko, cannot sign in behind the host's gate; Element Desktop and a page at the forward can.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX63",
+  "title": "A Loopback Client Signs In On The Person's Click",
+  "state": "Idea",
+  "size": "-",
+  "priority": "Medium",
+  "rank": 5,
+  "blockedBy": [],
+  "covers": "Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there"
+}
+```
+
+**How much it matters.** Low - without it, desktop clients that take the SSO callback on a loopback port of their own,
+such as nheko, cannot sign in behind the host's gate; Element Desktop and a page at the forward can.
 
 **What must be true.** When a client asks the gate's SSO to send the person back to a loopback port of its own
 (`http://127.0.0.1:<n>/…` or `http://localhost:<n>/…`), the gate first shows the person a page asking "hand this

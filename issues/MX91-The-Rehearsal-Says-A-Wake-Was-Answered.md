@@ -1,7 +1,20 @@
 # MX91 — The Rehearsal Says A Wake Was Answered
 
-**Status:** Review.
-**Size:** XS - one step of the rehearsal client: wait for an answer, then report it; no change to the move check.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX91",
+  "title": "The Rehearsal Says A Wake Was Answered",
+  "state": "Review",
+  "size": "XS",
+  "priority": "Medium",
+  "rank": 4,
+  "blockedBy": ["MX89"],
+  "covers": "The rehearsal tells the move check a wake was answered only after it saw the task's answer in the room"
+}
+```
+
+**Why this size.** one step of the rehearsal client: wait for an answer, then report it; no change to the move check.
 
 **What must be true.** The check of an agent's move asks whoever posted the waking message to say they read the
 task's answer in the room. In a rehearsal that is said by the run itself, and only after it has seen the answer.

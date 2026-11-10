@@ -1,7 +1,20 @@
 # MX94 — The Homeserver Holds Its Limits On Any Machine
 
-**Status:** Review.
-**Size:** S - one podman flag in the unit and in the `backup`/`restore` run, and one test against the real
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX94",
+  "title": "The Homeserver Holds Its Limits On Any Machine",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 7,
+  "blockedBy": [],
+  "covers": "The local homeserver's container sets its open files too, and a test runs the real homeserver under a process limit its uncapped pool would break"
+}
+```
+
+**Why this size.** one podman flag in the unit and in the `backup`/`restore` run, and one test against the real
 homeserver; nothing another repository reads.
 
 **What must be true.** The local homeserver starts and serves on a machine of any size, and its container takes no

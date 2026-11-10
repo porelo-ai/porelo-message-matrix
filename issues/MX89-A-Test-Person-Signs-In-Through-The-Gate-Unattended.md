@@ -1,7 +1,20 @@
 # MX89 — A Test Person Signs In Through The Gate Unattended
 
-**Status:** Review.
-**Size:** S - one test-scope program and its tests in this repository; it ships nothing and changes no contract.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX89",
+  "title": "A Test Person Signs In Through The Gate Unattended",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 2,
+  "blockedBy": [],
+  "covers": "A rehearsal signs the test person into the project's room through the gate's SSO without a browser, posts, reads and logs out; no login a real host does not offer"
+}
+```
+
+**Why this size.** one test-scope program and its tests in this repository; it ships nothing and changes no contract.
 
 **What must be true.** A rehearsal on a host, with no person at a keyboard, signs the test person into the project's
 room through the host's gate exactly as Element's *Continue with SSO* does, and then posts, reads and logs out, so a

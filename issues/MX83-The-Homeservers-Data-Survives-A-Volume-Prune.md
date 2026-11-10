@@ -1,6 +1,18 @@
 # MX83 — The Homeserver's Data Survives A Volume Prune
 
-**Status:** Idea.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX83",
+  "title": "The Homeserver's Data Survives A Volume Prune",
+  "state": "Idea",
+  "size": "-",
+  "priority": "Medium",
+  "rank": 2,
+  "blockedBy": [],
+  "covers": "The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked"
+}
+```
 
 **What must be true.** The homeserver's accounts, rooms and messages survive an account's routine podman clean-up,
 such as `podman volume prune` run while the homeserver is stopped. On a machine that keeps its homeserver, a recent

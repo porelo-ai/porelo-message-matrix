@@ -1,7 +1,20 @@
 # MX23 — The Transport Takes Its Tokens On Its Input
 
-**Status:** Review.
-**Size:** M - one contract change, made here and in porelo together: every verb reads its secrets from its input
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX23",
+  "title": "The Transport Takes Its Tokens On Its Input",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 24,
+  "blockedBy": [],
+  "covers": "The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable"
+}
+```
+
+**Why this size.** one contract change, made here and in porelo together: every verb reads its secrets from its input
 instead of the environment, `describe` says so, and the environment stays a fallback for a Porelo of the old way;
 the tests of every verb that takes a token, `doc/transport.md`, and a VM run against a porelo that hands them so.
 

@@ -1,7 +1,20 @@
 # MX79 — Only The Forward's Own Page Reads The Gate
 
-**Status:** Review.
-**Size:** S - two rules in `GateRules` and `Gate.sso`, one header kept by `GateRequest`, their tests and the gate's page in
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX79",
+  "title": "Only The Forward's Own Page Reads The Gate",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 17,
+  "blockedBy": [],
+  "covers": "A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in"
+}
+```
+
+**Why this size.** two rules in `GateRules` and `Gate.sso`, one header kept by `GateRequest`, their tests and the gate's page in
 `doc/homeserver.md`.
 
 **What must be true.** A page in the person's browser that is not served at the forward the request came in on - a page

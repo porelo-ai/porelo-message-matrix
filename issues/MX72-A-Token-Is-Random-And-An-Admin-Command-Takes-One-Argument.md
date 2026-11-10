@@ -1,7 +1,20 @@
 # MX72 — A Token Is Random And An Admin Command Takes One Argument
 
-**Status:** Review.
-**Size:** S - a few cases in three test classes.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX72",
+  "title": "A Token Is Random And An Admin Command Takes One Argument",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 29,
+  "blockedBy": [],
+  "covers": "A homeserver token not random, an admin command's user id unchecked or a credential over its limit fails a unit test"
+}
+```
+
+**Why this size.** a few cases in three test classes.
 
 **What must be true.** A homeserver token that stopped being random, an admin room command that took a user id unchecked, and a credential over its limit each fail a unit test.
 

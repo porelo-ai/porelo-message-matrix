@@ -1,7 +1,21 @@
 # MX82 — A Local Agent's Line Reaches A Moved Task
 
-**Status:** Analyzed.
-**Size:** S - `poll` already hands over any member's line that carries both fields; an integration test holds that
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX82",
+  "title": "A Local Agent's Line Reaches A Moved Task",
+  "state": "Analyzed",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 1,
+  "blockedBy": [],
+  "covers": "A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs",
+  "openQuestions": 2
+}
+```
+
+**Why this size.** `poll` already hands over any member's line that carries both fields; an integration test holds that
 for a local agent's account, the documents state the form, and the room client beside it signs.
 
 **What must be true.** While agents move into tasks, a line a local agent on the development machine posts in the

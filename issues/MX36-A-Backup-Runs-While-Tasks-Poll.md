@@ -1,7 +1,20 @@
 # MX36 — A Backup Runs While Tasks Poll
 
-**Status:** Review.
-**Size:** S - one module (`Keep`, `Poll`) and its tests, no contract other repositories read.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX36",
+  "title": "A Backup Runs While Tasks Poll",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 23,
+  "blockedBy": [],
+  "covers": "`backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock`"
+}
+```
+
+**Why this size.** one module (`Keep`, `Poll`) and its tests, no contract other repositories read.
 
 **What must be true.** `backup <dir>` succeeds within its bound while Porelo's poll loops run, so the host's
 playbook copies the conversation off a busy host without stopping the tasks. Polls lose no message and never

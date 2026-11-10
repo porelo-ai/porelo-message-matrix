@@ -1,7 +1,20 @@
 # MX80 — The Workflows Run On A Forge As On GitHub
 
-**Status:** Review.
-**Size:** S - the workflows, `settings.xml`, `.mvn/` and `porelo.yml`, with the tests that read them, taken over from
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX80",
+  "title": "The Workflows Run On A Forge As On GitHub",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 16,
+  "blockedBy": [],
+  "covers": "The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads"
+}
+```
+
+**Why this size.** the workflows, `settings.xml`, `.mvn/` and `porelo.yml`, with the tests that read them, taken over from
 porelo-message-sluice's forge-ready workflows where they exist; no code that ships changes.
 
 **What must be true.** This repository's workflows run unchanged and green on the host's Forgejo and on GitHub, on the

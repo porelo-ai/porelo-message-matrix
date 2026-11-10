@@ -1,7 +1,21 @@
 # MX84 — Setup Waits For No Poll It Need Not
 
-**Status:** Review; accepted by the operator, 2026-11-08. Bug, found in a move to a host.
-**Size:** S - one method in `Lifecycle` and its tests; no contract another repository reads.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX84",
+  "title": "Setup Waits For No Poll It Need Not",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 12,
+  "blockedBy": [],
+  "covers": "Several tasks of one project started at once all get through `setup`: it takes the relay's poll lock only when it must forget the relay's position"
+}
+```
+
+**Why this size.** one method in `Lifecycle` and its tests; no contract another repository reads.
+**How it stands.** Accepted by the operator, 2026-11-08. Bug, found in a move to a host.
 
 **What must be true.** Several tasks of one project started at once on a central homeserver all get through `setup`.
 None ends 75 because the project's relay is being polled, unless setup really has to forget the relay's position.

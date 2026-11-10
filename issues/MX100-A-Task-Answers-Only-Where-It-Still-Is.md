@@ -1,7 +1,20 @@
 # MX100 — A Task Answers Only Where It Still Is
 
-**Status:** Backlog.
-**Size:** S - which of a task's direct chats `send --to <person>` may write into, and its tests.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX100",
+  "title": "A Task Answers Only Where It Still Is",
+  "state": "Backlog",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 1,
+  "blockedBy": [],
+  "covers": "A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer"
+}
+```
+
+**Why this size.** which of a task's direct chats `send --to <person>` may write into, and its tests.
 
 **What must be true.** A task's answer to a person never goes into a direct chat the task itself has left or was taken
 out of, and one chat whose state the task may not read does not stop the answer from reaching another.

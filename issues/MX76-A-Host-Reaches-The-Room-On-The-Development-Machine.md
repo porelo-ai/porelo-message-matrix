@@ -1,7 +1,20 @@
 # MX76 — A Host Reaches The Room On The Development Machine
 
-**Status:** Review.
-**Size:** M - a script with its tests, the registration's challenge read, and the documents.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX76",
+  "title": "A Host Reaches The Room On The Development Machine",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 19,
+  "blockedBy": [],
+  "covers": "A task on a rented host talks in the room on the development machine's homeserver, over one `ssh -R` to one socket only, while agents move"
+}
+```
+
+**Why this size.** a script with its tests, the registration's challenge read, and the documents.
 
 **What must be true.** While agents move into tasks, a task on a rented host talks in the project's room on the
 development machine's homeserver, over one `ssh -R` the development machine opens to the host, to one socket only.

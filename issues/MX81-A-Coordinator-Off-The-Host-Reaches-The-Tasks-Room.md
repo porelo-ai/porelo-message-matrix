@@ -1,7 +1,22 @@
 # MX81 — A Coordinator Off The Host Reaches The Task's Room
 
-**Status:** Review; accepted by the operator, 2026-11-06. Bug, found by the operator on 2026-11-06 in a rehearsal of the move.
-**Size:** S - the start's steps, their check on a host, and the documents; [MX76](README.md#mx76)'s code is there.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX81",
+  "title": "A Coordinator Off The Host Reaches The Task's Room",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 13,
+  "blockedBy": [],
+  "covers": "A task on a host reports in the room of a coordinator on the development machine from its first step, over [MX76](README.md#mx76)'s tunnel set up before the start; without the tunnel the start stops instead of reporting into a room nobody reads"
+}
+```
+
+**Why this size.** the start's steps, their check on a host, and the documents; [MX76](README.md#mx76)'s code is there.
+**How it stands.** Accepted by the operator, 2026-11-06. Bug, found by the operator on 2026-11-06 in a rehearsal of the
+move.
 
 **What must be true.** A task started on a host for a project whose agents report to a coordinator on the development
 machine talks in that coordinator's room from its first step. No room on the host stands in for it, and nobody relays

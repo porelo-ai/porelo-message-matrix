@@ -1,7 +1,20 @@
 # MX99 — The Rehearsal Judges A Busy Room Right
 
-**Status:** Backlog.
-**Size:** M - the rehearsal client and program in `src/test` and their tests; nothing that ships.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX99",
+  "title": "The Rehearsal Judges A Busy Room Right",
+  "state": "Backlog",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 2,
+  "blockedBy": [],
+  "covers": "The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open"
+}
+```
+
+**Why this size.** the rehearsal client and program in `src/test` and their tests; nothing that ships.
 
 **What must be true.** The room rehearsal says `OK` only where the room behaved, and `FAIL` only where it did not, also
 in a room with history, other persons, retired tasks and other logins on the same host, and it never leaves the test

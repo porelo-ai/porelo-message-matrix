@@ -1,7 +1,20 @@
 # MX73 — Every Trust Path Checks The Certificate
 
-**Status:** Review.
-**Size:** S - one new test class over `Trust`, with certificates the build already makes or a fixed pair.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX73",
+  "title": "Every Trust Path Checks The Certificate",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 30,
+  "blockedBy": [],
+  "covers": "Each `checkServerTrusted` overload refuses an unknown chain, and a file with several CAs trusts them all, under test"
+}
+```
+
+**Why this size.** one new test class over `Trust`, with certificates the build already makes or a fixed pair.
 
 **What must be true.** Each `checkServerTrusted` of the trust manager refuses a chain neither trust source knows, whichever overload is called, and a file with several CAs trusts all of them. Today only the path the HTTP client takes is held.
 

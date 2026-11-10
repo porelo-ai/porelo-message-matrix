@@ -1,6 +1,18 @@
 # MX78 — A Backup Knows Its Own Snapshot
 
-**Status:** Idea.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX78",
+  "title": "A Backup Knows Its Own Snapshot",
+  "state": "Idea",
+  "size": "-",
+  "priority": "Medium",
+  "rank": 3,
+  "blockedBy": [],
+  "covers": "A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good"
+}
+```
 
 **What must be true.** However many earlier snapshots are still unfinished when `backup` starts, the copy it reports holds
 all its positions name, and a snapshot finishing during the copy does not fail it for good.

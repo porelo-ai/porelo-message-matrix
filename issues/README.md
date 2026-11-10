@@ -3,6 +3,40 @@
 The index, grouped by state; within a group the order is the priority. The number is identity, not
 sequence.
 
+## Idea
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx97"></a>[MX97](MX97-A-Verb-Refuses-A-Repeated-Flag-And-Repeats-No-Secret.md) | - | - | A lifecycle verb refuses a flag given twice with 64, and no failure line repeats a secret or a control character from a homeserver's error text |
+| <a id="mx83"></a>[MX83](MX83-The-Homeservers-Data-Survives-A-Volume-Prune.md) | - | - | The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked |
+| <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
+| <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
+| <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
+
+## Accepted
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there |
+| <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
+
+## Analyzed
+
+| # | Size | Blocked by | What it covers | Open questions |
+|---|---|---|---|---|
+| <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs | 2 |
+| <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
+
+## Backlog
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
+| <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
+| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
+| <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
+| <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
+
 ## Review
 
 | # | Size | Blocked by | What it covers |
@@ -31,57 +65,13 @@ sequence.
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
 | <a id="mx36"></a>[MX36](MX36-A-Backup-Runs-While-Tasks-Poll.md) | S | - | `backup <dir>` succeeds within its bound while Porelo's poll loops run, instead of starving behind overlapping shared holds of `keep.lock` |
 | <a id="mx23"></a>[MX23](MX23-The-Transport-Takes-Its-Tokens-On-Its-Input.md) | M | - | The transport's tokens never in its environment: Porelo hands them on the transport's input, so no moment at its start leaves them readable |
-| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | - | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
+| <a id="mx75"></a>[MX75](MX75-A-Stalled-Client-Is-Closed.md) | S | - | A client that stalls halfway through a request loses its connection to the gate at the idle limit, and a test fails if that stops |
 | <a id="mx69"></a>[MX69](MX69-A-Lost-Message-Or-Copy-Fails-A-Test.md) | M | - | A silently dropped message, an unfilled sync gap, an unrecorded sender or a hollow restore fails a unit test |
 | <a id="mx70"></a>[MX70](MX70-The-Gates-Rules-Are-Held-To-Their-Edges.md) | S | - | Moving an edge of who belongs to a login, or of which redirect is the person's own client, fails a unit test |
 | <a id="mx71"></a>[MX71](MX71-The-Gates-Request-Parser-Is-Held-To-Its-Refusals.md) | S | - | A request that could read differently to the gate and the homeserver fails a unit test if it ever passes |
 | <a id="mx72"></a>[MX72](MX72-A-Token-Is-Random-And-An-Admin-Command-Takes-One-Argument.md) | S | - | A homeserver token not random, an admin command's user id unchecked or a credential over its limit fails a unit test |
 | <a id="mx73"></a>[MX73](MX73-Every-Trust-Path-Checks-The-Certificate.md) | S | - | Each `checkServerTrusted` overload refuses an unknown chain, and a file with several CAs trusts them all, under test |
 | <a id="mx74"></a>[MX74](MX74-Small-Refusals-Are-Held-By-Tests.md) | S | - | The smaller refusals, each cheap to hold, fail a unit test if removed |
-
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-
-## Backlog
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
-| <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
-| <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
-| <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
-| <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
-
-## Analyzed
-
-| # | Size | Blocked by | Open questions | What it covers |
-|---|---|---|---|---|
-| <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | 2 | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs |
-| <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | 0 | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes |
-
-## Accepted
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there |
-| <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
-
-## Idea
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx97"></a>[MX97](MX97-A-Verb-Refuses-A-Repeated-Flag-And-Repeats-No-Secret.md) | - | - | A lifecycle verb refuses a flag given twice with 64, and no failure line repeats a secret or a control character from a homeserver's error text |
-| <a id="mx83"></a>[MX83](MX83-The-Homeservers-Data-Survives-A-Volume-Prune.md) | - | - | The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked |
-| <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
-| <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
-| <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
-
-## Estimated
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
 
 ## Finished
 

@@ -1,7 +1,20 @@
 # MX98 — An Answer Goes Into The Chat The Person Wrote In
 
-**Status:** Review.
-**Size:** S - which of a task's direct chats `send --to <person>` writes into, and its tests; no change to Porelo.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX98",
+  "title": "An Answer Goes Into The Chat The Person Wrote In",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 1,
+  "blockedBy": [],
+  "covers": "A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open"
+}
+```
+
+**Why this size.** which of a task's direct chats `send --to <person>` writes into, and its tests; no change to Porelo.
 
 **What must be true.** A task's answer to a person's direct line goes into the chat the person wrote that line in, so
 the person reads it where they asked, however many chats with the task they still have open.

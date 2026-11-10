@@ -1,7 +1,20 @@
 # MX24 — The Room Outlives The Machine
 
-**Status:** Review.
-**Size:** M - two new verbs and a change to `setup`, the unit's mounts, a contract porelo-host reads, and an
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX24",
+  "title": "The Room Outlives The Machine",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 22,
+  "blockedBy": [],
+  "covers": "`backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore"
+}
+```
+
+**Why this size.** two new verbs and a change to `setup`, the unit's mounts, a contract porelo-host reads, and an
 integration test with the real homeserver; no other repository changes.
 
 **What must be true.** The local homeserver's conversation survives the machine it ran on: the transport writes a

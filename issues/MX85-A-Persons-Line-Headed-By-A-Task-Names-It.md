@@ -1,7 +1,20 @@
 # MX85 — A Person's Line Headed By A Task Names It
 
-**Status:** Review.
-**Size:** S - one method in `Person`, one call in `Poll`, their tests, and the decision it revises; the person
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX85",
+  "title": "A Person's Line Headed By A Task Names It",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 11,
+  "blockedBy": [],
+  "covers": "A person's line headed `Agent Pi: …`, typed with no pill, is meant for the member shown as Agent Pi, so Porelo wakes that task"
+}
+```
+
+**Why this size.** one method in `Person`, one call in `Poll`, their tests, and the decision it revises; the person
 file's `to` keeps its meaning and only names more accounts.
 
 **What must be true.** A person who writes `Agent Pi: …` in the project's room, as typed text with no pill, gets

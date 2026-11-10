@@ -1,7 +1,20 @@
 # MX52 — A Person Joins Another Project's Room Unchanged
 
-**Status:** Review.
-**Size:** S - one branch of `Lifecycle.join`, its answer and the doc's table, with an integration test; the answer
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX52",
+  "title": "A Person Joins Another Project's Room Unchanged",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 15,
+  "blockedBy": [],
+  "covers": "A person with an account for one project joins another project's room on the same homeserver by an invitation, keeping their password and sessions"
+}
+```
+
+**Why this size.** one branch of `Lifecycle.join`, its answer and the doc's table, with an integration test; the answer
 gains one shape Porelo and porelo-frontend show.
 
 **What must be true.** A person who already has an account on this homeserver for one project joins another project's

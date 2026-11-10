@@ -1,7 +1,20 @@
 # MX90 — The Room's Scenarios Are Rehearsed On A Host
 
-**Status:** Review.
-**Size:** S - one step list for the rehearsal and one try on a local VM host; no code that ships.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX90",
+  "title": "The Room's Scenarios Are Rehearsed On A Host",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 3,
+  "blockedBy": ["MX89"],
+  "covers": "A rehearsal proves on a host that a person's line reaches exactly the tasks meant (a head, `All agents:`, `@room`, nobody, a direct chat) and that the task's answer comes back"
+}
+```
+
+**Why this size.** one step list for the rehearsal and one try on a local VM host; no code that ships.
 
 **What must be true.** A rehearsal on a host proves, unattended, that what a person writes in the project's room
 reaches exactly the tasks it is meant for, and that a task's answer comes back to the person.

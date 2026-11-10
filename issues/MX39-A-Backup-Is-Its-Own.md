@@ -1,7 +1,20 @@
 # MX39 — A Backup Is Its Own
 
-**Status:** Review.
-**Size:** S - one class, `Keep`, and its tests; no contract another repository reads.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX39",
+  "title": "A Backup Is Its Own",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 18,
+  "blockedBy": [],
+  "covers": "A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled"
+}
+```
+
+**Why this size.** one class, `Keep`, and its tests; no contract another repository reads.
 
 **What must be true.** A copy `backup <dir>` reports as made holds the homeserver's database and the poll positions
 of that one backup, so a restored relay hands over exactly what came after its last poll; and no backup ever empties

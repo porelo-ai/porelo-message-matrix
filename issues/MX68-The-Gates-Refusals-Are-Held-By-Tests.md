@@ -1,7 +1,20 @@
 # MX68 — The Gate's Refusals Are Held By Tests
 
-**Status:** Review.
-**Size:** M - about twenty cases in one test class against its fake backend, no production code unless a test finds a defect.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX68",
+  "title": "The Gate's Refusals Are Held By Tests",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 20,
+  "blockedBy": [],
+  "covers": "Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail"
+}
+```
+
+**Why this size.** about twenty cases in one test class against its fake backend, no production code unless a test finds a defect.
 
 **What must be true.** Whoever removes one of the gate's refusals of a login, a registration or a reserved alias sees a unit test fail. Today mutation testing can remove these and every unit test passes.
 

@@ -1,7 +1,20 @@
 # MX43 — This Repository Moves Into A Porelo Task
 
-**Status:** Backlog; blocked by [MX80](README.md#mx80).
-**Size:** S - nothing to build in this repository's code once [MX80](README.md#mx80) is done; the work is the image's
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX43",
+  "title": "This Repository Moves Into A Porelo Task",
+  "state": "Backlog",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 3,
+  "blockedBy": ["MX80"],
+  "covers": "This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back"
+}
+```
+
+**Why this size.** nothing to build in this repository's code once [MX80](README.md#mx80) is done; the work is the image's
 dry run, the trial move's steps and this issue worked to Review from inside the task: about 35 minutes of the agent's
 work, 15 for the dry run here and 20 in the task, beside the waits for the image, the suite, the forge's Build, the
 reading from outside and the way back.

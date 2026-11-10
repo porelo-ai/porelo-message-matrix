@@ -1,7 +1,21 @@
 # MX77 — The Room's Poll Has A Position Of Its Own
 
-**Status:** Analyzed.
-**Size:** M - `Poll` and its callers in `Lifecycle`, one key more in the transport's contract, docs, a decision and an
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX77",
+  "title": "The Room's Poll Has A Position Of Its Own",
+  "state": "Analyzed",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 2,
+  "blockedBy": [],
+  "covers": "`poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes",
+  "openQuestions": 0
+}
+```
+
+**Why this size.** `Poll` and its callers in `Lifecycle`, one key more in the transport's contract, docs, a decision and an
 integration test; nothing in Porelo.
 
 **What must be true.** `poll --persons` reads one project's room and no other room of the account it reads as, and

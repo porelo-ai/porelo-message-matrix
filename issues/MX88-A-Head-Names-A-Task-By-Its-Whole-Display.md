@@ -1,7 +1,20 @@
 # MX88 — A Head Names A Task By Its Whole Display
 
-**Status:** Review.
-**Size:** S - one method in `MeantFor`, which a person's line and the room tool use, its tests and the contract's head rule.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX88",
+  "title": "A Head Names A Task By Its Whole Display",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 8,
+  "blockedBy": [],
+  "covers": "A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so"
+}
+```
+
+**Why this size.** one method in `MeantFor`, which a person's line and the room tool use, its tests and the contract's head rule.
 
 **What must be true.** A task is shown in the room as `Agent Pi` or, when its name differs from its agent, as
 `Agent Pi (fix)`. A head `Agent Pi:` names only the member shown `Agent Pi`, never `Agent Pi (fix)`, and a head

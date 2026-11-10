@@ -1,7 +1,20 @@
 # MX51 — Long Verbs Say How Far They Are
 
-**Status:** Review.
-**Size:** S - stderr lines in `LocalHomeserver.awaitUp` and `Keep`, with their tests; stdout's contract is
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX51",
+  "title": "Long Verbs Say How Far They Are",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 14,
+  "blockedBy": [],
+  "covers": "`setup`, `backup` and `restore` say on stderr what they wait for and for how long, every 10 s; waits for porelo to show a transport's stderr as it comes"
+}
+```
+
+**Why this size.** stderr lines in `LocalHomeserver.awaitUp` and `Keep`, with their tests; stdout's contract is
 unchanged.
 
 **What must be true.** A person who runs a command that waits on the homeserver sees what it waits for and how long

@@ -1,7 +1,20 @@
 # MX70 — The Gate's Rules Are Held To Their Edges
 
-**Status:** Review.
-**Size:** S - table cases over plain functions in one test class.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX70",
+  "title": "The Gate's Rules Are Held To Their Edges",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 27,
+  "blockedBy": [],
+  "covers": "Moving an edge of who belongs to a login, or of which redirect is the person's own client, fails a unit test"
+}
+```
+
+**Why this size.** table cases over plain functions in one test class.
 
 **What must be true.** `GateRules` decides who belongs to a login and which redirect is the person's own client; moving any of its edges fails a unit test.
 

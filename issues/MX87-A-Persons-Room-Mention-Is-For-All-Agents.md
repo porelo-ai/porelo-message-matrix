@@ -1,7 +1,20 @@
 # MX87 — A Person's Room Mention Is For All Agents
 
-**Status:** Review.
-**Size:** S - one condition in `Person`, its tests and the contract line Porelo reads.
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX87",
+  "title": "A Person's Room Mention Is For All Agents",
+  "state": "Review",
+  "size": "S",
+  "priority": "Medium",
+  "rank": 9,
+  "blockedBy": [],
+  "covers": "A person's line that mentions the whole room (`@room`) is marked `\"all\": true`, as one headed `All agents:`"
+}
+```
+
+**Why this size.** one condition in `Person`, its tests and the contract line Porelo reads.
 
 **What must be true.** A person who mentions the whole room (`@room`, which the client sends as `m.mentions.room`) in
 the project's room gets a person file marked `"all": true`, so Porelo hands it to every task, as for a line headed

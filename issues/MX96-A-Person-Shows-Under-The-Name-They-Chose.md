@@ -1,7 +1,20 @@
 # MX96 — A Person Shows Under The Name They Chose
 
-**Status:** Review.
-**Size:** M - `keep-room`'s input and its naming of accounts, one fix in the gate's sign-in, their contract in
+```json
+{
+  "$schema": "issue-1.json",
+  "id": "MX96",
+  "title": "A Person Shows Under The Name They Chose",
+  "state": "Review",
+  "size": "M",
+  "priority": "Medium",
+  "rank": 5,
+  "blockedBy": [],
+  "covers": "On a host a person shows in the room under the name the host passes on `keep-room`'s input, set when their account shows none, never over a name of their own"
+}
+```
+
+**Why this size.** `keep-room`'s input and its naming of accounts, one fix in the gate's sign-in, their contract in
 `doc/transport.md`, which Porelo reads, and tests against the real homeserver behind its gate.
 
 **What must be true.** In a project's room a person shows under the name they chose once, such as `Ada`, never as their
