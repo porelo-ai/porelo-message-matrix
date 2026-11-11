@@ -1523,6 +1523,54 @@ class RoomRehearsalTest {
     }
 
     /**
+     * Harm guarded: another person of the project, the host's own admin among them, counted as a
+     * stranger because the run knows only the signed-in person, so a room that behaves fails; or a
+     * login no host has, or one named by hand beside a room given by hand, taken for a person.
+     */
+    @Test
+    void aProjectsOtherPersonsAreNamedByTheirLogins() throws Exception {
+        final RoomRehearsal.Arguments given =
+                RoomRehearsal.Arguments.parse(
+                        new String[] {
+                            "--socket",
+                            "/s",
+                            "--project",
+                            "foo",
+                            "--person-login",
+                            "carol",
+                            "--person-login",
+                            "bob",
+                            "--talk-log",
+                            "true"
+                        });
+        assertThat(RoomRehearsal.persons(given, "@bob:matrix.example"))
+                .as("each login on the signed-in person's server, the person itself left out")
+                .containsExactlyInAnyOrder("@carol:matrix.example");
+        for (final List<String> wrong :
+                List.of(
+                        List.of("--project", "foo", "--person-login", "Carol"),
+                        List.of("--project", "foo", "--person-login", "carol.x"),
+                        List.of("--project", "foo", "--person-login", "porelo"),
+                        List.of("--project", "foo", "--person-login", "c", "--person-login", "c"),
+                        List.of(
+                                "--room",
+                                "!r:x",
+                                "--task",
+                                "pi=@pi.bob:x=Agent Pi",
+                                "--task",
+                                "core=@core.bob:x=Agent Core",
+                                "--person-login",
+                                "carol"))) {
+            final List<String> args = new ArrayList<>(List.of("--socket", "/s"));
+            args.addAll(wrong);
+            args.addAll(List.of("--talk-log", "true"));
+            final Failure refused = projectRefusal(args.toArray(String[]::new));
+            assertThat(refused).as("refused: " + wrong).isNotNull();
+            assertThat(refused.exitCode()).as("its exit: " + wrong).isEqualTo(Exit.USAGE);
+        }
+    }
+
+    /**
      * Harm guarded: a rehearsal that takes another person's task, another project's, a helper, a
      * person or a stopped task's left account for a running task of the project, so a run judges
      * accounts nobody started for it.

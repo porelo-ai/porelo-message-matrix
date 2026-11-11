@@ -68,7 +68,9 @@ class RehearseBusyRoomTest {
         for (final List<String> wrong :
                 List.of(
                         List.of("bob", "host.example.org"),
-                        List.of("bob", "host.example.org", "foo", "more"),
+                        List.of("bob", "host.example.org", "foo", "More"),
+                        List.of("bob", "host.example.org", "foo", "carol", "-oX"),
+                        List.of("bob", "host.example.org", "foo", "carol\nx"),
                         List.of("Bob", "host.example.org", "foo"),
                         List.of("bob", "-oProxyCommand=x", "foo"),
                         List.of("bob", "host.example.org", "Foo"),
@@ -112,6 +114,21 @@ class RehearseBusyRoomTest {
         assertThat(ProcessHandle.of(forward).map(ProcessHandle::isAlive))
                 .as("the forward is closed")
                 .isNotEqualTo(java.util.Optional.of(true));
+    }
+
+    /**
+     * Harm guarded: the project's other persons not reaching the rehearsal, so their accounts and
+     * helpers in the room are taken for strangers.
+     */
+    @Test
+    void theProjectsOtherPersonsReachTheRehearsal() throws Exception {
+        final Run run = run(List.of("bob", "host.example.org", "foo", "carol", "dave"), Map.of());
+
+        assertThat(run.exit()).as(run.output()).isZero();
+        assertThat(Files.readAllLines(calls).get(1))
+                .as("the rehearsal")
+                .contains(
+                        " --project foo --person-login carol --person-login dave --talk-log ssh ");
     }
 
     /** Harm guarded: a host out of reach read as a room that misbehaves, or waited on for ever. */

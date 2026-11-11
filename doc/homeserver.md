@@ -207,12 +207,14 @@ and status. The administrator token is read only for gate operations and is neve
 Whether a host's tasks answer a person in the project's room as they should is rehearsed from the development machine,
 as one of the host's people, through the gate:
 
-    build/rehearse-busy-room.sh <login on the host> <host> <project>
+    build/rehearse-busy-room.sh <login on the host> <host> <project> [<person>...]
 
 - **It needs nothing typed in.** As `<login>` it forwards the host's `/run/porelo-matrix/client.sock`, signs in through
   the gate's sign-in as a browser does, finds the room `#porelo-<project>:<server>` in the homeserver's directory and
   the project's running tasks among its members: each `@porelo-<project>-<task>.<login>:<server>`, by the name the
   room shows. A stopped task has left the room and is not among them; two or more must run.
+- **The project's other persons are named by their logins**, each a further `<person>`: their accounts and their
+  helpers in the room are no stranger's. Any other member, or a line of one, fails the scenario of the room's order.
 - **It prints the room and the tasks it found, then one line per scenario**, `OK`, `FAIL` with what was asked and
   what came back, or `SKIP`, and nothing of the session. Each task's record of what reached it is read with
   `porelo talk log` on the host.

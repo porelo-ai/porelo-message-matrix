@@ -27,8 +27,10 @@ import org.jspecify.annotations.Nullable;
  * <@account> ...] --talk-log <command...>}; the task's name is appended to the {@code talk log}
  * command, which runs on the host as the person (for instance {@code ssh <person>@<host> porelo
  * talk log}). {@code --person} names a further person of the room, whose lines and membership are
- * no stranger's. One line per scenario, {@code OK} or {@code FAIL}, with what was asked and what
- * came back; exit 0 only when every scenario held.
+ * no stranger's; with {@code --project}, {@code --person-login <login>} names one by the login
+ * alone, as that login's account on the signed-in person's server, with that login's helpers. One
+ * line per scenario, {@code OK} or {@code FAIL}, with what was asked and what came back; exit 0
+ * only when every scenario held.
  */
 final class RoomRehearsal {
 
@@ -186,6 +188,7 @@ final class RoomRehearsal {
         final String room;
         final List<Task> tasks;
         final String project = given.project();
+        Set<String> persons = given.persons();
         if (project == null) {
             room = java.util.Objects.requireNonNull(given.room());
             tasks = given.tasks();
@@ -196,7 +199,8 @@ final class RoomRehearsal {
             // Joined first: a person only invited may not read who is in the room.
             client.step("join " + room);
             tasks = running(client.shown(room), project, user);
-            Arguments.distinct(tasks, given.persons());
+            persons = persons(given, user);
+            Arguments.distinct(tasks, persons);
             out.println("ROOM " + room + " (" + alias + ")");
             tasks.forEach(
                     task ->
@@ -216,7 +220,7 @@ final class RoomRehearsal {
                                 client,
                                 room,
                                 tasks,
-                                given.persons(),
+                                persons,
                                 command(given.talkLog(), Duration.ofSeconds(60)),
                                 given.answerWithin(),
                                 given.quietFor(),
@@ -861,6 +865,22 @@ final class RoomRehearsal {
         };
     }
 
+    /**
+     * The further persons of the room: each {@code --person}, and each {@code --person-login} as
+     * that login's account on the signed-in person's server, which a project's run learns only at
+     * the sign-in.
+     *
+     * @param given the command line
+     * @param user the signed-in person
+     */
+    static Set<String> persons(final Arguments given, final String user) {
+        final String server = user.substring(user.indexOf(':'));
+        final Set<String> persons = new java.util.LinkedHashSet<>(given.persons());
+        given.personLogins().forEach(login -> persons.add("@" + login + server));
+        persons.remove(user);
+        return Set.copyOf(persons);
+    }
+
     /** The command line, read whole before anything is asked of the host. */
     record Arguments(
             Path socket,
@@ -868,6 +888,7 @@ final class RoomRehearsal {
             @Nullable String project,
             List<Task> tasks,
             Set<String> persons,
+            Set<String> personLogins,
             List<String> talkLog,
             Duration answerWithin,
             Duration quietFor) {
@@ -878,6 +899,7 @@ final class RoomRehearsal {
             String project = null;
             final List<Task> tasks = new ArrayList<>();
             final Set<String> persons = new java.util.LinkedHashSet<>();
+            final Set<String> personLogins = new java.util.LinkedHashSet<>();
             final List<String> talkLog = new ArrayList<>();
             long answer = 300;
             long quiet = 60;
@@ -898,6 +920,14 @@ final class RoomRehearsal {
                                     Exit.USAGE, "--person takes an @account, each once: " + person);
                         }
                     }
+                    case "--person-login" -> {
+                        final String login = value(args, ++i);
+                        if (!Login.valid(login) || !personLogins.add(login)) {
+                            throw new Failure(
+                                    Exit.USAGE,
+                                    "--person-login takes a login, each once: " + login);
+                        }
+                    }
                     case "--answer-within" -> {
                         answer = bounded(once(answerGiven ? "" : null, args, ++i));
                         answerGiven = true;
@@ -914,7 +944,11 @@ final class RoomRehearsal {
                 }
             }
             final boolean byHand =
-                    project == null && room != null && room.startsWith("!") && tasks.size() >= 2;
+                    project == null
+                            && room != null
+                            && room.startsWith("!")
+                            && tasks.size() >= 2
+                            && personLogins.isEmpty();
             final boolean byProject =
                     project != null
                             && PROJECT.matcher(project).matches()
@@ -926,6 +960,7 @@ final class RoomRehearsal {
                         "usage: RoomRehearsal --socket <path> (--room <!room-id> --task"
                                 + " <task>=<@account>=<display> (two or more) | --project <project>)"
                                 + " [--answer-within <s>] [--quiet-for <s>] [--person <@account>...]"
+                                + " [--person-login <login>...] (with --project)"
                                 + " --talk-log <command...>");
             }
             if (byHand) {
@@ -937,6 +972,7 @@ final class RoomRehearsal {
                     project,
                     tasks,
                     persons,
+                    personLogins,
                     talkLog,
                     Duration.ofSeconds(answer),
                     Duration.ofSeconds(quiet));

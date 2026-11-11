@@ -4,11 +4,13 @@
 # porelo-message-matrix, and copied into porelo-host as it is.
 # It runs this repository's build/rehearse-busy-room.sh from a fresh clone of main in its own scratch directory, from
 # REHEARSAL_MATRIX_SOURCE (a URL, path or bundle; default the public repository over https), and writes in no checkout.
+# The project's other active persons come from the host's own answer, <report>/org-status.json, which the run's project
+# step wrote as root with `porelo-host org status --json`: their accounts and helpers in the room are no stranger's.
 # Every ssh goes as the person alone: the run's agent, the run's pinned host key, no other key. Its exit is the rehearsal's, so 0 only when every scenario held; 77 (SKIP)
 # when too little time is left before the hard stop to wait for the tasks' answers.
 set -u
 for name in REHEARSAL_HOST REHEARSAL_PERSON REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS REHEARSAL_PROJECT \
-    REHEARSAL_DEADLINE; do
+    REHEARSAL_DEADLINE REHEARSAL_REPORT; do
     eval "value=\${$name:-}"
     # shellcheck disable=SC2154 # set by the eval above
     [ -n "$value" ] || {
@@ -23,6 +25,25 @@ if [ "$left" -lt 1800 ]; then
     exit 77
 fi
 source=${REHEARSAL_MATRIX_SOURCE:-https://github.com/porelo-ai/porelo-message-matrix.git}
+
+# Every other person the host has active in the project, as the host itself answered; without that answer the run cannot
+# tell a person of the project from a stranger.
+status=$REHEARSAL_REPORT/org-status.json
+persons=$(python3 -I -c 'import json,sys
+status=json.load(open(sys.argv[1]))
+for row in status.get("persons") or []:
+    if (row.get("state") == "active" and row.get("login") != sys.argv[2]
+            and any(p.get("project") == sys.argv[3] for p in row.get("projects") or [])):
+        print(row["login"])' "$status" "$REHEARSAL_PERSON" "$REHEARSAL_PROJECT") || {
+    echo "busy-room: the host's persons could not be read from $status"
+    exit 2
+}
+# One login per word, unglobbed; the rehearsal's script refuses any word that is not a login.
+set -f
+# shellcheck disable=SC2086 # split on purpose
+set -- $persons
+set +f
+echo "busy-room: the project's other persons: ${*:-none}"
 
 work=$(mktemp -d) || exit 2
 # shellcheck disable=SC2329 # run by the EXIT trap
@@ -54,7 +75,7 @@ export REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS
 export MAVEN_ARGS="${MAVEN_ARGS:--o -Daether.enhancedLocalRepository.split=true -Daether.enhancedLocalRepository.localPrefix=installed/matrix}"
 
 PATH="$work/bin:$PATH" timeout --kill-after=10 $((left - 60)) \
-    "$work/matrix/build/rehearse-busy-room.sh" "$REHEARSAL_PERSON" "$REHEARSAL_HOST" "$REHEARSAL_PROJECT"
+    "$work/matrix/build/rehearse-busy-room.sh" "$REHEARSAL_PERSON" "$REHEARSAL_HOST" "$REHEARSAL_PROJECT" "$@"
 status=$?
 echo "busy-room: the rehearsal ended $status"
 # 77 is the run's SKIP, but from the rehearsal it is a refusal by the gate or the homeserver: a failure.

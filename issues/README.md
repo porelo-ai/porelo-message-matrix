@@ -40,6 +40,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx106"></a>[MX106](MX106-The-Busy-Room-Knows-The-Projects-Other-Persons.md) | XS | - | The busy-room step names the project's other active persons, as the host answers them, to the rehearsal, so their accounts and helpers in the room are no stranger's |
 | <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
 | <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes `main` from a fresh clone in its own scratch directory and never writes in a checkout of this repository |
 | <a id="mx102"></a>[MX102](MX102-The-Busy-Room-Rehearsal-Is-One-Call.md) | S | - | build/rehearse-busy-room.sh <login> <host> <project> runs the busy room's rehearsal against a host as one call: it finds the project's room and its running tasks itself and keeps the rehearsal's exit |
