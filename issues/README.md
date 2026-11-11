@@ -13,6 +13,7 @@ sequence.
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx105"></a>[MX105](MX105-A-Stopped-Task-Leaves-Its-Own-Homeservers-Room.md) | S | - | On the account's own homeserver, a verb takes a stopped task's account out of the project's room without deactivating it, so the next `enroll` brings the same account back |
+| <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
 
 ## Accepted
 
