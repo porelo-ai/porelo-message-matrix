@@ -209,14 +209,14 @@ class KeepRoomIT {
                         "--project",
                         "demo",
                         "--task",
-                        "worker",
+                        "porelo-demo-worker",
                         "--login",
                         login);
         assertThat(enroll.exit()).as("enroll: %s", enroll.err()).isZero();
         assertThat(room("demo"))
                 .as("the login's accounts by name")
                 .containsEntry(id("porelo." + login), "join")
-                .containsEntry(id("worker." + login), "join");
+                .containsEntry(id("porelo-demo-worker." + login), "join");
 
         final MatrixClient asPorelo = nobody.as(held.get(Config.ADMIN_TOKEN));
         assertThat(
@@ -236,7 +236,7 @@ class KeepRoomIT {
         assertThat(texts(dropped.path("removed")))
                 .as("the dropped login's every account, its provisioning one first")
                 .startsWith(id("porelo." + login))
-                .contains(id("worker." + login), id(login));
+                .contains(id("porelo-demo-worker." + login), id(login));
         assertThat(room("demo").entrySet())
                 .as("nothing of the login is left in the room")
                 .noneMatch(
@@ -505,7 +505,7 @@ class KeepRoomIT {
                         "--project",
                         "demo",
                         "--task",
-                        "worker",
+                        "porelo-demo-worker",
                         "--login",
                         login);
         assertThat(enroll.exit()).as("enroll: %s", enroll.err()).isZero();

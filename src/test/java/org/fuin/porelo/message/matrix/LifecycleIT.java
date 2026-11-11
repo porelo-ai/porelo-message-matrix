@@ -1303,23 +1303,30 @@ class LifecycleIT {
     }
 
     /**
-     * Harm guarded: a person joining under a retired task's name must not take over its account,
-     * and with it every line the task wrote in the room.
+     * Harm guarded: a person joining under the name of an account that left the room by itself - a
+     * retired task's, or a person's who walked out - must not take it over, and with it every line
+     * it wrote in the room.
      */
     @Test
-    @DisplayName("join without --reset refuses the name of a retired task's account with 77")
-    void joinDoesNotTakeOverARetiredTask() throws Exception {
+    @DisplayName("join without --reset refuses an account that left the room by itself with 77")
+    void joinDoesNotTakeOverAnAccountThatLeftByItself() throws Exception {
         final JsonNode setup = run(firstRun(), "setup", "--project", PROJECT);
         final Map<String, String> kept =
                 with(firstRun(), setup.path("account"), setup.path("secrets"));
-        run(kept, "enroll", "--project", PROJECT, "--task", "erin");
-        run(kept, "retire", "--project", PROJECT, "--task", "erin");
+        final JsonNode credentials =
+                run(kept, "join", "--project", PROJECT, "--person", "erin").path("login");
+        final String room = setup.path("conversation").asText();
+        new MatrixClient(Config.from(kept))
+                .as(login("erin", credentials.path("password").asText()))
+                .post(
+                        "/_matrix/client/v3/rooms/" + MatrixClient.segment(room) + "/leave",
+                        MatrixClient.JSON.createObjectNode());
 
         final Transport.Result joined =
                 attempt(kept, "join", "--project", PROJECT, "--person", "erin");
 
         assertThat(joined.exit())
-                .as("a retired task's name is not free for a person: %s", joined.err())
+                .as("an account that left by itself is not free for a person: %s", joined.err())
                 .isEqualTo(Exit.NOT_PERMITTED);
     }
 

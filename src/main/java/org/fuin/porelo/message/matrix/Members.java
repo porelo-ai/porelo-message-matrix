@@ -119,13 +119,12 @@ final class Members {
                 || localpart.startsWith("porelo-relay-")) {
             return new Kind("helper", null, null);
         }
-        final String taskPrefix = "porelo-" + project + "-";
         if (central) {
             final int dot = localpart.lastIndexOf('.');
-            if (dot > 0 && localpart.startsWith(taskPrefix)) {
+            if (dot > 0) {
                 final String task = localpart.substring(0, dot);
                 final String owner = localpart.substring(dot + 1);
-                if (task.length() > taskPrefix.length() && named(task) && Login.valid(owner)) {
+                if (task(task, project) && Login.valid(owner)) {
                     return new Kind("task", task, owner);
                 }
             }
@@ -133,15 +132,27 @@ final class Members {
                     ? new Kind("person", null, null)
                     : new Kind("other", null, null);
         }
-        if (localpart.startsWith(taskPrefix)
-                && localpart.length() > taskPrefix.length()
-                && named(localpart)) {
+        if (task(localpart, project)) {
             return new Kind("task", localpart, null);
         }
         // join gives a person a name of the transport's, never one starting so.
         return named(localpart) && !localpart.startsWith(Lifecycle.ADMIN)
                 ? new Kind("person", null, null)
                 : new Kind("other", null, null);
+    }
+
+    /**
+     * Whether {@code name} is a task of {@code project} as this class reads one, {@code
+     * porelo-<project>-<task>}: the one rule {@code enroll} and {@code members} share.
+     */
+    static boolean task(final String name, final String project) {
+        final String prefix = "porelo-" + project + "-";
+        return name.startsWith(prefix)
+                && name.length() > prefix.length()
+                && !name.startsWith("porelo-relay-")
+                // The host's gate takes no task ending in a dot before its login.
+                && !name.endsWith(".")
+                && named(name);
     }
 
     private static boolean named(final String name) {

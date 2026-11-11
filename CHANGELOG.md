@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `enroll --project P --task T` refuses (78) a `T` that is not `porelo-P-<task>`, before any account is made: `members`
+  would read such an account as a person or not at all, so the task would get no line meant for it.
 - `send --to <person>` answers only into a direct chat the task is still in: one it left or was taken out of is passed
   over, where the answer failed with 77 before although another chat was open. A chat whose members the task may not
   see (403, 404) is passed over too, instead of stopping the send before the other chats were looked at.

@@ -89,7 +89,7 @@ class MainTest {
                         "--project",
                         "p",
                         "--task",
-                        "t",
+                        "porelo-p-t",
                         "--loopback-only");
 
         assertThat(exit).as(stderr()).isEqualTo(Exit.CONFIG);

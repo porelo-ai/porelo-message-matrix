@@ -27,12 +27,6 @@ sequence.
 | <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs | 2 |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
-
 ## Backlog
 
 | # | Size | Blocked by | What it covers |
@@ -45,6 +39,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
 | <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes `main` from a fresh clone in its own scratch directory and never writes in a checkout of this repository |
 | <a id="mx102"></a>[MX102](MX102-The-Busy-Room-Rehearsal-Is-One-Call.md) | S | - | build/rehearse-busy-room.sh <login> <host> <project> runs the busy room's rehearsal against a host as one call: it finds the project's room and its running tasks itself and keeps the rehearsal's exit |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |

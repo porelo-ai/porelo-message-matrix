@@ -102,7 +102,7 @@ class DescribeTest {
         for (final String[] args :
                 new String[][] {
                     {"setup", "--project", "p", "--login", "node-1"},
-                    {"enroll", "--project", "p", "--task", "t", "--login", "node-1"},
+                    {"enroll", "--project", "p", "--task", "porelo-p-t", "--login", "node-1"},
                     {"retire", "--project", "p", "--task", "t", "--login", "node-1"},
                     {"join", "--project", "p", "--person", "n", "--login", "node-1"},
                     {"clear", "--project", "p", "--login", "node-1"}

@@ -390,6 +390,59 @@ class LifecycleTest {
     }
 
     /**
+     * Harm guarded: a task enrolled under a name the room's readers do not take as a task of its
+     * project gets no line meant for it, and nothing says so.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {
+                "porelo-demo_x",
+                "porelo-other-x",
+                "porelo-demo-",
+                "worker",
+                "porelo-demo-x.",
+                "porelo-relay-demo-x"
+            })
+    void enrollRefusesATaskNameMembersCannotReadBack(final String task) throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            org.assertj.core.api.Assertions.assertThat(
+                            reason(
+                                    central(homeserver.url()),
+                                    centralAccount(),
+                                    "enroll",
+                                    "--project",
+                                    "demo",
+                                    "--task",
+                                    task))
+                    .as("'%s' is no task of demo as members reads one", task)
+                    .startsWith(Exit.CONFIG + " ")
+                    .contains("porelo-demo-<task>");
+            org.assertj.core.api.Assertions.assertThat(homeserver.requests())
+                    .as("nothing reaches the homeserver for a refused name")
+                    .isEmpty();
+        }
+        org.assertj.core.api.Assertions.assertThat(
+                        reason("{}", account(), "enroll", "--project", "demo", "--task", task))
+                .as("the account's own homeserver refuses '%s' before it is started", task)
+                .startsWith(Exit.CONFIG + " ")
+                .contains("porelo-demo-<task>");
+    }
+
+    /** The name members reads as a task of its project, on both homeservers. */
+    @Test
+    void aTaskNameOfTheProjectIsATask() {
+        assertThat(Members.task("porelo-demo-x", "demo")).as("the contract's form").isTrue();
+        assertThat(Members.task("porelo-demo-a.b", "demo")).as("a dot inside the task").isTrue();
+        assertThat(Members.task("porelo-demo_x", "demo")).as("porelo's container form").isFalse();
+        assertThat(Members.task("porelo-demo-x.", "demo"))
+                .as("a trailing dot, which the host's gate refuses before the login")
+                .isFalse();
+        assertThat(Members.task("porelo-relay-x", "relay"))
+                .as("a relay's name stays a helper's, even in a project called relay")
+                .isFalse();
+    }
+
+    /**
      * Harm guarded: a host whose machine the homeserver let go (expelled, or the homeserver reset)
      * can never clear, so its give-back stops on a refusal nobody can act on.
      */

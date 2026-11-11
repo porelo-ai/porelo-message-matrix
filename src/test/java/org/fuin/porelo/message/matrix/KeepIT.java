@@ -149,7 +149,14 @@ class KeepIT {
         final JsonNode setup = lifecycle(env, unit, "setup", "--project", PROJECT);
         final Map<String, String> admin = with(env, setup.path("account"), setup.path("secrets"));
         final JsonNode enrolled =
-                lifecycle(admin, unit, "enroll", "--project", PROJECT, "--task", "worker");
+                lifecycle(
+                        admin,
+                        unit,
+                        "enroll",
+                        "--project",
+                        PROJECT,
+                        "--task",
+                        "porelo-demo-worker");
         final Map<String, String> task = with(env, enrolled.path("secrets"));
         final String room = setup.path("conversation").asText();
         send(task, room, "handed over before the copy");

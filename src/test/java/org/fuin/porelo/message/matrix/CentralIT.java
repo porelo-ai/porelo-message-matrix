@@ -243,13 +243,13 @@ class CentralIT {
                             "--project",
                             PROJECT,
                             "--task",
-                            "worker",
+                            "porelo-demo-worker",
                             "--login",
                             MACHINE_ONE);
             assertThat(enrolled.exit()).as("enroll: %s", enrolled.err()).isZero();
             assertThat(MatrixClient.JSON.readTree(enrolled.out()).path("address").asText())
                     .as("the task's account was registered over the socket")
-                    .startsWith("@worker." + MACHINE_ONE + ":");
+                    .startsWith("@porelo-demo-worker." + MACHINE_ONE + ":");
         }
     }
 
@@ -348,7 +348,7 @@ class CentralIT {
         assertThat(admitted.exit()).as("setup again: %s", admitted.err()).isZero();
 
         final String[] enroll = {
-            "enroll", "--project", PROJECT, "--task", "worker", "--login", MACHINE_TWO
+            "enroll", "--project", PROJECT, "--task", "porelo-demo-worker", "--login", MACHINE_TWO
         };
         final Map<String, String> noToken = new HashMap<>(account);
         noToken.remove(Config.REGISTRATION_TOKEN);
@@ -360,7 +360,7 @@ class CentralIT {
         assertThat(enrolled.out() + enrolled.err()).as("never its value").doesNotContain(token);
         assertThat(MatrixClient.JSON.readTree(enrolled.out()).path("address").asText())
                 .as("the task's account was registered")
-                .isEqualTo("@worker." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
+                .isEqualTo("@porelo-demo-worker." + MACHINE_TWO + ":" + Tuwunel.SERVER_NAME);
     }
 
     /** What a Porelo handing its secrets on the input writes there. */

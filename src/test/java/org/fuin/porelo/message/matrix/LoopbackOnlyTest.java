@@ -61,7 +61,12 @@ class LoopbackOnlyTest {
                     case "setup" -> new String[] {"setup", "--project", "p", "--loopback-only"};
                     case "enroll" ->
                             new String[] {
-                                "enroll", "--project", "p", "--task", "t", "--loopback-only"
+                                "enroll",
+                                "--project",
+                                "p",
+                                "--task",
+                                "porelo-p-t",
+                                "--loopback-only"
                             };
                     case "members" -> new String[] {"members", "--project", "p", "--loopback-only"};
                     default ->
@@ -104,7 +109,7 @@ class LoopbackOnlyTest {
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        "'enroll --project p --task t'",
+        "'enroll --project p --task porelo-p-t'",
         "'retire --project p --task t'",
         "'join --project p --person n'"
     })
@@ -195,7 +200,7 @@ class LoopbackOnlyTest {
         final String[] args =
                 "setup".equals(verb)
                         ? new String[] {"setup", "--project", "p"}
-                        : new String[] {"enroll", "--project", "p", "--task", "t"};
+                        : new String[] {"enroll", "--project", "p", "--task", "porelo-p-t"};
 
         run(
                 Map.of(Config.HOMESERVER, "https://127.0.0.1:1", Config.ADMIN_TOKEN, "a"),

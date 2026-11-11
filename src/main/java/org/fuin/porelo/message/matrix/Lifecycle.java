@@ -602,6 +602,7 @@ final class Lifecycle {
     private static ObjectNode enroll(
             final Options options, final Settings settings, final Map<String, String> env)
             throws Failure {
+        refuseANameNoTask(options);
         if (settings.homeserver() != null) {
             return enrollCentral(options, settings, env);
         }
@@ -685,6 +686,32 @@ final class Lifecycle {
                 central(settings.environment(url, account.accessToken()), login));
         answer.put("address", account.userId());
         return answer;
+    }
+
+    /**
+     * Refuses a task name {@code members} would not read back as a task of the project, before
+     * anything is made: such a task would get no line meant for it.
+     */
+    private static void refuseANameNoTask(final Options options) throws Failure {
+        final String task = required(options.task(), "--task");
+        if (!Members.task(task, options.project())) {
+            if (("porelo-" + options.project() + "-").startsWith("porelo-relay-")) {
+                throw new Failure(
+                        Exit.CONFIG,
+                        "project "
+                                + options.project()
+                                + " can enroll no task: porelo-relay-… names only a project's relay");
+            }
+            throw new Failure(
+                    Exit.CONFIG,
+                    "'"
+                            + task
+                            + "' is not a task name of project "
+                            + options.project()
+                            + ": a task is enrolled as porelo-"
+                            + options.project()
+                            + "-<task>, not ending in a dot");
+        }
     }
 
     private static String centralTask(final Options options) throws Failure {

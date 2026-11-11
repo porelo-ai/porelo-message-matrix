@@ -338,14 +338,14 @@ class GateIT {
                                 "--project",
                                 "demo",
                                 "--task",
-                                "worker",
+                                "porelo-demo-worker",
                                 "--login",
                                 login);
                 assertThat(enroll.exit()).as("enroll: %s", enroll.err()).isZero();
                 final JsonNode enrolled = MatrixClient.JSON.readTree(enroll.out());
                 assertThat(enrolled.path("address").asText())
                         .as("the task's account under the person's login")
-                        .isEqualTo("@worker." + login + ":localhost");
+                        .isEqualTo("@porelo-demo-worker." + login + ":localhost");
                 assertThat(enrolled.path("secrets").path(Config.LOGIN).asText())
                         .as("the task's secrets mark a central account")
                         .isEqualTo(login);
