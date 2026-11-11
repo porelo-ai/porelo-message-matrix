@@ -13,7 +13,6 @@ sequence.
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
 | <a id="mx105"></a>[MX105](MX105-A-Stopped-Task-Leaves-Its-Own-Homeservers-Room.md) | S | - | On the account's own homeserver, a verb takes a stopped task's account out of the project's room without deactivating it, so the next `enroll` brings the same account back |
-| <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
 
 ## Accepted
 
@@ -36,6 +35,12 @@ sequence.
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
+
+## Implementing
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
 
 ## Review
 

@@ -5,10 +5,10 @@
   "$schema": "issue-1.json",
   "id": "MX107",
   "title": "The Build's Outside Downloads Come From A Cache",
-  "state": "Idea",
+  "state": "Implementing",
   "size": "M",
-  "priority": "Medium",
-  "rank": 7,
+  "priority": "Highest",
+  "rank": 1,
   "blockedBy": [],
   "covers": "Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red"
 }
@@ -17,8 +17,9 @@
 **Why this size.** Four downloads across three workflows, each with its own cache: the homeserver image both
 through podman and as the binary the no-podman path unpacks. Plus the removal of older entries and one green run on each
 forge. Larger than S because the image takes two paths.
-**How it stands.** Idea (2026-11-11): filed for the porelo-project story ST317, after porelo-host's molecule went red
-on a registry's 504.
+**How it stands.** Implementing (2026-11-11): urgent on the operator's word (Agent Coordinator, 14:13Z), built by one
+external subagent and reviewed here; the changed workflows' own Build is the test, no VM run. Filed for the
+porelo-project story ST317, after porelo-host's molecule went red on a registry's 504.
 
 **What must be true.** A build, shared rules check or workflow check whose inputs have not changed downloads nothing
 from outside the forge except the Maven artifacts it newly needs. Each cache entry is keyed by the input's digest or
