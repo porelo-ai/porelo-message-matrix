@@ -32,6 +32,7 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes `main` from a fresh clone in its own scratch directory and never writes in a checkout of this repository |
+| <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
