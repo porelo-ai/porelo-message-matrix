@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX103",
   "title": "The Busy Room Step Leaves The Checkout Alone",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "XS",
   "priority": "High",
   "rank": 1,
