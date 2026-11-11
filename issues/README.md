@@ -36,16 +36,11 @@ sequence.
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
-
 ## Review
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
 | <a id="mx106"></a>[MX106](MX106-The-Busy-Room-Knows-The-Projects-Other-Persons.md) | XS | - | The busy-room step names the project's other active persons, as the host answers them, to the rehearsal, so their accounts and helpers in the room are no stranger's |
 | <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
 | <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes `main` from a fresh clone in its own scratch directory and never writes in a checkout of this repository |

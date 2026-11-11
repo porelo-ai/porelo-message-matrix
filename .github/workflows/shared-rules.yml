@@ -62,10 +62,33 @@ jobs:
                   JAVA_HOME="$JAVA_HOME_25_X64" ./mvnw -B -ntp -q -U -s settings.xml -Pci-tools dependency:build-classpath \
                       -Dmdep.outputFile="$RUNNER_TEMP/ci-tools.classpath"
 
+            # The GraalVM's archive is kept by its pinned digest, and porelo-machines checks it against that digest
+            # again after a hit; a moved pin is a new key, and GitHub drops the old one after seven days unused.
+            - name: The pinned GraalVM's digest
+              id: graalvm-pin
+              run: |
+                  set -euo pipefail
+                  sha256=$("$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.machines.Main jdk --print-sha256)
+                  [[ $sha256 =~ ^[0-9a-f]{64}$ ]] || { echo "::error::porelo-machines named no pinned digest: $sha256"; exit 1; }
+                  echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+            - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              id: graalvm-cache
+              with:
+                  path: ~/.cache/porelo-pinned/graalvm
+                  key: pinned-graalvm-${{ steps.graalvm-pin.outputs.sha256 }}
+
             - name: Install the pinned GraalVM
               run: |
                   "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
-                      org.fuin.porelo.machines.Main jdk --github
+                      org.fuin.porelo.machines.Main jdk --github --cache "$HOME/.cache/porelo-pinned/graalvm"
+
+            - if: steps.graalvm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ~/.cache/porelo-pinned/graalvm
+                  key: pinned-graalvm-${{ steps.graalvm-pin.outputs.sha256 }}
 
             - name: Refuse a shared rules block whose hash does not fit its text
               run: |

@@ -69,9 +69,22 @@ jobs:
                   key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
                   restore-keys: maven-
 
-            # rpmbuild for the .rpm, zlib's headers for the native image.
-            - name: Install what the packages are built with
-              run: sudo apt-get update -qq && sudo apt-get install -y -qq rpm zlib1g-dev
+            # rpmbuild for the .rpm, zlib's headers for the native image. GitHub's runner image holds both, so nothing
+            # is fetched from Ubuntu's archive, whose outage would fail the build; a runner without them installs them.
+            - name: What the packages are built with
+              run: |
+                  set -euo pipefail
+                  missing=""
+                  for package in rpm zlib1g-dev; do
+                      dpkg-query -W -f='${db:Status-Abbrev}' "$package" 2>/dev/null | grep -q '^ii' || missing="$missing $package"
+                  done
+                  if [ -z "$missing" ]; then
+                      echo "rpm and zlib1g-dev are installed on the runner"
+                      exit 0
+                  fi
+                  echo "::warning::the runner lacks$missing; installed from Ubuntu's archive"
+                  # shellcheck disable=SC2086 # one package per word
+                  sudo apt-get update -qq && sudo apt-get install -y -qq $missing
 
             # The runner's own Java only runs the tools; nothing it compiles is published. JAVA_HOME_25_X64 is
             # the runner's environment, not the workflow's, so it is read by the shell: ${{ env.… }} is empty.
@@ -85,10 +98,33 @@ jobs:
                   JAVA_HOME="$JAVA_HOME_25_X64" ./mvnw -B -ntp -q -U -s settings.xml -Pci-tools dependency:build-classpath \
                       -Dmdep.outputFile="$RUNNER_TEMP/ci-tools.classpath"
 
+            # The GraalVM's archive is kept by its pinned digest, and porelo-machines checks it against that digest
+            # again after a hit; a moved pin is a new key, and GitHub drops the old one after seven days unused.
+            - name: The pinned GraalVM's digest
+              id: graalvm-pin
+              run: |
+                  set -euo pipefail
+                  sha256=$("$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.machines.Main jdk --print-sha256)
+                  [[ $sha256 =~ ^[0-9a-f]{64}$ ]] || { echo "::error::porelo-machines named no pinned digest: $sha256"; exit 1; }
+                  echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+            - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              id: graalvm-cache
+              with:
+                  path: ~/.cache/porelo-pinned/graalvm
+                  key: pinned-graalvm-${{ steps.graalvm-pin.outputs.sha256 }}
+
             - name: Install the pinned GraalVM
               run: |
                   "$JAVA_HOME_25_X64/bin/java" -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
-                      org.fuin.porelo.machines.Main jdk --github
+                      org.fuin.porelo.machines.Main jdk --github --cache "$HOME/.cache/porelo-pinned/graalvm"
+
+            - if: steps.graalvm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ~/.cache/porelo-pinned/graalvm
+                  key: pinned-graalvm-${{ steps.graalvm-pin.outputs.sha256 }}
 
             - name: Refuse an action that is not pinned
               run: |
@@ -126,56 +162,113 @@ jobs:
                   java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
                       check-releases "$RUNNER_TEMP/effective-pom.xml" --requires org.fuin.porelo:porelo-release
 
-            # The tests start the homeserver from the image homeserver/Dockerfile pins, with podman. A runner without
-            # podman, as the host's forge has, gets that image's binary by the same digest, each manifest and layer
-            # checked against its digest, and the tests run it as a task does; the tests that need a container then
-            # skip. ghcr.io's pull token is anonymous and still kept off the command line.
-            - name: The homeserver where no container starts
+            # The tests start the homeserver from the image homeserver/Dockerfile pins. Its index, manifest, config and
+            # layers are kept as fetched, an OCI layout keyed by the pinned digest, and every file is checked against
+            # its digest again after a hit; a moved pin is a new key, and GitHub drops the old one after seven days
+            # unused. ghcr.io's pull token is anonymous and still kept off the command line.
+            - name: The homeserver's pinned image
+              id: tuwunel-pin
               run: |
                   set -euo pipefail
-                  if command -v podman > /dev/null; then
-                      echo "podman: the tests start the homeserver's image"
-                      exit 0
-                  fi
-                  dir="$RUNNER_TEMP/tuwunel"
-                  mkdir -p "$dir"
-                  ref=$(sed -n 's|^FROM \(ghcr\.io/[^:@]*\)[^@]*@\(sha256:[0-9a-f]\{64\}\)$|\1 \2|p' homeserver/Dockerfile)
-                  read -r image digest <<< "$ref" || true
-                  [ -n "${digest:-}" ] || { echo "::error::homeserver/Dockerfile pins no ghcr.io image by digest"; exit 1; }
+                  ref=$(sed -n 's|^FROM \(ghcr\.io/[^:@]*[^@]*@sha256:[0-9a-f]\{64\}\)$|\1|p' homeserver/Dockerfile)
+                  [ -n "$ref" ] || { echo "::error::homeserver/Dockerfile pins no ghcr.io image by digest"; exit 1; }
+                  echo "ref=$ref" >> "$GITHUB_OUTPUT"
+                  echo "sha256=${ref##*@sha256:}" >> "$GITHUB_OUTPUT"
+
+            - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              id: tuwunel-cache
+              with:
+                  path: ~/.cache/porelo-pinned/tuwunel
+                  key: pinned-tuwunel-${{ steps.tuwunel-pin.outputs.sha256 }}
+
+            - name: The homeserver's image, from its cache or ghcr.io
+              env:
+                  REF: ${{ steps.tuwunel-pin.outputs.ref }}
+              run: |
+                  set -euo pipefail
+                  layout="$HOME/.cache/porelo-pinned/tuwunel"
+                  blobs="$layout/blobs/sha256"
+                  mkdir -p "$blobs"
+                  image=${REF%@*}
                   repo=${image#ghcr.io/}
-                  token=$(curl -fsSL "https://ghcr.io/token?scope=repository:$repo:pull" | jq -r .token)
-                  # The token goes into curl's configuration, where a quote or a line break would add lines of its own.
-                  [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || { echo "::error::ghcr.io answered no plain token"; exit 1; }
-                  fetch() { # <manifests|blobs> <digest> <file>, kept only when its bytes are that digest
+                  repo=${repo%:*}
+                  digest=${REF##*@}
+                  token=
+                  fetch() { # <manifests|blobs> <digest>: kept as blobs/sha256/<hex> only when its bytes are that digest
                       [[ "$2" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::'$2' is no sha256 digest"; exit 1; }
+                      local file="$blobs/${2#sha256:}"
+                      if [ -f "$file" ] && echo "${2#sha256:}  $file" | sha256sum -c --status -; then
+                          return 0
+                      fi
+                      if [ -z "$token" ]; then
+                          token=$(curl -fsSL "https://ghcr.io/token?scope=repository:$repo:pull" | jq -r .token)
+                          # The token goes into curl's configuration, where a quote or a line break would add lines of its own.
+                          [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || { echo "::error::ghcr.io answered no plain token"; exit 1; }
+                          echo "fetching from ghcr.io: the cache does not hold all of $REF"
+                      fi
                       printf 'header = "Authorization: Bearer %s"\n' "$token" | curl -fsSL -K - \
                           -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json' \
-                          -o "$3" "https://ghcr.io/v2/$repo/$1/$2"
-                      echo "${2#sha256:}  $3" | sha256sum -c --quiet - || { echo "::error::$1 $2 is not what was pinned"; exit 1; }
+                          -o "$file.part" "https://ghcr.io/v2/$repo/$1/$2"
+                      echo "${2#sha256:}  $file.part" | sha256sum -c --quiet - || { echo "::error::$1 $2 is not what was pinned"; exit 1; }
+                      mv "$file.part" "$file"
                   }
-                  fetch manifests "$digest" "$dir/index.json"
+                  fetch manifests "$digest"
+                  index="$blobs/${digest#sha256:}"
                   manifest=$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64"
-                      and .platform.variant == null) | .digest' "$dir/index.json")
-                  [ "$(wc -w <<< "$manifest")" = 1 ] || { echo "::error::$image@$digest has no single linux/amd64 image"; exit 1; }
-                  fetch manifests "$manifest" "$dir/image.json"
-                  # A later layer's copy replaces an earlier one's, as in the image itself.
-                  jq -r '.layers[] | .mediaType + " " + .digest' "$dir/image.json" > "$dir/layers"
+                      and .platform.variant == null) | .digest' "$index")
+                  [ "$(wc -w <<< "$manifest")" = 1 ] || { echo "::error::$REF has no single linux/amd64 image"; exit 1; }
+                  fetch manifests "$manifest"
+                  fetch blobs "$(jq -r .config.digest "$blobs/${manifest#sha256:}")"
+                  jq -r '.layers[] | .mediaType + " " + .digest' "$blobs/${manifest#sha256:}" > "$RUNNER_TEMP/layers"
+                  while read -r type layer; do
+                      case "$type" in
+                          *.tar+zstd | *.tar+gzip) ;;
+                          *) echo "::error::a layer of $REF is $type"; exit 1 ;;
+                      esac
+                      fetch blobs "$layer"
+                  done < "$RUNNER_TEMP/layers"
+                  # Nothing but what this image needs stays, so the cache holds only the pinned image.
+                  { echo "$digest"; echo "$manifest"; jq -r '.config.digest, .layers[].digest' "$blobs/${manifest#sha256:}"; } \
+                      | sed 's/^sha256://' > "$RUNNER_TEMP/needed"
+                  find "$blobs" -type f -printf '%f\n' | { grep -vxF -f "$RUNNER_TEMP/needed" || true; } \
+                      | sed "s|^|$blobs/|" | xargs -r rm -f
+                  printf '{"imageLayoutVersion":"1.0.0"}' > "$layout/oci-layout"
+                  jq -n --arg digest "$digest" --argjson size "$(stat -c %s "$index")" --arg type "$(jq -r .mediaType "$index")" \
+                      '{schemaVersion: 2, manifests: [{mediaType: $type, digest: $digest, size: $size}]}' > "$layout/index.json"
+
+                  if command -v podman > /dev/null; then
+                      # Pulled from the layout, the image keeps the pinned index's digest; named as the Dockerfile names
+                      # it, the tests' podman finds it and asks no registry.
+                      id=$(podman pull -q "oci:$layout")
+                      podman tag "$id" "$image"
+                      podman image exists "$REF" || { echo "::error::podman does not find $REF after taking it from the cache"; exit 1; }
+                      echo "podman: the tests start the homeserver's image $REF"
+                      exit 0
+                  fi
+                  # A runner without podman, as the host's forge has, runs the image's own binary as a task does; the
+                  # tests that need a container then skip. A later layer's copy replaces an earlier one's, as in the image.
+                  dir="$RUNNER_TEMP/tuwunel"
+                  mkdir -p "$dir"
                   while read -r type layer; do
                       case "$type" in
                           *.tar+zstd) unpack=--zstd ;;
-                          *.tar+gzip) unpack=--gzip ;;
-                          *) echo "::error::a layer of $image@$digest is $type"; exit 1 ;;
+                          *) unpack=--gzip ;;
                       esac
-                      fetch blobs "$layer" "$dir/layer"
                       # Listed into a file: a pipe into grep -q would end tar early, and pipefail would read that as no match.
-                      tar "$unpack" -tf "$dir/layer" > "$dir/listing"
+                      tar "$unpack" -tf "$blobs/${layer#sha256:}" > "$dir/listing"
                       if grep -qxF usr/bin/tuwunel "$dir/listing"; then
-                          tar "$unpack" -xf "$dir/layer" -C "$dir" usr/bin/tuwunel
+                          tar "$unpack" -xf "$blobs/${layer#sha256:}" -C "$dir" usr/bin/tuwunel
                       fi
-                  done < "$dir/layers"
-                  rm -f "$dir/layer" "$dir/listing"
+                  done < "$RUNNER_TEMP/layers"
+                  rm -f "$dir/listing"
                   "$dir/usr/bin/tuwunel" --version
                   echo "MATRIX_TEST_TUWUNEL=$dir/usr/bin/tuwunel" >> "$GITHUB_ENV"
+
+            - if: steps.tuwunel-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ~/.cache/porelo-pinned/tuwunel
+                  key: pinned-tuwunel-${{ steps.tuwunel-pin.outputs.sha256 }}
 
             - name: Build, test against the native executable, and package
               timeout-minutes: 20

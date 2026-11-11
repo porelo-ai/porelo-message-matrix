@@ -23,16 +23,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * On a runner without podman the Build takes the homeserver's binary out of the pinned image
- * itself, and every integration test then runs what this step left. The step's own script runs here
- * against a stand-in for {@code ghcr.io}: a {@code curl} on the path serving files by the last part
- * of the URL. Tagged, since a change to the workflows alone starts no Build.
+ * The Build keeps the homeserver's pinned image as fetched, in a cache keyed by its digest, and on
+ * a runner without podman takes the binary out of it; every integration test then runs what this
+ * step left. The step's own script runs here against a stand-in for {@code ghcr.io}: a {@code curl}
+ * on the path serving files by the last part of the URL. Tagged, since a change to the workflows
+ * alone starts no Build.
  */
 @Tag("documents")
 class HomeserverStepTest {
 
     private static final Path BUILD = Path.of(".github", "workflows", "build.yml");
-    private static final String STEP = "The homeserver where no container starts";
+    private static final String PIN = "The homeserver's pinned image";
+    private static final String STEP = "The homeserver's image, from its cache or ghcr.io";
     private static final String GZIP = "application/vnd.oci.image.layer.v1.tar+gzip";
     private static final String OLD = "#!/bin/sh\necho tuwunel old\n";
     private static final String NEW = "#!/bin/sh\necho tuwunel new\n";
@@ -47,6 +49,8 @@ class HomeserverStepTest {
     private Path githubEnv;
     private Path requests;
     private Path configs;
+    private Path home;
+    private String ref;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -57,6 +61,7 @@ class HomeserverStepTest {
         githubEnv = directory.resolve("github-env");
         requests = directory.resolve("requests");
         configs = directory.resolve("configs");
+        home = Files.createDirectories(directory.resolve("home"));
         Files.createDirectories(work.resolve("homeserver"));
         // Only the tools the step names, so a podman installed here is not found.
         for (final String tool :
@@ -71,6 +76,10 @@ class HomeserverStepTest {
                         "wc",
                         "mkdir",
                         "rm",
+                        "mv",
+                        "stat",
+                        "find",
+                        "xargs",
                         "cat",
                         "env")) {
             Files.createSymbolicLink(bin.resolve(tool), Path.of("/usr/bin", tool));
@@ -199,9 +208,86 @@ class HomeserverStepTest {
                 .noneMatch(r -> r.contains("other"));
     }
 
+    // Prevents a registry that is down from failing a Build whose pinned image was fetched before.
+    @Test
+    @DisplayName(
+            "A second run takes the image from the cache, asks no registry, and keeps only its files")
+    void aSecondRunAsksNoRegistry() throws Exception {
+        pin(image(layer(entry("usr/bin/tuwunel", NEW))));
+        assertThat(run().exit()).as("the first run").isZero();
+        final Path blobs = home.resolve(".cache/porelo-pinned/tuwunel/blobs/sha256");
+        Files.writeString(blobs.resolve("stray"), "an earlier pin's file");
+        Files.delete(requests);
+        Files.delete(githubEnv);
+
+        final Run run = run();
+
+        assertThat(run.exit()).as("the step: %s", run.log()).isZero();
+        assertThat(requests).as("no request to the registry").doesNotExist();
+        assertThat(Files.readString(temp.resolve("tuwunel/usr/bin/tuwunel")))
+                .as("the binary the tests are given")
+                .isEqualTo(NEW);
+        assertThat(blobs.resolve("stray")).as("a file the pin does not name").doesNotExist();
+        assertThat(home.resolve(".cache/porelo-pinned/tuwunel/index.json"))
+                .as("the layout's index")
+                .content()
+                .contains(ref.substring(ref.indexOf('@') + 1));
+    }
+
+    // Prevents a cached file that is not its digest from reaching the tests.
+    @Test
+    @DisplayName("A cached file whose bytes are not its digest is fetched again")
+    void aDamagedCachedFileIsFetchedAgain() throws Exception {
+        final String layer = layer(entry("usr/bin/tuwunel", NEW));
+        pin(image(layer));
+        assertThat(run().exit()).as("the first run").isZero();
+        Files.writeString(
+                home.resolve(".cache/porelo-pinned/tuwunel/blobs/sha256")
+                        .resolve(layer.substring("sha256:".length())),
+                "other bytes");
+        Files.delete(requests);
+
+        final Run run = run();
+
+        assertThat(run.exit()).as("the step: %s", run.log()).isZero();
+        assertThat(Files.readAllLines(requests))
+                .as("the requests made")
+                .anyMatch(r -> r.endsWith("/blobs/" + layer));
+        assertThat(Files.readString(temp.resolve("tuwunel/usr/bin/tuwunel")))
+                .as("the binary the tests are given")
+                .isEqualTo(NEW);
+    }
+
+    // Prevents a cache keyed by anything but the pinned digest, or an image pinned by no digest.
+    @Test
+    @DisplayName(
+            "The pin names the Dockerfile's reference and its digest, and a FROM with no digest stops it")
+    void thePinNamesTheReferenceAndItsDigest() throws Exception {
+        final String index = image(layer(entry("usr/bin/tuwunel", NEW)));
+        pin(index);
+        final Path output = directory.resolve("github-output");
+
+        assertThat(run(PIN, output).exit()).as("the pin").isZero();
+        assertThat(Files.readAllLines(output))
+                .as("what the pin hands the cache and the step")
+                .containsExactly("ref=" + ref, "sha256=" + index.substring("sha256:".length()));
+
+        Files.writeString(
+                work.resolve("homeserver").resolve("Dockerfile"),
+                "FROM ghcr.io/example/tuwunel:latest\n");
+        final Run unpinned = run(PIN, output);
+        assertThat(unpinned.exit()).as("the pin of an image with no digest").isNotZero();
+        assertThat(unpinned.log()).contains("pins no ghcr.io image by digest");
+    }
+
     private record Run(int exit, String log) {}
 
     private Run run() throws IOException, InterruptedException {
+        return run(STEP, directory.resolve("github-output"));
+    }
+
+    private Run run(final String name, final Path githubOutput)
+            throws IOException, InterruptedException {
         final Path output = directory.resolve("output");
         final ProcessBuilder command =
                 new ProcessBuilder(
@@ -212,7 +298,7 @@ class HomeserverStepTest {
                                 "-o",
                                 "pipefail",
                                 "-c",
-                                step(BUILD, STEP).run())
+                                step(BUILD, name).run())
                         .directory(work.toFile())
                         .redirectErrorStream(true)
                         .redirectOutput(output.toFile());
@@ -220,6 +306,9 @@ class HomeserverStepTest {
         command.environment().put("PATH", bin.toString());
         command.environment().put("RUNNER_TEMP", temp.toString());
         command.environment().put("GITHUB_ENV", githubEnv.toString());
+        command.environment().put("GITHUB_OUTPUT", githubOutput.toString());
+        command.environment().put("HOME", home.toString());
+        command.environment().put("REF", ref);
         command.environment().put("SERVED", served.toString());
         command.environment().put("REQUESTS", requests.toString());
         command.environment().put("CONFIGS", configs.toString());
@@ -234,9 +323,8 @@ class HomeserverStepTest {
 
     /** Pins the index by its digest, as homeserver/Dockerfile does. */
     private void pin(final String index) throws IOException {
-        Files.writeString(
-                work.resolve("homeserver").resolve("Dockerfile"),
-                "FROM ghcr.io/example/tuwunel:latest@" + index + "\n");
+        ref = "ghcr.io/example/tuwunel:latest@" + index;
+        Files.writeString(work.resolve("homeserver").resolve("Dockerfile"), "FROM " + ref + "\n");
     }
 
     /** Serves an index naming one linux/amd64 image of these layers; returns the index's digest. */
@@ -250,8 +338,11 @@ class HomeserverStepTest {
                     .append(layer)
                     .append("\"}");
         }
+        final String config = serve("{}".getBytes(StandardCharsets.UTF_8));
         final String manifest =
-                serve(("{\"layers\":[" + list + "]}").getBytes(StandardCharsets.UTF_8));
+                serve(
+                        ("{\"config\":{\"digest\":\"" + config + "\"},\"layers\":[" + list + "]}")
+                                .getBytes(StandardCharsets.UTF_8));
         return serve(
                 ("{\"manifests\":[{\"digest\":\"arm\",\"platform\":{\"os\":\"linux\","
                                 + "\"architecture\":\"arm64\"}},{\"digest\":\""

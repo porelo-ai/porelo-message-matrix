@@ -36,6 +36,16 @@ jobs:
                   [ -n "$MAVEN_SNAPSHOTS_URL" ] || { echo "::error::vars.MAVEN_SNAPSHOTS_URL is empty on $SERVER_URL"; exit 1; }
                   [ -n "$PORELO_PACKAGES_READ_TOKEN" ] || { echo "::error::secrets.PORELO_PACKAGES_READ_TOKEN is empty on $SERVER_URL"; exit 1; }
 
+            # The tools come from Maven's local repository as in the Build, so Maven Central's outage fails no check
+            # of a workflow; an entry no run reads any more is dropped by GitHub after seven days.
+            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: |
+                      ~/.m2/repository
+                      ~/.m2/wrapper
+                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+                  restore-keys: maven-
+
             # As the Shared rules check does: the runner's own Java runs the tools; check-actions needs no other JDK.
             - name: Every step pinned to a commit
               env:
