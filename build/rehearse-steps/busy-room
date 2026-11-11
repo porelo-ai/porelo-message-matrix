@@ -2,9 +2,9 @@
 # The busy-room step of porelo-host's rented-host run (build/rehearse-move.sh, build/rehearse-steps/busy-room there): the
 # project's room on the host rehearsed as the test person, after the `tasks` step started its tasks. Kept here, in
 # porelo-message-matrix, and copied into porelo-host as it is.
-# It runs this repository's build/rehearse-busy-room.sh from a worktree of origin/main of the checkout
-# REHEARSAL_MATRIX_CHECKOUT (default ~/git/porelo-message-matrix), with ssh as the person alone: the run's agent, the
-# run's pinned host key, no other key. Its exit is the rehearsal's, so 0 only when every scenario held; 77 (SKIP)
+# It runs this repository's build/rehearse-busy-room.sh from a fresh clone of main in its own scratch directory, from
+# REHEARSAL_MATRIX_SOURCE (a URL, path or bundle; default the public repository over https), and writes in no checkout.
+# Every ssh goes as the person alone: the run's agent, the run's pinned host key, no other key. Its exit is the rehearsal's, so 0 only when every scenario held; 77 (SKIP)
 # when too little time is left before the hard stop to wait for the tasks' answers.
 set -u
 for name in REHEARSAL_HOST REHEARSAL_PERSON REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS REHEARSAL_PROJECT \
@@ -22,28 +22,21 @@ if [ "$left" -lt 1800 ]; then
     echo "only $((left / 60)) min left before the hard stop; the busy room needs 30"
     exit 77
 fi
-checkout=${REHEARSAL_MATRIX_CHECKOUT:-$HOME/git/porelo-message-matrix}
-git -C "$checkout" rev-parse --git-dir >/dev/null 2>&1 || {
-    echo "no porelo-message-matrix checkout at $checkout; set REHEARSAL_MATRIX_CHECKOUT"
-    exit 2
-}
+source=${REHEARSAL_MATRIX_SOURCE:-https://github.com/porelo-ai/porelo-message-matrix.git}
 
 work=$(mktemp -d) || exit 2
 # shellcheck disable=SC2329 # run by the EXIT trap
 end() {
-    git -C "$checkout" worktree remove --force "$work/matrix" 2>/dev/null
     rm -rf "$work"
 }
 trap end EXIT
 trap 'exit 75' INT TERM HUP
 
-# Main as the forge has it, else as the checkout last fetched it, said in the log.
-ref=FETCH_HEAD
-git -C "$checkout" fetch -q origin main </dev/null 2>/dev/null || {
-    echo "busy-room: main could not be fetched; taking the checkout's origin/main"
-    ref=origin/main
+# Never a checkout's last fetch: a main that cannot be cloned stops the step.
+GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 --branch main "$source" "$work/matrix" </dev/null || {
+    echo "busy-room: main could not be cloned from $source"
+    exit 2
 }
-git -C "$checkout" worktree add -q --detach "$work/matrix" "$ref" || exit 2
 echo "busy-room: porelo-message-matrix $(git -C "$work/matrix" rev-parse --short HEAD)"
 
 # Every ssh the rehearsal opens - the forward and each task's talk log - goes as the person, by the run's agent and key.

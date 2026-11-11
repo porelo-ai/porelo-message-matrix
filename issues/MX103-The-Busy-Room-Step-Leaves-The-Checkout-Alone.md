@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX103",
   "title": "The Busy Room Step Leaves The Checkout Alone",
-  "state": "Implementing",
+  "state": "Review",
   "size": "XS",
   "priority": "High",
   "rank": 1,
@@ -16,8 +16,10 @@
 
 **Why this size.** one shell step, `build/rehearse-steps/busy-room`, and its copy in porelo-host; a test script, proven
 by running it.
-**How it stands.** Found in a rented-host run: the step is run by another repository's agent, for whom this
-repository's checkout is read-only.
+**How it stands.** Review: built. The step was run on the development machine with a public clone and an unreachable
+host: it cloned main, ran the rehearsal (75, the host unreachable) and left the checkout's worktrees, refs and objects
+unchanged and no scratch directory. With an unresolvable source it ended 2 naming it. The run against a host follows in
+the next rental, after porelo-host takes the file.
 
 **What must be true.** The busy-room step of the rented-host run gets this repository's `main` without writing in any
 existing checkout of it: no `git fetch`, no `git worktree add`, no ref or object written there.
