@@ -22,7 +22,7 @@ person's session or a chat open behind it.
 
 ## Why
 
-A reading of [MX89](README.md#mx89) to [MX91](README.md#mx91) by another model (gemini-4-argon-high) found ways the
+A reading of the room rehearsal's first version by another model (gemini-4-argon-high) found ways the
 rehearsal can misjudge a real host. The runs on the foo-org host held, in a young room with one person and three tasks;
 a busier room would not.
 
