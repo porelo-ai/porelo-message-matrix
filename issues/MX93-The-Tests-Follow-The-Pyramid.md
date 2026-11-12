@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX93",
   "title": "The Tests Follow The Pyramid",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "L",
   "priority": "Medium",
   "rank": 1,
@@ -127,10 +127,6 @@ and the packages are (`CpuBaselineIT`, `DumpableIT`, `PackagesIT`).
   request or a check from the code fails a unit test, not only an integration test.
 - No unit test sleeps, waits out a real bound or asks the machine's resolver.
 - The shares by count are measured again and written into this issue before it goes to Review.
-
-## Open questions
-
-- None: every step is a choice about this repository's own tests.
 
 ## To be checked
 

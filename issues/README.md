@@ -25,8 +25,13 @@ sequence.
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
 | <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs | 2 |
-| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there | - |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
+
+## Estimated
+
+| # | Size | Blocked by | What it covers |
+|---|---|---|---|
+| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there |
 
 ## Backlog
 
