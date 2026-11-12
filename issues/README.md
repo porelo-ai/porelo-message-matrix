@@ -25,8 +25,8 @@ sequence.
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
 | <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs | 2 |
+| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there | - |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
-| <a id="mx93"></a>[MX93](MX93-The-Tests-Follow-The-Pyramid.md) | L | - | Every flow proven by unit tests over fakes and the unit suite under a minute: today 57 % in-process unit tests, 31 % process tests in the unit suite (178 s), 12 % against the real homeserver; the lifecycle, room, direct and receipt paths only there | 0 |
 
 ## Backlog
 
@@ -41,10 +41,10 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx107"></a>[MX107](MX107-The-Builds-Outside-Downloads-Come-From-A-Cache.md) | M | - | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image, the Ubuntu packages and the Maven tools from a cache keyed by their digest or version, keeping only the newest entry, so a registry or mirror that is down does not turn them red |
-| <a id="mx106"></a>[MX106](MX106-The-Busy-Room-Knows-The-Projects-Other-Persons.md) | XS | - | The busy-room step names the project's other active persons, as the host answers them, to the rehearsal, so their accounts and helpers in the room are no stranger's |
-| <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start |
-| <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes `main` from a fresh clone in its own scratch directory and never writes in a checkout of this repository |
 | <a id="mx102"></a>[MX102](MX102-The-Busy-Room-Rehearsal-Is-One-Call.md) | S | - | build/rehearse-busy-room.sh <login> <host> <project> runs the busy room's rehearsal against a host as one call: it finds the project's room and its running tasks itself and keeps the rehearsal's exit |
+| <a id="mx103"></a>[MX103](MX103-The-Busy-Room-Step-Leaves-The-Checkout-Alone.md) | XS | - | The rented-host run's busy-room step takes this repository's main from a fresh clone in its own scratch directory and never writes in a checkout of this repository |
+| <a id="mx104"></a>[MX104](MX104-Enroll-Refuses-A-Task-Name-Members-Cannot-Read.md) | XS | - | `enroll --project P --task T` refuses (78) a T that `members` would not read back as a task of P, so a wrong name fails at the start, not later in the room |
+| <a id="mx106"></a>[MX106](MX106-The-Busy-Room-Knows-The-Projects-Other-Persons.md) | XS | - | The busy-room step names the project's other active persons, as the host answers them, to the rehearsal, so their accounts and helpers in the room are no stranger's |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
 | <a id="mx99"></a>[MX99](MX99-The-Rehearsal-Judges-A-Busy-Room-Right.md) | M | - | The room rehearsal judges a room with history, other persons, retired tasks and other logins right, and leaves no session or chat open |
