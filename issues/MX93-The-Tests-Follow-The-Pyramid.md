@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX93",
   "title": "The Tests Follow The Pyramid",
-  "state": "Accepted",
+  "state": "Analyzed",
   "size": "L",
   "priority": "Medium",
   "rank": 1,
@@ -37,7 +37,14 @@ test class's own time; surefire and failsafe run one class after another, so the
 The skipped tests, all for want of a native build on the JVM run: `CpuBaselineIT` (1), `DumpableIT` (2), `PackagesIT`
 (4); the Build's `-Pnative verify` runs them.
 
-So the unit suite takes 178 s, three times the minute allowed, and two thirds of it are integration tests by the
+Measured again with `./mvnw -B -s settings.xml clean test` on the development machine, at the issue's analysis: the
+unit suite 1139 tests, none failed, 141 s wall with compiling. The slowest classes are the same: `PodmanUnitTest` 34 s,
+`RoomTest` 26 s, `LocalHomeserverTest` 10 s, the `TlsTest` groups 10 s, `GateTest` 7 s, `GateRequestTest` 7 s,
+`KeepWriterPreferenceTest` 6 s, `ForgetPositionTest` 5 s, and a new one, `RehearseBusyRoomTest` 5 s, which runs the
+busy-room shell script as a child process. `UnreachableTest` took 0.03 s there, as that machine's resolver answered at
+once; it still asks the machine's resolver. Every test and wait named below is still in the code as described.
+
+At the first measurement the unit suite took 178 s, three times the minute allowed, and two thirds of it are integration tests by the
 pyramid's definition: by that definition the shares are 57 / 43 / 0, against 70-80 / 15-20 / 5-10.
 
 The slowest classes of the unit suite: `PodmanUnitTest` 53 s (39 tests, real child processes waiting out their
@@ -107,6 +114,12 @@ and the packages are (`CpuBaselineIT`, `DumpableIT`, `PackagesIT`).
   tests alone and its time is read in each build; a test fails that starts a process without the tag, as
   `DocumentTestsTaggedTest` does for documents.
 
+- **Red first, for each step:** a seam is proven by a unit test that fails when the seam's value is ignored (a bound
+  passed in but the old constant used, a fake lookup not asked); a path moved off the homeserver by a unit test that
+  fails when the request it asserts is taken out of the code.
+- **Levels:** everything above is unit level over fakes, except the one integration test kept per bound and per verb
+  against the real homeserver; nothing here needs a VM.
+
 ## Acceptance
 
 - The unit suite, in-process tests only, runs in under a minute on the development machine, measured in a clean build.
@@ -115,8 +128,14 @@ and the packages are (`CpuBaselineIT`, `DumpableIT`, `PackagesIT`).
 - No unit test sleeps, waits out a real bound or asks the machine's resolver.
 - The shares by count are measured again and written into this issue before it goes to Review.
 
+## Open questions
+
+- None: every step is a choice about this repository's own tests.
+
 ## To be checked
 
 - Why `KeepRoomIT` takes 103 s for 4 tests and `GateIT` 38 s for 3: each starts the homeserver behind its gate, and
   sharing one start per class may be enough.
+- Whether `RehearseBusyRoomTest` stays in the unit suite under the process tag or its script's logic moves into
+  plain Java tested in process.
 - Whether `PollIT`'s sleeps can be replaced by waiting for the poll's own "waiting" sign.
