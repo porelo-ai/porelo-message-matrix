@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX108",
   "title": "The Issue Heads Are Checked Every Day",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "XS",
   "priority": "Low",
   "rank": 6,
