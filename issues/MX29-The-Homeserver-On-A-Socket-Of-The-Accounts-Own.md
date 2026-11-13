@@ -7,7 +7,7 @@
   "title": "The Homeserver On A Socket Of The Account's Own",
   "state": "Backlog",
   "size": "-",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 5,
   "blockedBy": [],
   "covers": "The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves"

@@ -7,7 +7,7 @@
   "title": "The Gate Says Why It Failed",
   "state": "Backlog",
   "size": "S",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 4,
   "blockedBy": [],
   "covers": "The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token"

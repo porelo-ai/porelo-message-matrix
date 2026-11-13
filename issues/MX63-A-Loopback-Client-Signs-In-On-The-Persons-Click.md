@@ -7,7 +7,7 @@
   "title": "A Loopback Client Signs In On The Person's Click",
   "state": "Idea",
   "size": "-",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 5,
   "blockedBy": [],
   "covers": "Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there"

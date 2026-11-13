@@ -7,7 +7,7 @@
   "title": "No Port Reaches The Homeserver Behind Its Gate",
   "state": "Idea",
   "size": "-",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 4,
   "blockedBy": [],
   "covers": "In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in"

@@ -7,7 +7,7 @@
   "title": "A Room Shows No Helper",
   "state": "Accepted",
   "size": "XL",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 2,
   "blockedBy": [],
   "covers": "A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller"

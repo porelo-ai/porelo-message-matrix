@@ -7,7 +7,7 @@
   "title": "The Room's Poll Has A Position Of Its Own",
   "state": "Analyzed",
   "size": "M",
-  "priority": "Medium",
+  "priority": "Low",
   "rank": 2,
   "blockedBy": [],
   "covers": "`poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes",

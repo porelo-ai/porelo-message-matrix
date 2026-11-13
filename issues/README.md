@@ -10,9 +10,9 @@ sequence.
 | <a id="mx97"></a>[MX97](MX97-A-Verb-Refuses-A-Repeated-Flag-And-Repeats-No-Secret.md) | - | - | A lifecycle verb refuses a flag given twice with 64, and no failure line repeats a secret or a control character from a homeserver's error text |
 | <a id="mx83"></a>[MX83](MX83-The-Homeservers-Data-Survives-A-Volume-Prune.md) | - | - | The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked |
 | <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
+| <a id="mx105"></a>[MX105](MX105-A-Stopped-Task-Leaves-Its-Own-Homeservers-Room.md) | S | - | On the account's own homeserver, a verb takes a stopped task's account out of the project's room without deactivating it, so the next `enroll` brings the same account back |
 | <a id="mx64"></a>[MX64](MX64-No-Port-Reaches-The-Homeserver-Behind-Its-Gate.md) | - | - | In gate mode the homeserver's unit publishes no TCP port, so `127.0.0.1:8008` accepts no connection and only the gate's socket leads in |
 | <a id="mx63"></a>[MX63](MX63-A-Loopback-Client-Signs-In-On-The-Persons-Click.md) | - | - | Before the gate hands an SSO login token to a client's own loopback port, such as nheko's, the person confirms it on a page of the gate's; without that click no token goes there |
-| <a id="mx105"></a>[MX105](MX105-A-Stopped-Task-Leaves-Its-Own-Homeservers-Room.md) | S | - | On the account's own homeserver, a verb takes a stopped task's account out of the project's room without deactivating it, so the next `enroll` brings the same account back |
 
 ## Accepted
 
