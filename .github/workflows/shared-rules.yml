@@ -100,6 +100,12 @@ jobs:
                   java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
                       org.fuin.porelo.release.Main check-citations .
 
+            # A head the planner's board refuses is otherwise seen only when the board reads main.
+            - name: Refuse an issue head the shared schema refuses, or an index out of the heads' order
+              run: |
+                  java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \
+                      org.fuin.porelo.release.Main issues check issues
+
             - name: Refuse a page missing from the site's navigation or a link out of doc
               run: |
                   java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" \

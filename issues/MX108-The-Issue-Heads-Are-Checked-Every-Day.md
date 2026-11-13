@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX108",
   "title": "The Issue Heads Are Checked Every Day",
-  "state": "Implementing",
+  "state": "Review",
   "size": "XS",
   "priority": "Low",
   "rank": 6,
@@ -15,6 +15,9 @@
 ```
 
 **Why this size.** one step in one workflow, `.github/workflows/shared-rules.yml`; no code and no contract.
+**How it stands.** Review: built. On the development machine the check passed on `issues/` and failed, exit 1, on a
+copy whose head lacked `size`, naming the file and the field; check-actions passed. The workflow's own run on GitHub
+is the test, no VM run.
 
 **What must be true.** An issue head in `issues/` that the shared issue schema refuses - a missing size, a rank of
 `null` - or an index whose rows do not follow the heads is seen on `main` within a day, by a red *Shared rules check*

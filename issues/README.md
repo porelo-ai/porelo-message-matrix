@@ -41,12 +41,6 @@ sequence.
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx108"></a>[MX108](MX108-The-Issue-Heads-Are-Checked-Every-Day.md) | XS | - | The daily Shared rules check runs porelo-release's issue check on issues/, so a head the planner's board refuses, or an index out of the heads' order, turns main's daily run red |
-
 ## Review
 
 | # | Size | Blocked by | What it covers |
@@ -87,6 +81,7 @@ sequence.
 | <a id="mx72"></a>[MX72](MX72-A-Token-Is-Random-And-An-Admin-Command-Takes-One-Argument.md) | S | - | A homeserver token not random, an admin command's user id unchecked or a credential over its limit fails a unit test |
 | <a id="mx73"></a>[MX73](MX73-Every-Trust-Path-Checks-The-Certificate.md) | S | - | Each `checkServerTrusted` overload refuses an unknown chain, and a file with several CAs trusts them all, under test |
 | <a id="mx74"></a>[MX74](MX74-Small-Refusals-Are-Held-By-Tests.md) | S | - | The smaller refusals, each cheap to hold, fail a unit test if removed |
+| <a id="mx108"></a>[MX108](MX108-The-Issue-Heads-Are-Checked-Every-Day.md) | XS | - | The daily Shared rules check runs porelo-release's issue check on issues/, so a head the planner's board refuses, or an index out of the heads' order, turns main's daily run red |
 
 ## Finished
 
