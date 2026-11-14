@@ -24,7 +24,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
-| <a id="mx82"></a>[MX82](MX82-A-Local-Agents-Line-Reaches-A-Moved-Task.md) | S | - | A local agent's line reaches a moved task as its signed message, believed through a certificate a person signed; `poll` already carries it, a test holds that and the room client signs | 2 |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
 
 ## Estimated
@@ -54,7 +53,6 @@ sequence.
 | <a id="mx86"></a>[MX86](MX86-A-Persons-Line-For-All-Agents-Says-So.md) | S | [MX85](README.md#mx85) | A person's line headed `All agents: …` is marked `"all": true` in its person file, so Porelo hands it to every task of the project |
 | <a id="mx85"></a>[MX85](MX85-A-Persons-Line-Headed-By-A-Task-Names-It.md) | S | - | A person's line headed `Agent Pi: …`, typed with no pill, is meant for the member shown as Agent Pi, so Porelo wakes that task |
 | <a id="mx84"></a>[MX84](MX84-Setup-Waits-For-No-Poll-It-Need-Not.md) | S | - | Several tasks of one project started at once all get through `setup`: it takes the relay's poll lock only when it must forget the relay's position |
-| <a id="mx81"></a>[MX81](MX81-A-Coordinator-Off-The-Host-Reaches-The-Tasks-Room.md) | S | - | A task on a host reports in the room of a coordinator on the development machine from its first step, over [MX76](README.md#mx76)'s tunnel set up before the start; without the tunnel the start stops instead of reporting into a room nobody reads |
 | <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 | <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
@@ -132,6 +130,8 @@ sequence.
 
 | # | Title | Why |
 |---|---|---|
+| <a id="mx82"></a>[MX82](README.md#mx82) | A Local Agent's Line Reaches A Moved Task | During the move no communication runs between agents on the development machine and tasks on the host, so a local agent's signed line reaching a moved task is not needed |
+| <a id="mx81"></a>[MX81](README.md#mx81) | A Coordinator Off The Host Reaches The Task's Room | During the move no communication runs between agents on the development machine and tasks on the host, so a coordinator off the host in the task's room is not needed |
 | <a id="mx92"></a>[MX92](README.md#mx92) | Element Web Signs In Headless As A Smoke | The gate answers a browser page only from its own origin or Element Desktop's, so Element web cannot sign in there unless the host is widened; the scripted client already proves the same path, and Element's look stays in the operator's own test |
 | <a id="mx45"></a>[MX45](README.md#mx45) | A Project Admin Brings The Room Onto A Central Homeserver | Replaced by [MX65](README.md#mx65): the host's helper makes and keeps the room with `keep-room` and `drop-room`, and `setup --create-room` is gone |
 | <a id="mx55"></a>[MX55](README.md#mx55) | A Person Has Their Own Account In The Room | Replaced by the one-key design; a person's own account `@<login>` and `members --persons` are part of [MX57](README.md#mx57) |
