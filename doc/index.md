@@ -34,12 +34,13 @@ mail:
 That is all for the local homeserver: the project's first task start brings it up, makes the project's
 room and an account for each task. Each task is then a peer the others can write to.
 
-For a homeserver elsewhere, name it, and say how its certificate is trusted if it is not from a public
-authority:
+For a homeserver elsewhere, name it and the project's room there, and say how its certificate is trusted if it is
+not from a public authority:
 
 | Setting | What |
 |---|---|
 | `homeserver` | The homeserver's URL, e.g. `https://matrix.example.org`; plain `http` only on this machine's loopback. Absent: this machine's own |
+| `room` | The project's room there, as an alias `#local:server` or a room id; required with `homeserver`, refused without it |
 | `ca_file` | An absolute path to a PEM file: an intranet's CA, or a self-signed server's certificate |
 | `tls_verify` | `off` checks no certificate, and warns on stderr at every start. For development only, never for use |
 
@@ -63,6 +64,6 @@ answer to you appears there.
 
 Agents working on the host can keep their login in Porelo's vault and use the executable's
 [`room read`, `room post` and `room wait`](transport.md#talking-in-the-room) commands. Each names a
-vault entry and a room id. Read first to establish a position; a post waits until addressed lines have
-been read. Names such as `Agent Core` in a line's head, Matrix mentions, and `All agents` say whom it is
+vault entry and a room id. Read first to establish a position; a post is refused (75) while lines meant for
+the account are unread. Names such as `Agent Core` in a line's head, Matrix mentions, and `All agents` say whom it is
 meant for.

@@ -109,8 +109,8 @@ What a person does on the central homeserver:
 
 ### Moving a project from a homeserver elsewhere
 
-A project whose settings named `homeserver` without `room` is refused (78) by `setup` and `settings` until
-`room` is set. Once `room` is set and a person invites `@porelo.<login>` into it, Porelo makes the login's new
+A project whose settings named `homeserver` without `room` is refused (78) by `setup`, and named under `refused` by
+`settings`, until `room` is set. Once `room` is set and a person invites `@porelo.<login>` into it, Porelo makes the login's new
 accounts (`@porelo.<login>`, `@porelo-relay-<project>.<login>`, `@<task>.<login>`); the old accounts stay
 on the homeserver until a person removes them.
 
@@ -167,7 +167,8 @@ call may not, is taken. So a page elsewhere, or on another local port, that send
 cannot take or start their sign-in. Registration offers the `m.login.dummy` authentication stage;
 the gate creates an available account and signs it in with the supplied password. The caller may
 register or use only `@<login>` or `@<name>.<login>`, where `<name>` starts with a lower-case letter
-or digit and then contains lower-case letters, digits, underscores or hyphens. `@porelo` belongs to
+or digit and then contains lower-case letters, digits, dots, underscores, equals signs or hyphens, ending
+in no dot. `@porelo` belongs to
 no caller. Access tokens, in the header or query, are bound with `whoami`; each connection caches at
 most 64 identities by token hash.
 

@@ -405,7 +405,7 @@ another's and retiring a task of it stays harmless.
 
 **Why:** taking such an account over would set a new password and log every other session out, so the first
 project's task would lose its token at once; retiring it would deactivate another project's task. Porelo names a
-task `porelo-<project>_<task>`, which two pairs no longer share, so a clash comes only from a Porelo that named tasks
+task `porelo-<project>-<task>`, which two pairs no longer share, so a clash comes only from a Porelo that named tasks
 otherwise or a task named by hand. Naming the account by the pair instead would give every enrolled task a new
 address Porelo keeps, for a case the names already prevent.
 

@@ -45,6 +45,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx111"></a>[MX111](MX111-The-Docs-Say-What-The-Code-Does.md) | S | - | Every sentence of `README.md`, `doc/` and the CHANGELOG's latest section names only commands, flags, paths, defaults, states, messages and behavior the code on main has; where the code is wrong, a bug of its own |
 | <a id="mx109"></a>[MX109](MX109-No-Room-Is-Reached-Through-A-Tunnel.md) | M | - | The path to a homeserver on another machine through a `unix:` socket goes: a `unix:` or `*.localhost` homeserver is only a host's gate and is never handed a lent registration token, and the script laying agents' certificates on a host is gone |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
