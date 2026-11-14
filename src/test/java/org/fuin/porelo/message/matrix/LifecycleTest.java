@@ -360,21 +360,21 @@ class LifecycleTest {
     }
 
     /**
-     * Harm guarded: a token lent for a homeserver behind a tunnel is dropped, so registering there
-     * can never succeed.
+     * Harm guarded: a registration token lent from the person's vault goes on towards a host's gate
+     * on a socket or a {@code *.localhost}, which registers by the caller's login and needs none.
      */
     @Test
-    void aTokenLentForASocketIsKept() throws Failure {
-        final Settings settings =
-                new Settings(URI.create("unix:/run/room.sock"), null, true, "#p:example.org");
-        assertThat(
-                        Lifecycle.elsewhereToken(
-                                settings, Map.of(Config.REGISTRATION_TOKEN, "lent-token")))
-                .as("what was lent goes on")
-                .isEqualTo("lent-token");
-        assertThat(Lifecycle.elsewhereToken(settings, Map.of()))
-                .as("a gate needs none, and only its challenge can tell")
-                .isEmpty();
+    void aTokenLentForAHostsGateIsDropped() throws Failure {
+        for (final String homeserver :
+                List.of("unix:/run/room.sock", "http://gate.localhost:8008")) {
+            final Settings settings =
+                    new Settings(URI.create(homeserver), null, true, "#p:example.org");
+            assertThat(
+                            Lifecycle.elsewhereToken(
+                                    settings, Map.of(Config.REGISTRATION_TOKEN, "lent-token")))
+                    .as("nothing lent goes on to %s", homeserver)
+                    .isEmpty();
+        }
     }
 
     private Map<String, String> centralAccount() {
@@ -468,13 +468,13 @@ class LifecycleTest {
     }
 
     /**
-     * Harm guarded: a task started on a host while the tunnel to the room is down, or while its
-     * account cannot open the socket, is made anyway and reports into no room; a 75 naming the
-     * socket and the cause lets the start stop and say why.
+     * Harm guarded: a task started on a host while the gate's socket is down, or while its account
+     * cannot open it, is made anyway and reports into no room; a 75 naming the socket and the cause
+     * lets the start stop and say why.
      */
     @Test
     @org.junit.jupiter.api.DisplayName(
-            "setup through a socket whose tunnel is down, or that the account cannot open, ends 75 naming it")
+            "setup through a gate's socket that is down, or that the account cannot open, ends 75 naming it")
     void setupThroughASocketNotReachedIsTemporary(
             @org.junit.jupiter.api.io.TempDir final java.nio.file.Path dir) throws Exception {
         final java.nio.file.Path down = dir.resolve("down.sock");
@@ -484,9 +484,7 @@ class LifecycleTest {
                         "XDG_STATE_HOME",
                         dir.resolve("state").toString(),
                         "PORELO_MATRIX_LOGIN",
-                        "hosta",
-                        Config.REGISTRATION_TOKEN,
-                        "lent-token");
+                        "hosta");
         try (java.nio.channels.ServerSocketChannel listener =
                 java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
             listener.bind(java.net.UnixDomainSocketAddress.of(closed));
@@ -511,7 +509,7 @@ class LifecycleTest {
                         .contains("unix:" + socket + " not reachable: ");
                 causes.add(reason.substring(reason.indexOf("not reachable: ")));
             }
-            // The system's own words, in its language: a missing tunnel and a missing grant differ.
+            // The system's own words, in its language: a missing socket and a missing grant differ.
             assertThat(causes.getLast())
                     .as("a socket the account cannot open names another cause than a missing one")
                     .isNotEqualTo(causes.getFirst());

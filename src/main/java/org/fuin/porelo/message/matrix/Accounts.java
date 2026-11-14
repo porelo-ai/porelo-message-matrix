@@ -99,25 +99,14 @@ final class Accounts {
 
     /**
      * Registers through the gate without a token, or completes an external homeserver's token
-     * challenge.
+     * challenge. A host's gate, on a socket or a {@code *.localhost}, is never handed a token; only
+     * the gate's own homeserver is, on a socket whose listener the client checks.
      */
     static Session register(
             final MatrixClient anybody,
             final String localpart,
             final String password,
             final String registrationToken)
-            throws Failure {
-        return register(
-                anybody, localpart, password, registrationToken, MatrixClient::runningAccount);
-    }
-
-    /** As above, with who must be listening on a socket before the token goes to it. */
-    static Session register(
-            final MatrixClient anybody,
-            final String localpart,
-            final String password,
-            final String registrationToken,
-            final MatrixClient.ListenerOwner tokenListener)
             throws Failure {
         final ObjectNode request =
                 MatrixClient.JSON
@@ -135,15 +124,17 @@ final class Accounts {
         }
         final ObjectNode auth =
                 request.putObject("auth").put("session", first.body().path("session").asText());
-        // A host's gate asks only for the dummy stage: who registers is the caller's login. A
-        // socket says nothing about what is behind it, so the challenge decides.
-        final MatrixClient answering;
+        // A host's gate asks only for the dummy stage: who registers is the caller's login.
         if (offersDummyAlone(first)) {
             auth.put("type", DUMMY_STAGE);
-            answering = anybody;
+        } else if (Settings.hosted(anybody.config().homeserver()) && !anybody.checksListener()) {
+            throw new Failure(
+                    Exit.CONFIG,
+                    "the homeserver on "
+                            + anybody.config().homeserver()
+                            + " is no host's gate: it offers no registration by the dummy stage");
         } else if (!registrationToken.isEmpty() && offers(first, TOKEN_STAGE)) {
             auth.put("type", TOKEN_STAGE).put("token", registrationToken);
-            answering = anybody.listenedToBy(tokenListener);
         } else if (!registrationToken.isEmpty()) {
             throw refused("registering " + localpart + ", whose challenge asks no token", first);
         } else if (offers(first, TOKEN_STAGE)) {
@@ -154,10 +145,9 @@ final class Accounts {
                             + " was not lent for it");
         } else {
             auth.put("type", DUMMY_STAGE);
-            answering = anybody;
         }
         final MatrixClient.Answer second =
-                answering.exchange("POST", "/_matrix/client/v3/register", request);
+                anybody.exchange("POST", "/_matrix/client/v3/register", request);
         if (second.status() != 200) {
             throw refused("registering " + localpart, second);
         }

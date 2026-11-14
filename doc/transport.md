@@ -40,8 +40,9 @@ The keys, on stdin or in the old way's environment:
 | `XDG_STATE_HOME`, else `HOME` | From the environment, in either way: where `poll` keeps its position: `…/porelo/transports/matrix/`; people's room positions are under `room/` |
 
 - **Unix sockets speak HTTP/1.1**, with `Host: localhost`; socket file permissions guard access, and
-  TCP listener ownership is not checked. Only a registration token goes solely to a listener of the running account;
-  a listener of another account then answers 78. An unreachable socket is temporary (75), as an unreachable TCP
+  TCP listener ownership is not checked. A project's `unix:` homeserver is a host's gate and is handed no registration
+  token; only `gate --prepare` sends the gate's own homeserver its token, over a socket whose listener it checks. An
+  unreachable socket is temporary (75), as an unreachable TCP
   homeserver is. `setup` answers the socket's path in `reaches`.
 - **Names ending in `.localhost` are loopback**, as are `localhost`, `127.0.0.1`, and `::1`.
   A `*.localhost` URL connects to `127.0.0.1` on the same port without DNS; plain HTTP checks that
@@ -92,9 +93,9 @@ administrator token and login tokens, and the gate's socket directory. The login
   `setup`; an option that differs from the kept login is refused with 78. A login begins with a lower-case
   letter, contains only lower-case letters, digits and `-`, has no dot, and is at most 32 characters.
   `porelo` and names starting with `porelo-` are reserved. Every other value is refused with 78, naming the rule.
-  On a `unix:` or `*.localhost` homeserver nothing is asked beforehand and the homeserver's challenge decides: a host's gate
-  offers the dummy stage and never receives a token; one that asks only for a token and got none stops `setup` and `enroll`
-  with 78 naming it, and over a socket the token goes only to a listener of the running account (78 otherwise). Elsewhere the token is
+  A `unix:` or `*.localhost` homeserver is a host's gate: it registers by the dummy stage, a token lent for it is
+  dropped and never sent, and a socket whose challenge offers no dummy stage alone stops `setup` and `enroll` with 78.
+  Elsewhere the token is
   `PORELO_MATRIX_REGISTRATION_TOKEN` among the secrets on the input, which Porelo lends `setup` and `enroll` from the
   person's vault as `describe`'s `credentials` ask (78 without it). `PORELO_MATRIX_MACHINE_SECRET` keeps its
   existing key and derives passwords for the login's accounts.

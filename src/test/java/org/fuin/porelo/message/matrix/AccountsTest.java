@@ -58,11 +58,11 @@ class AccountsTest {
     }
 
     /**
-     * Harm guarded: a homeserver that registers only with a token, reached over a socket, is taken
-     * for a gate, and the person learns nothing of what is missing.
+     * Harm guarded: a homeserver that registers only with a token is answered as a gate, and the
+     * person learns nothing of what is missing.
      */
     @Test
-    void aSocketsHomeserverAskingATokenNoneWasLentForStopsNamingIt() throws Exception {
+    void aHomeserverAskingATokenNoneWasLentForStopsNamingIt() throws Exception {
         try (FakeHomeserver homeserver = new FakeHomeserver()) {
             homeserver.answer(
                     401,
@@ -81,6 +81,38 @@ class AccountsTest {
             assertThat(homeserver.requests())
                     .as("no second request guesses a stage it was not offered")
                     .hasSize(1);
+        }
+    }
+
+    /**
+     * Harm guarded: a registration token goes to a {@code *.localhost} name, which is a host's gate
+     * and never needs one.
+     */
+    @Test
+    void aLocalhostNameAskingATokenGetsNone() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            homeserver.answer(
+                    401,
+                    "{\"flows\":[{\"stages\":[\"m.login.registration_token\"]}],"
+                            + "\"session\":\"challenge\"}");
+            final URI gate =
+                    URI.create("http://gate.localhost:" + URI.create(homeserver.url()).getPort());
+            final MatrixClient client = new MatrixClient(new Config(gate, "", null, true));
+            assertThatThrownBy(
+                            () ->
+                                    Accounts.register(
+                                            client, "porelo.bob", "password", "a-lent-token"))
+                    .isInstanceOfSatisfying(
+                            Failure.class,
+                            failure ->
+                                    assertThat(failure.exitCode())
+                                            .as("a setting, not a refusal to retry")
+                                            .isEqualTo(Exit.CONFIG))
+                    .hasMessageContaining("no host's gate");
+            assertThat(homeserver.requests())
+                    .as("only the challenge's request, without the token")
+                    .hasSize(1)
+                    .noneMatch(request -> request.body().contains("a-lent-token"));
         }
     }
 

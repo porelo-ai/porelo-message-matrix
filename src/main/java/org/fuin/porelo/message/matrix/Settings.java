@@ -36,11 +36,15 @@ record Settings(
                     + " homeserver; use ca_file";
 
     /**
-     * Whether registering may need no token: a host's gate needs none, and is reached on a Unix
-     * socket or as a {@code *.localhost}, as a tunnel to a homeserver that does need one is too. So
-     * none is asked beforehand, and the homeserver's challenge tells them apart.
+     * A host's homeserver behind its gate, reached on a Unix socket or as a {@code *.localhost}: it
+     * registers by the caller's login and is never handed a registration token.
      */
-    boolean tokenOptional() {
+    boolean hosted() {
+        return hosted(homeserver);
+    }
+
+    /** As {@link #hosted()}, for a homeserver's address. */
+    static boolean hosted(final @Nullable URI homeserver) {
         return homeserver != null
                 && ("unix".equals(homeserver.getScheme())
                         || (homeserver.getHost() != null

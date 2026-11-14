@@ -14,16 +14,14 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
 import java.nio.file.Path;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Who may read a registration token that goes over a Unix socket. */
+/** A Unix socket is only a host's gate, so no registration token ever goes over one. */
 @Timeout(10)
 class RegisterOverASocketTest {
 
@@ -35,30 +33,29 @@ class RegisterOverASocketTest {
 
     @TempDir private Path dir;
 
-    /** Harm guarded: a person's registration token goes to another account's listener. */
+    /**
+     * Harm guarded: a lent registration token leaves over a socket, whose listener may be anybody
+     * who could bind it, to something that is no host's gate.
+     */
     @Test
-    void aTokenDoesNotGoToAListenerOfAnotherAccount() throws Exception {
-        final UserPrincipal nobody =
-                FileSystems.getDefault()
-                        .getUserPrincipalLookupService()
-                        .lookupPrincipalByName("nobody");
+    void aSocketWhoseChallengeAsksATokenGetsNone() throws Exception {
         try (ScriptedSocket socket =
-                new ScriptedSocket(dir.resolve("room.sock"), TOKEN_CHALLENGE)) {
+                new ScriptedSocket(dir.resolve("room.sock"), TOKEN_CHALLENGE, REGISTERED)) {
             assertThatThrownBy(
                             () ->
                                     Accounts.register(
                                             client(),
                                             "porelo.bob",
                                             "derived-password",
-                                            "a-lent-token",
-                                            () -> nobody))
+                                            "a-lent-token"))
                     .isInstanceOfSatisfying(
                             Failure.class,
                             failure ->
                                     assertThat(failure.exitCode())
-                                            .as("waiting cures nothing")
+                                            .as("a setting, waiting cures nothing")
                                             .isEqualTo(Exit.CONFIG))
-                    .hasMessageContaining("nobody");
+                    .hasMessageContaining("no host's gate");
+            socket.close();
             socket.awaitTheLastConnection();
             assertThat(socket.requests())
                     .as("only the challenge's request arrived, without the token")
@@ -67,19 +64,28 @@ class RegisterOverASocketTest {
         }
     }
 
-    /** Harm guarded: the check refuses the tunnel's own end, so no moved task can register. */
+    /**
+     * Harm guarded: the gate's own homeserver, whose listener is checked as this account, cannot
+     * register the gate's administrator with its token, so no host's gate can be prepared.
+     */
     @Test
-    void aTokenGoesToAListenerOfThisAccount() throws Exception {
+    void theGatesOwnHomeserverTakesItsTokenFromAClientThatChecksItsListener() throws Exception {
         try (ScriptedSocket socket =
                 new ScriptedSocket(dir.resolve("room.sock"), TOKEN_CHALLENGE, REGISTERED)) {
-            final Accounts.Session account =
-                    Accounts.register(client(), "porelo.bob", "derived-password", "a-lent-token");
-            assertThat(account.userId())
-                    .as("the account was made")
+            final MatrixClient checked =
+                    new MatrixClient(
+                            new Config(
+                                    URI.create("unix:" + dir.resolve("room.sock")), "", null, true),
+                            Listener.TABLES,
+                            MatrixClient.runningAccount());
+            final Accounts.Session admin =
+                    Accounts.register(checked, "porelo", "a-secret", "the-own-token");
+            assertThat(admin.userId())
+                    .as("the administrator was registered")
                     .isEqualTo("@porelo.bob:example.org");
             assertThat(socket.requests().getLast())
-                    .as("the token answered the challenge")
-                    .contains("a-lent-token");
+                    .as("the token answered the own homeserver's challenge")
+                    .contains("the-own-token");
         }
     }
 

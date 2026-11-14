@@ -1668,8 +1668,8 @@ final class Lifecycle {
      */
     static String elsewhereToken(final Settings settings, final Map<String, String> env)
             throws Failure {
-        return settings.tokenOptional()
-                ? env.getOrDefault(Config.REGISTRATION_TOKEN, "").strip()
+        return settings.hosted()
+                ? ""
                 : required(
                         env,
                         Config.REGISTRATION_TOKEN,

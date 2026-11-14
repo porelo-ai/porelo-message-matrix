@@ -114,7 +114,7 @@ final class MatrixClient {
         UserPrincipal name() throws Failure;
     }
 
-    /** The account this program runs as, which is who holds a tunnel's end on its own host. */
+    /** The account this program runs as, which is who must listen on a gate's own socket. */
     static UserPrincipal runningAccount() throws Failure {
         try {
             return FileSystems.getDefault()
@@ -130,9 +130,20 @@ final class MatrixClient {
      * connection that carries the request; a client over TCP is itself.
      */
     MatrixClient listenedToBy(final ListenerOwner owner) throws Failure {
-        return "unix".equals(config.homeserver().getScheme())
-                ? new MatrixClient(config, tables, owner.name())
-                : this;
+        return overSocket() ? new MatrixClient(config, tables, owner.name()) : this;
+    }
+
+    /** Whether this client reaches its homeserver on a Unix socket. */
+    boolean overSocket() {
+        return "unix".equals(config.homeserver().getScheme());
+    }
+
+    /**
+     * Whether this client refuses a socket's listener that is not the account it expects, as the
+     * gate's client of its own homeserver does.
+     */
+    boolean checksListener() {
+        return overSocket() && socketOwner != null;
     }
 
     /**
