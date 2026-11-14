@@ -308,3 +308,7 @@ tries again; every other code refuses it.
 | 78 | The configuration: missing, unknown, an untrusted certificate, a reset homeserver, a loopback port another uid listens on; or a machine that will not keep the tokens from the account's other processes |
 
 The reason goes to stderr, and never contains a token.
+
+A verb that waits on the homeserver - `setup`, `backup`, `restore`, and `expel` when it starts it -
+says on stderr what it waits for when the wait starts, and every 10 s how long it has waited and the time it has
+left, through the same filter as the homeserver's last error. stdout keeps its one JSON answer.

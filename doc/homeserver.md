@@ -223,3 +223,9 @@ as one of the host's people, through the gate:
   forward and leaves its direct chats and its session at the end, on a failure too.
 - **ssh is the caller's**: its config, agent and known hosts decide how `<login>@<host>` is reached. The rehearsal is
   built from this checkout's tests and ships in no package.
+- **A signal ends it without leaving**: on SIGINT or SIGTERM the JVM stops without logging the person out or leaving
+  its direct chats. In the rented-host run that is the hard stop, and the rental is deleted after it.
+- **The rented-host run's step**, `build/rehearse-steps/busy-room`, runs this call from a fresh clone of `main` in a
+  scratch directory of its own, from `REHEARSAL_MATRIX_SOURCE` or the public repository, and writes in no checkout. It
+  names as further persons everyone the host's `org status` answer has active in the project, and stops (2) without
+  that answer.

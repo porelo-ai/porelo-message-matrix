@@ -19,7 +19,7 @@ Settled reasoning, accepted risks included: what was decided, why, and what woul
 | [The local homeserver is chosen, never pulled in](#the-local-homeserver-is-chosen-never-pulled-in) | `Provides: porelo-homeserver`; the transport neither depends on it nor recommends it. |
 | [The transport brings the filter](#the-transport-brings-the-filter) | The transport's package depends on `porelo-message-sluice-filter`. |
 | [A homeserver's certificate: public, the operator's own, or - for development - unchecked](#a-homeservers-certificate-public-the-operators-own-or-for-development-unchecked) | A public certificate, a CA file, or the check switched off loudly for development. |
-| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
+| [Tokens and passwords never travel or stay readable](#tokens-and-passwords-never-travel-or-stay-readable) | Plain `http` only on loopback and only to the account's own listener, the tokens on standard input, the running transport not dumpable, a password reset redacted at once, the project's room taken only if it is Porelo's. |
 | [After a restore, setup takes the administrator back](#after-a-restore-setup-takes-the-administrator-back) | Only behind `restore`'s mark, only on the account's own homeserver; the new password reaches the homeserver's run through podman's environment. |
 | [No administrator on a central homeserver](#no-administrator-on-a-central-homeserver) | Each person's Porelo acts only as the accounts of its login, with passwords derived by HMAC-SHA256 from the person's secret in `account`. |
 | [The host keeps a project's room; elsewhere a person does](#the-host-keeps-a-projects-room-elsewhere-a-person-does) | Behind the gate only the administrator makes and keeps it; on a homeserver elsewhere a person keeps it by hand. |
@@ -280,10 +280,14 @@ goes, and the CA file is the only way to trust an unusual certificate.
 - **A password reset is redacted from the admin room at once.** Tuwunel sets a password only through an
   admin-room command, and the command and the server's reply both hold it. Both are redacted right after,
   so no event the homeserver serves still holds the password.
-- **The running transport is not dumpable.** Porelo hands it the tokens as its environment, and a fresh
-  executable is dumpable whatever started it, so any process of the account could read them from
-  `/proc/<pid>/environ` while it runs - `poll --wait` up to 30 s. Its first step is `prctl(PR_SET_DUMPABLE, 0)`,
-  read back, so its `/proc` files and memory belong to root; a machine that refuses it gets 78.
+- **The tokens come on standard input, never in the environment.** `describe` says `"secrets": "input"`, and
+  Porelo then hands the secrets in one object on stdin (`doc/transport.md`), so they are never in
+  `/proc/<pid>/environ`, which the kernel fills at `exec`, before the transport runs any code. With `secrets` on
+  stdin, no `PORELO_MATRIX_*` variable of the environment is read.
+- **The running transport is not dumpable.** A fresh executable is dumpable whatever started it, so any process
+  of the account could read its memory while it runs - `poll --wait` up to 30 s. Its first step is
+  `prctl(PR_SET_DUMPABLE, 0)`, read back, so its `/proc` files and memory belong to root; a machine that refuses
+  it gets 78.
 - **The project's room is taken only if it is Porelo's.** It must have been made by Porelo's administrator,
   be invite-only, and have guests forbidden. A room somebody else put under `#porelo-<project>` first, or
   one opened since, is refused: tasks and people would otherwise be put into a room of somebody else's
@@ -293,10 +297,10 @@ goes, and the CA file is the only way to trust an unusual certificate.
 leave the database at once, or only when RocksDB next compacts, is the homeserver's matter. The local
 homeserver's database is a podman volume of the account itself, readable by no other account.
 
-**Risk accepted:** between `exec` and the `prctl` call the environment is still readable - 15 to 40 ms
-under `strace`; a shell loop reading `/proc/<pid>/environ` right after each start caught the token in 25 of
-300 starts. A process of the account that watches `/proc` for the transport's starts can still take a token.
-Only a token that is not in the environment at all closes it, which changes Porelo's contract.
+**Risk accepted:** a Porelo of the old way still hands the tokens as the environment, and the transport still
+takes them so. Between `exec` and the `prctl` call that environment is readable - 15 to 40 ms under `strace`; a
+shell loop reading `/proc/<pid>/environ` right after each start caught the token in 25 of 300 starts. It stays
+so that such a Porelo keeps working; a Porelo that reads `"secrets": "input"` leaves no token there.
 
 **Risk accepted:** between the check of the port's owner and the connection there is a window of
 milliseconds. Another account cannot bind a port this account holds, so only a homeserver that dies in that
@@ -304,8 +308,7 @@ window lets another account take the port before the request. A socket the accou
 close it, which changes porelo's and porelo-frontend's side too.
 
 **What would change the answer:** Tuwunel offering a way to set a password that is not a room event; it
-would then replace the command. Porelo handing the tokens over on a pipe instead of the environment; the
-transport then reads them there and the window is gone.
+would then replace the command. No Porelo of the old way left to serve; the environment's fallback then goes.
 
 ## After a restore, setup takes the administrator back
 

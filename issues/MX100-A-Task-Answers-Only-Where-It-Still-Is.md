@@ -16,7 +16,7 @@
 
 **Why this size.** which of a task's direct chats `send --to <person>` may write into, and its tests.
 
-**How it stands.** Review (2026-11-10): built after [MX102](README.md#mx102) on the coordinator's word (16:39Z);
+**How it stands.** Review (2026-11-10): built;
 `SendTest` and `DirectTest` green, each new test seen red by a break.
 
 **What must be true.** A task's answer to a person never goes into a direct chat the task itself has left or was taken
