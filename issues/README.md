@@ -37,6 +37,7 @@ sequence.
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
+| <a id="mx110"></a>[MX110](MX110-The-Gates-Body-Limit-Test-Fits-In-One-Gigabyte.md) | S | - | `GateRequestTest` runs under `-Xmx1g` like the rest of the suite, a body at the gate's 64 MiB limit still read whole and one byte over still refused, in both framings |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
