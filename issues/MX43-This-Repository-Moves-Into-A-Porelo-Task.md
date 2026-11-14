@@ -17,7 +17,7 @@
 **Why this size.** nothing to build in this repository's code once [MX80](README.md#mx80) is done; the work is the image's
 dry run, the trial move's steps and this issue worked to Review from inside the task: about 35 minutes of the agent's
 work, 15 for the dry run here and 20 in the task, beside the waits for the image, the suite, the forge's Build, the
-reading from outside and the way back.
+host's reading and the way back.
 
 **What must be true.** porelo-message-matrix is worked by its own agent inside a Porelo task of the project `porelo` on
 the rented host: the agent takes this issue from start to Review in the task, its pushes reach the host's forge, the
@@ -47,10 +47,10 @@ setup and its local registry settings, and the project's procedure for an agent'
   through the central forge.** This repository reads only porelo-parent and the release tools (`porelo-release`,
   `porelo-machines`) and deploys no Maven artifact, so the trial changes no snapshot another repository builds
   against.
-- **The room during the move:** the development machine's homeserver carries the project's room, reached from the
-  host over one `ssh -R` to one socket, [MX76](README.md#mx76). The agent in the task changes this repository but never
-  restarts or updates that homeserver: what it builds is tested in its own task and the forge's Build, and reaches the
-  development machine only through the gathered push and a deliberate install there.
+- **The room during the move is the host's:** the task talks only in the project's room on the host's homeserver,
+  with the operator and the other moved agents. Nothing runs between the development machine and the host's tasks: no
+  tunnel, no bridge, no shared room; the agents on the development machine keep their own room. What the task builds is
+  tested in its own task and the forge's Build, and reaches the development machine only through the gathered push.
 - **What the task's context gives the agent in place of `.AGENTS.md`**, which is not committed: its name
   `Agent Matrix`, its attribution `Assisted-by: Claude Code, <model>` and no other trailer, that its upstream is the
   host's forge and the central forge only through the gathered push, the room in place of the channel, and the
@@ -59,26 +59,23 @@ setup and its local registry settings, and the project's procedure for an agent'
   before the start.
 - **The skills:** the seven this repository names, fetched in the task into Claude Code's skills folder, each under its
   slug, checked against its digest.
-- **The reading a hand-over needs:** neither Codex CLI nor Antigravity CLI is in the task. The coordinator reads the
-  pull request's diff from outside against the seven skills and posts the findings in the room; the task's agent
-  answers each there. A fix amends the task's commit and goes with `--force` to the task's own unmerged branch.
+- **The reading a hand-over needs is done on the host:** neither Codex CLI nor Antigravity CLI is in the task. A
+  reader started apart from the task, by the forge or by hand, reads the pull request's diff against the seven skills
+  and posts its findings in the host's room; the task's agent answers each there. A fix amends the task's commit and goes with `--force` to the task's own unmerged branch.
 - **The steps, in the move procedure's order:**
   1. *Here, before the host:* a task of this repository on this machine, built from `porelo.yml`, runs
      `./mvnw -B -s settings.xml -Pnative verify` and `-Pdocuments test` green, and its skipped tests are named. This is
      the image's first build by Porelo.
   2. *The switch:* the coordinator's `project.yml` commit gives the repository the host's forge as upstream; this issue
      is set Implementing on `main` before it, so the forge receives that state.
-  3. *The room first:* the operator's steps 1 to 6 of [MX81](README.md#mx81) (Do/See): the tunnel, the project's
-     `homeserver: unix:` and `room`, the lent token, the invitation, the certificates. Without them the task reports
-     into the host's room, which the coordinator does not reach.
-  4. *The start:* `porelo task start --repository porelo-message-matrix --agent claude` on the host, attended, its
+  3. *The start:* `porelo task start --repository porelo-message-matrix --agent claude` on the host, attended, its
      terminal opened by the operator.
-  5. *Inside the task:* the agent reads its context, fetches the skills, makes the change the trial carries, runs the
+  4. *Inside the task:* the agent reads its context, fetches the skills, makes the change the trial carries, runs the
      documents tests and the full suite in the task, and pushes. The gate opens the pull request; the agent reads the
-     Build and the *Shared rules check* through the `forgejo` reader, both green, answers the reading, and sets
+     Build and the *Shared rules check* through the `forgejo` reader, both green, answers the reading of the host's reader, and sets
      Review.
-  6. *The check:* the move's check for this repository, red before the start, green after.
-  7. *The way back:* what the forge holds of the task's work is fetched into the checkout here, the coordinator switches
+  5. *The check:* the move's check for this repository, red before the start, green after.
+  6. *The way back:* what the forge holds of the task's work is fetched into the checkout here, the coordinator switches
      the upstream back, and the session here resumes.
 - **The change the trial carries is real work the Build reads**, since a push of documents, issues or `porelo.yml`
   alone starts no Build on the forge: proposed, [MX60](README.md#mx60), the host's gate naming in its log why it
@@ -108,5 +105,4 @@ setup and its local registry settings, and the project's procedure for an agent'
   for the skills.
 - That the task's context gives what the plan names in place of `.AGENTS.md`, the attribution above all.
 - That a native build fits in the task's memory limit: it took about 4 GB on the Fedora VM.
-- How a moved agent's task sees the local agents' lines in the room: local agents have names no task has and are
-  listed as external ([MX76](README.md#mx76)); that the task's agent is woken only by its own name is shown in step 4.
+- That the task's agent is woken only by its own name in the host's room, shown in step 3.

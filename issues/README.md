@@ -36,6 +36,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx109"></a>[MX109](MX109-No-Room-Is-Reached-Through-A-Tunnel.md) | M | - | The path to a homeserver on another machine through a `unix:` socket goes: a socket is only a host's gate, which never receives a registration token, and the script laying agents' certificates on a host is gone |
 | <a id="mx43"></a>[MX43](MX43-This-Repository-Moves-Into-A-Porelo-Task.md) | S | [MX80](README.md#mx80) | This repository worked by its own agent inside a Porelo task on the rented host, its issue to Review there, the forge's build green, reached in the room by its name; a trial, then the way back |
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
@@ -56,7 +57,6 @@ sequence.
 | <a id="mx80"></a>[MX80](MX80-The-Workflows-Run-On-A-Forge-As-On-GitHub.md) | S | - | The workflows run unchanged and green on the host's Forgejo and on GitHub: publication and snapshot registry switched by the setup's variables, the homeserver in the forge's job, `porelo.yml` in the keys Porelo reads |
 | <a id="mx79"></a>[MX79](MX79-Only-The-Forwards-Own-Page-Reads-The-Gate.md) | S | - | A page not served at the forward the request came in on reads no answer of the gate's and registers or signs in nothing, and no page elsewhere starts the person's sign-in |
 | <a id="mx39"></a>[MX39](MX39-A-Backup-Is-Its-Own.md) | S | - | A copy `backup` reports as made holds the database and positions of that one backup: no late earlier snapshot taken for it, and no backup emptying a directory another one filled |
-| <a id="mx76"></a>[MX76](MX76-A-Host-Reaches-The-Room-On-The-Development-Machine.md) | M | - | A task on a rented host talks in the room on the development machine's homeserver, over one `ssh -R` to one socket only, while agents move |
 | <a id="mx68"></a>[MX68](MX68-The-Gates-Refusals-Are-Held-By-Tests.md) | M | - | Whoever removes a refusal of the gate's for a login, a registration or a reserved alias sees a unit test fail |
 | <a id="mx66"></a>[MX66](MX66-The-Default-Project-Has-No-Room.md) | S | - | The transport refuses to make or join a room for the project `default`, whatever settings reach it; what is left over can still be cleared |
 | <a id="mx24"></a>[MX24](MX24-The-Room-Outlives-The-Machine.md) | M | - | `backup <dir>` and `restore <dir>` for the host's playbook, so the local homeserver's conversation outlives a rented host; `setup` takes `@porelo` back after a restore |
@@ -130,6 +130,7 @@ sequence.
 
 | # | Title | Why |
 |---|---|---|
+| <a id="mx76"></a>[MX76](README.md#mx76) | A Host Reaches The Room On The Development Machine | Nothing runs between the development machine and the host's tasks - no tunnel, no bridge, no shared room; a moved agent talks only in the room on the host's homeserver, with the operator, and the reading before a hand-over is done on the host by a reader started apart from the task |
 | <a id="mx82"></a>[MX82](README.md#mx82) | A Local Agent's Line Reaches A Moved Task | During the move no communication runs between agents on the development machine and tasks on the host, so a local agent's signed line reaching a moved task is not needed |
 | <a id="mx81"></a>[MX81](README.md#mx81) | A Coordinator Off The Host Reaches The Task's Room | During the move no communication runs between agents on the development machine and tasks on the host, so a coordinator off the host in the task's room is not needed |
 | <a id="mx92"></a>[MX92](README.md#mx92) | Element Web Signs In Headless As A Smoke | The gate answers a browser page only from its own origin or Element Desktop's, so Element web cannot sign in there unless the host is widened; the scripted client already proves the same path, and Element's look stays in the operator's own test |
