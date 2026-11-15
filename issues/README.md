@@ -45,7 +45,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx111"></a>[MX111](MX111-The-Docs-Say-What-The-Code-Does.md) | S | - | Every sentence of `README.md`, `doc/` and the CHANGELOG's latest section names only commands, flags, paths, defaults, states, messages and behavior the code on main has; where the code is wrong, a bug of its own |
 | <a id="mx109"></a>[MX109](MX109-No-Room-Is-Reached-Through-A-Tunnel.md) | M | - | The path to a homeserver on another machine through a `unix:` socket goes: a `unix:` or `*.localhost` homeserver is only a host's gate and is never handed a lent registration token, and the script laying agents' certificates on a host is gone |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
@@ -75,6 +74,7 @@ sequence.
 
 | # | Title | What was built |
 |---|---|---|
+| <a id="mx111"></a>[MX111](README.md#mx111) | The Docs Say What The Code Does | `README.md`, `doc/` and the CHANGELOG's latest section were read against the code and seven claims the code did not bear out were corrected, none of them a bug in the code; tested by the operator: passed |
 | <a id="mx52"></a>[MX52](README.md#mx52) | A Person Joins Another Project's Room Unchanged | `join` of a person whose account is in another project's room on the account's own homeserver invites it into this project's room, answering `"invited":true` with no password, so their password and sessions stay as they were; tested by the operator: passed |
 | <a id="mx107"></a>[MX107](README.md#mx107) | The Builds Outside Downloads Come From A Cache | Build, Shared rules and Workflow check take the pinned GraalVM, the homeserver's image and Maven's repository from caches keyed by digest or pom hash, and install Ubuntu's packages only where the runner lacks them, so a registry that is down does not turn them red; tested by the operator: passed |
 | <a id="mx106"></a>[MX106](README.md#mx106) | The Busy Room Knows The Project's Other Persons | The busy-room step passes every person the host has active in the project to the rehearsal as `--person-login`, so their accounts and helpers in the room are no stranger's; tested by the operator: passed |
