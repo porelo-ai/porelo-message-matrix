@@ -47,7 +47,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx112"></a>[MX112](MX112-The-Task-Image-Uses-The-Pinned-GraalVM.md) | XS | - | `porelo.yml`'s task image and the busy-room step's `JAVA_HOME` fallback name GraalVM 25.5.5.0.3, the version and digest the shared build tools pin, as the CI build already does |
+| <a id="mx112"></a>[MX112](MX112-The-Task-Image-Uses-The-Pinned-GraalVM.md) | XS | - | `porelo.yml`'s task image and the busy-room step's `JAVA_HOME` fallback name GraalVM 25.5.5.0.3, and the task image the Ubuntu 24.04 digest, that the shared build tools pin, as the CI build already does |
 
 ## Review
 
