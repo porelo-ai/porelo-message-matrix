@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX115",
   "title": "Uninstalling Keeps The Conversation For A Later Install",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "M",
   "priority": "High",
   "rank": 3,

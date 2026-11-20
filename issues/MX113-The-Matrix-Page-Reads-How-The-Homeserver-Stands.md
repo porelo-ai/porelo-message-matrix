@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX113",
   "title": "The Matrix Page Reads How The Homeserver Stands",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "M",
   "priority": "High",
   "rank": 1,

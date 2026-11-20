@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX114",
   "title": "A Room Opens In The Person's Matrix Client",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "S",
   "priority": "High",
   "rank": 2,
