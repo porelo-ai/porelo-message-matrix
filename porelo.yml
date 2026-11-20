@@ -7,7 +7,7 @@
 # No container starts inside a task's container, so the integration tests run the homeserver's own binary here,
 # copied from the image homeserver/Dockerfile pins, by the same digest (TaskImageTest holds them one).
 image:
-    from: "docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
+    from: "docker.io/library/ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
     run: |
         # From Ubuntu: the C toolchain and zlib's headers for native-image, rpm for the .rpm and its checks,
         # systemd for the systemd-socket-activate the gate's integration tests start it with.
@@ -16,8 +16,8 @@ image:
                 build-essential zlib1g-dev ca-certificates curl git unzip rpm systemd \
             && rm -rf /var/lib/apt/lists/*
         RUN curl -fsSL -o /tmp/graalvm.tar.gz \
-                https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.4.4.1.1/graalvm-community-jdk-25i4-25.0.4.1.1_linux-x64_bin.tar.gz \
-            && echo "05ccbbe783210b6886ff7b08fcd0b061c5dce4852b05db87284fc0e24abb08e2  /tmp/graalvm.tar.gz" | sha256sum -c - \
+                https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.5.5.0.3/graalvm-community-jdk-25i5-25.0.5.0.3_linux-x64_bin.tar.gz \
+            && echo "c6438dee6c3ade2220d40b7ccdcad24b512d30e233e61bb4fc70519522de34ef  /tmp/graalvm.tar.gz" | sha256sum -c - \
             && mkdir -p /opt/graalvm && tar -xzf /tmp/graalvm.tar.gz -C /opt/graalvm --strip-components=1 \
             && rm /tmp/graalvm.tar.gz \
             && for tool in java javac jar native-image; do ln -s /opt/graalvm/bin/$tool /usr/local/bin/$tool; done

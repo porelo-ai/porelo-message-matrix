@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX112",
   "title": "The Task Image Uses The Pinned GraalVM",
-  "state": "Implementing",
+  "state": "Review",
   "size": "XS",
   "priority": "Medium",
   "rank": 6,

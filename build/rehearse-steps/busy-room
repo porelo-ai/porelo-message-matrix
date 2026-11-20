@@ -69,8 +69,8 @@ exec /usr/bin/ssh -o "IdentityAgent=$REHEARSAL_PERSON_AGENT" -o IdentityFile=non
 EOF
 chmod 700 "$work/bin/ssh"
 export REHEARSAL_PERSON_AGENT REHEARSAL_KNOWN_HOSTS
-[ -n "${JAVA_HOME:-}" ] || [ ! -d "$HOME/.porelo/jdk/graalvm-25.4.4.1.1" ] ||
-    export JAVA_HOME="$HOME/.porelo/jdk/graalvm-25.4.4.1.1"
+[ -n "${JAVA_HOME:-}" ] || [ ! -d "$HOME/.porelo/jdk/graalvm-25.5.5.0.3" ] ||
+    export JAVA_HOME="$HOME/.porelo/jdk/graalvm-25.5.5.0.3"
 # The development machine's Maven cache, offline: the rehearsal needs nothing it does not hold.
 export MAVEN_ARGS="${MAVEN_ARGS:--o -Daether.enhancedLocalRepository.split=true -Daether.enhancedLocalRepository.localPrefix=installed/matrix}"
 

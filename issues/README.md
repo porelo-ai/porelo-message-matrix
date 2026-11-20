@@ -44,12 +44,6 @@ sequence.
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx112"></a>[MX112](MX112-The-Task-Image-Uses-The-Pinned-GraalVM.md) | XS | - | `porelo.yml`'s task image and the busy-room step's `JAVA_HOME` fallback name GraalVM 25.5.5.0.3, and the task image the Ubuntu 24.04 digest, that the shared build tools pin, as the CI build already does |
-
 ## Review
 
 | # | Size | Blocked by | What it covers |
@@ -59,6 +53,7 @@ sequence.
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |
 | <a id="mx96"></a>[MX96](MX96-A-Person-Shows-Under-The-Name-They-Chose.md) | M | - | On a host a person shows in the room under the name the host passes on `keep-room`'s input, set when their account shows none, never over a name of their own |
 | <a id="mx95"></a>[MX95](MX95-The-Transport-Says-Who-Is-In-The-Room.md) | M | - | `members --project P` tells Porelo who is joined or invited in a project's room, each with the name the room shows and whether a task, a person or a helper, so the window can say who is in |
+| <a id="mx112"></a>[MX112](MX112-The-Task-Image-Uses-The-Pinned-GraalVM.md) | XS | - | `porelo.yml`'s task image and the busy-room step's `JAVA_HOME` fallback name GraalVM 25.5.5.0.3, and the task image the Ubuntu 24.04 digest, that the shared build tools pin, as the CI build already does |
 | <a id="mx88"></a>[MX88](MX88-A-Head-Names-A-Task-By-Its-Whole-Display.md) | S | - | A head `Agent Pi:` names only the task shown `Agent Pi`, and `Agent Pi (fix):` only the one shown so |
 | <a id="mx87"></a>[MX87](MX87-A-Persons-Room-Mention-Is-For-All-Agents.md) | S | - | A person's line that mentions the whole room (`@room`) is marked `"all": true`, as one headed `All agents:` |
 | <a id="mx86"></a>[MX86](MX86-A-Persons-Line-For-All-Agents-Says-So.md) | S | [MX85](README.md#mx85) | A person's line headed `All agents: …` is marked `"all": true` in its person file, so Porelo hands it to every task of the project |
