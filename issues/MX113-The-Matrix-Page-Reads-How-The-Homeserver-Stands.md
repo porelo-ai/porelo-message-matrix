@@ -50,6 +50,10 @@ nothing: which of Porelo's messages is a question stays Porelo's, read from what
   against the homeserver image with a task, a person and three lines, one read, one naming the person.
 - **Contract:** a section "Reading how the homeserver stands" in `doc/transport.md`, with `describe` naming the verb;
   changelog under Added.
+- **The page's numbers:** its unread tile counts `meant`, what is meant for the person; its room list shows each
+  room's `unread`, every unread line.
+- **Answer opens the question in the person's own Matrix client**, as [MX114](README.md#mx114) gives the address; the
+  window answers nothing itself and keeps no Matrix token, so `overview` never needs the person's.
 
 ## Acceptance
 
@@ -59,11 +63,6 @@ nothing: which of Porelo's messages is a question stays Porelo's, read from what
   lists both rooms, each task once, `unread` 2 and `meant` 1; a run of `poll` or `room read` after it hands over the
   same as before.
 - A homeserver whose administrator token is refused answers 77 and names no token.
-
-- **The page's numbers:** its unread tile counts `meant`, what is meant for the person; its room list shows each
-  room's `unread`, every unread line.
-- **Answer opens the question in the person's own Matrix client**, as [MX114](README.md#mx114) gives the address; the
-  window answers nothing itself and keeps no Matrix token, so `overview` never needs the person's.
 
 ## To be checked
 
