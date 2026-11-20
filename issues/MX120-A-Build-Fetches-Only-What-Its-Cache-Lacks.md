@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX120",
   "title": "A Build Fetches Only What Its Cache Lacks",
-  "state": "Backlog",
+  "state": "Implementing",
   "size": "S",
   "priority": "High",
   "rank": 1,
