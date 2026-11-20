@@ -60,14 +60,10 @@ nothing: which of Porelo's messages is a question stays Porelo's, read from what
   same as before.
 - A homeserver whose administrator token is refused answers 77 and names no token.
 
-## Open questions
-
-- **What counts as unread on the page:** every line in the project rooms after the person's receipt, or only the
-  lines meant for them (named, mentioned, `All agents`)? Recommended: show both, `meant` as the tile's number,
-  `unread` beside it, as Element counts highlights apart from unread.
-- **What "Answer" in "asked of you" does:** open the question in the person's Matrix client, where they answer as
-  today, or answer inside the window, Porelo posting as the person and keeping the person's token for it?
-  Recommended: open it in the client, as [MX114](README.md#mx114) does; no person's token is kept.
+- **The page's numbers:** its unread tile counts `meant`, what is meant for the person; its room list shows each
+  room's `unread`, every unread line.
+- **Answer opens the question in the person's own Matrix client**, as [MX114](README.md#mx114) gives the address; the
+  window answers nothing itself and keeps no Matrix token, so `overview` never needs the person's.
 
 ## To be checked
 
