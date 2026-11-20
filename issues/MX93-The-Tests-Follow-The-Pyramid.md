@@ -15,7 +15,7 @@
 ```
 
 **Why this size.** five fixes in this repository's tests and a few seams in the code they test (one M, three S, one XS, one
-S for the split); no contract changes, but more than a few days of work in all.
+S for the split); no contract changes, about three hours in all at the measured medians.
 
 **What must be true.** Every flow of the transport - its verbs' states, choices, limits and failure paths - is proven
 by unit tests over fakes that run in seconds; the unit suite runs in under a minute, and the tests against the real
