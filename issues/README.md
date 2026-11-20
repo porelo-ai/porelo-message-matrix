@@ -47,17 +47,12 @@ sequence.
 | <a id="mx60"></a>[MX60](MX60-The-Gate-Says-Why-It-Failed.md) | S | - | The host's gate logs why it answered 502 or could not act as the administrator (token missing or refused, homeserver silent, an unexpected status of the administrator's API), never a token |
 | <a id="mx29"></a>[MX29](MX29-The-Homeserver-On-A-Socket-Of-The-Accounts-Own.md) | - | - | The account's own homeserver behind a unix socket only it can open, across this transport, porelo and porelo-frontend, closing the window the check of the listener's owner leaves |
 
-## Implementing
-
-| # | Size | Blocked by | What it covers |
-|---|---|---|---|
-| <a id="mx120"></a>[MX120](MX120-A-Build-Fetches-Only-What-Its-Cache-Lacks.md) | S | - | The Maven cache of the Build and the shared rules check is saved again whenever the dependencies resolved differ from what was restored, so a moved parent or BOM is fetched from Maven Central once, not on every run, and a 429 from Central cannot fail a Build |
-
 ## Review
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
 | <a id="mx109"></a>[MX109](MX109-No-Room-Is-Reached-Through-A-Tunnel.md) | M | - | The path to a homeserver on another machine through a `unix:` socket goes: a `unix:` or `*.localhost` homeserver is only a host's gate and is never handed a lent registration token, and the script laying agents' certificates on a host is gone |
+| <a id="mx120"></a>[MX120](MX120-A-Build-Fetches-Only-What-Its-Cache-Lacks.md) | XS | - | The Maven cache of the Build and the shared rules check is saved again whenever the dependencies resolved differ from what was restored, so a moved parent or BOM is fetched from Maven Central once, not on every run, and a 429 from Central cannot fail a Build |
 | <a id="mx110"></a>[MX110](MX110-The-Gates-Body-Limit-Test-Fits-In-One-Gigabyte.md) | S | - | `GateRequestTest` runs under `-Xmx1g` like the rest of the suite, a body at the gate's 64 MiB limit still read whole and one byte over still refused, in both framings |
 | <a id="mx98"></a>[MX98](MX98-An-Answer-Goes-Into-The-Chat-The-Person-Wrote-In.md) | S | - | A task's answer to a person's direct line goes into the chat the person wrote in, not the oldest one still open |
 | <a id="mx100"></a>[MX100](MX100-A-Task-Answers-Only-Where-It-Still-Is.md) | S | - | A task never answers into a direct chat it has left or was taken out of, and a chat it cannot read does not stop its answer |

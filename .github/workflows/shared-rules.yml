@@ -45,13 +45,21 @@ jobs:
                   [ -n "$MAVEN_SNAPSHOTS_URL" ] || { echo "::error::vars.MAVEN_SNAPSHOTS_URL is empty on $SERVER_URL"; exit 1; }
                   [ -n "$PORELO_PACKAGES_READ_TOKEN" ] || { echo "::error::secrets.PORELO_PACKAGES_READ_TOKEN is empty on $SERVER_URL"; exit 1; }
 
-            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+            # Keyed by the run and its attempt, so each one can save what it fetched: an existing key is never saved over,
+            # and the pom alone does not say what its parent and BOMs resolve to.
+            - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              id: maven-cache
               with:
                   path: |
                       ~/.m2/repository
                       ~/.m2/wrapper
-                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-                  restore-keys: maven-
+                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}-${{ github.run_id }}-${{ github.run_attempt }}
+                  restore-keys: |
+                      maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}-
+                      maven-
+
+            # What changes status after this marker the job fetched itself, so maven-cache-save saves only a cache that grew.
+            - run: touch "$RUNNER_TEMP/maven-cache-restored"
 
             # As in the build: the runner's own Java only runs the tools, which install the pinned GraalVM.
             - name: Resolve the build's tools
@@ -170,3 +178,9 @@ jobs:
                   start=$(git rev-list -1 --before='26 hours ago' HEAD)
                   java -cp "$(cat "$RUNNER_TEMP/ci-tools.classpath")" org.fuin.porelo.release.Main \
                       check-commits "${start:+$start..}HEAD"
+
+            # Even after a failure, so what the job fetched is not asked of Central again.
+            - if: always()
+              uses: ./.github/actions/maven-cache-save
+              with:
+                  key: ${{ steps.maven-cache.outputs.cache-primary-key }}

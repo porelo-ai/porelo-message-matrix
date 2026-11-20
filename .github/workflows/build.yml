@@ -61,13 +61,21 @@ jobs:
                       *) echo "::error::vars.PORELO_PUBLISH is '$PORELO_PUBLISH', neither true nor false"; exit 1 ;;
                   esac
 
-            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+            # Keyed by the run and its attempt, so each one can save what it fetched: an existing key is never saved over,
+            # and the pom alone does not say what its parent and BOMs resolve to.
+            - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              id: maven-cache
               with:
                   path: |
                       ~/.m2/repository
                       ~/.m2/wrapper
-                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-                  restore-keys: maven-
+                  key: maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}-${{ github.run_id }}-${{ github.run_attempt }}
+                  restore-keys: |
+                      maven-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}-
+                      maven-
+
+            # What changes status after this marker the job fetched itself, so maven-cache-save saves only a cache that grew.
+            - run: touch "$RUNNER_TEMP/maven-cache-restored"
 
             # rpmbuild for the .rpm, zlib's headers for the native image. GitHub's runner image holds both, so nothing
             # is fetched from Ubuntu's archive, whose outage would fail the build; a runner without them installs them.
@@ -379,3 +387,9 @@ jobs:
                   echo "uploaded, but not in the ${CHANNEL} index after ten minutes:"
                   echo "$left"
                   exit 1
+
+            # Even after a failure, so what the job fetched is not asked of Central again.
+            - if: always()
+              uses: ./.github/actions/maven-cache-save
+              with:
+                  key: ${{ steps.maven-cache.outputs.cache-primary-key }}
