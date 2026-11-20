@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX110",
   "title": "The Gate's Body Limit Test Fits In One Gigabyte",
-  "state": "Implementing",
+  "state": "Review",
   "size": "S",
   "priority": "High",
   "rank": 4,

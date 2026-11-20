@@ -144,13 +144,24 @@ class GateRequestTest {
                 final GateRequest request = Objects.requireNonNull(GateRequest.read(wire));
                 assertThat(request.body())
                         .as("all bytes at the inclusive limit for chunked=%s", chunked)
-                        .hasSize(limit)
-                        .containsOnly((byte) 'x');
+                        .hasSize(limit);
+                assertThat(firstOtherThan(request.body(), (byte) 'x'))
+                        .as("every byte at the inclusive limit is 'x' for chunked=%s", chunked)
+                        .isEqualTo(-1);
                 assertThat(Objects.requireNonNull(GateRequest.read(wire)).path())
                         .as("body framing leaves the following request intact")
                         .isEqualTo("/next");
             }
         }
+    }
+
+    private static int firstOtherThan(byte[] bytes, byte expected) {
+        for (int index = 0; index < bytes.length; index++) {
+            if (bytes[index] != expected) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static Stream<Arguments> bodyLimits() {
