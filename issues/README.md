@@ -24,6 +24,8 @@ sequence.
 
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
+| <a id="mx113"></a>[MX113](MX113-The-Matrix-Page-Reads-How-The-Homeserver-Stands.md) | M | - | A read-only verb `overview` answers in one JSON object how a machine's homeserver stands - installed, running, who can reach it - and for each project room Porelo made: the agents present, and for one person what is unread and what is meant for them | - |
+| <a id="mx114"></a>[MX114](MX114-A-Room-Opens-In-The-Persons-Matrix-Client.md) | S | [MX113](README.md#mx113) | Each room `overview` lists carries the addresses a client opens it by, a room's own and a message's, and the contract says how Element Desktop opens them on this computer and through a host's gate, measured | - |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
 
 ## Estimated
