@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX116",
   "title": "Each Verb Only Maps And A Service Does The Work",
-  "state": "Idea",
+  "state": "Accepted",
   "size": "L",
   "priority": "High",
   "rank": 1,

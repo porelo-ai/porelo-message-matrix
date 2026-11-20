@@ -7,7 +7,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx116"></a>[MX116](MX116-Each-Verb-Only-Maps-And-A-Service-Does-The-Work.md) | L | - | Every command line verb, the room commands and the gate's request handler only check their input, map it to a record, call one service method and print its answer; the use cases move into services tested without the command line |
 | <a id="mx97"></a>[MX97](MX97-A-Verb-Refuses-A-Repeated-Flag-And-Repeats-No-Secret.md) | - | - | A lifecycle verb refuses a flag given twice with 64, and no failure line repeats a secret or a control character from a homeserver's error text |
 | <a id="mx83"></a>[MX83](MX83-The-Homeservers-Data-Survives-A-Volume-Prune.md) | - | - | The homeserver's accounts, rooms and messages survive a routine `podman volume prune` while it is stopped, and a machine that keeps its homeserver writes a recent copy without being asked |
 | <a id="mx78"></a>[MX78](MX78-A-Backup-Knows-Its-Own-Snapshot.md) | - | - | A copy holds all its positions name however many earlier snapshots still run, and a snapshot finishing during the copy does not fail it for good |
@@ -19,6 +18,7 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
+| <a id="mx116"></a>[MX116](MX116-Each-Verb-Only-Maps-And-A-Service-Does-The-Work.md) | L | - | Every command line verb, the room commands and the gate's request handler only check their input, map it to a record, call one service method and print its answer; the use cases move into services tested without the command line |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
 ## Analyzed
