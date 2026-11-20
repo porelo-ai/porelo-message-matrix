@@ -7,7 +7,7 @@
   "title": "The Gate's Body Limit Test Fits In One Gigabyte",
   "state": "Backlog",
   "size": "S",
-  "priority": "Medium",
+  "priority": "High",
   "rank": 4,
   "blockedBy": [],
   "covers": "`GateRequestTest` runs under `-Xmx1g` like the rest of the suite, a body at the gate's 64 MiB limit still read whole and one byte over still refused, in both framings"
