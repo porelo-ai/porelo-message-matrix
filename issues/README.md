@@ -18,7 +18,6 @@ sequence.
 
 | # | Size | Blocked by | What it covers |
 |---|---|---|---|
-| <a id="mx116"></a>[MX116](MX116-Each-Verb-Only-Maps-And-A-Service-Does-The-Work.md) | L | - | Every command line verb, the room commands and the gate's request handler only check their input, map it to a record, call one service method and print its answer; the use cases move into services tested without the command line |
 | <a id="mx38"></a>[MX38](MX38-A-Room-Shows-No-Helper.md) | XL | - | A person sees no helper account in the room, on the account's own homeserver and on a host: a project's application service acts through its task accounts only, a lobby the people never see admits them, and neither the administrator nor a relay is a member; splits into parts of L or smaller |
 
 ## Analyzed
@@ -26,6 +25,7 @@ sequence.
 | # | Size | Blocked by | What it covers | Open questions |
 |---|---|---|---|---|
 | <a id="mx113"></a>[MX113](MX113-The-Matrix-Page-Reads-How-The-Homeserver-Stands.md) | M | - | A read-only verb `overview` answers in one JSON object how a machine's homeserver stands - installed, running, who can reach it - and for each project room Porelo made: the agents present, and for one person what is unread and what is meant for them | - |
+| <a id="mx116"></a>[MX116](MX116-Each-Verb-Only-Maps-And-A-Service-Does-The-Work.md) | XL | - | Every command line verb, the room commands and the gate's request handler only check their input, map it to a record, call one service method and print its answer; the use cases move into services tested without the command line | - |
 | <a id="mx114"></a>[MX114](MX114-A-Room-Opens-In-The-Persons-Matrix-Client.md) | S | [MX113](README.md#mx113) | Each room `overview` lists carries the addresses a client opens it by, a room's own and a message's, and the contract says how Element Desktop opens them on this computer and through a host's gate, measured | - |
 | <a id="mx115"></a>[MX115](MX115-Uninstalling-Keeps-The-Conversation-For-A-Later-Install.md) | M | - | `clear --keep` leaves the account's conversation as one backup in a kept folder of its own and removes everything else; the first start after a later install restores it, and `clear` without `--keep` removes the kept folder too | - |
 | <a id="mx77"></a>[MX77](MX77-The-Rooms-Poll-Has-A-Position-Of-Its-Own.md) | M | - | `poll --persons` reads one project's room only, with a position and a lock of that room, apart from `--direct` and stable when the reading account changes | 0 |
