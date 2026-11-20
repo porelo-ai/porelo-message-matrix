@@ -43,6 +43,8 @@ and each task back with new tokens, so nothing kept in a vault matters.
   needs `clear` without `--keep`.
 - **On a host**, the same commands as the homeserver's account; `gate --prepare` runs again after the restore, as
   `doc/homeserver.md` already says for a reset database.
+- **In the service shape from the start:** the verb's entry point only parses, maps, calls one service method and
+  prints; the service reads no environment, stdin or arguments, as the move of the other verbs into services asks.
 - **Red first:** an integration test that makes a room with a task, a person and lines, runs `clear --keep`, checks
   that only `kept/` is left, then `setup` and `members` and `room read --all` give the same room, members and lines,
   and the task's old token is refused (401).

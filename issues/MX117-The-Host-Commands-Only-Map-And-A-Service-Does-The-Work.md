@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX117",
   "title": "The Host Commands Only Map And A Service Does The Work",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "M",
   "priority": "High",
   "rank": 2,

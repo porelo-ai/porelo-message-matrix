@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX118",
   "title": "The Lifecycle Verbs Only Map And A Service Does The Work",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "L",
   "priority": "High",
   "rank": 3,

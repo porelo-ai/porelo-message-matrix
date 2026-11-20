@@ -46,6 +46,8 @@ nothing: which of Porelo's messages is a question stays Porelo's, read from what
     that person's own read receipt in the room, not their own; `meant` those of them that name the person by
     `MeantFor`'s rule, mention them, or say `All agents`. Read as the administrator from the room's timeline and the
     receipts its sync carries, paged back to the receipt, at most 1000 lines per room ("1000+" beyond).
+- **In the service shape from the start:** the verb's entry point only parses, maps, calls one service method and
+  prints; the service reads no environment, stdin or arguments, as the move of the other verbs into services asks.
 - **Red first:** a unit test of the answer's shape from recorded events (`OverviewTest`), then an integration test
   against the homeserver image with a task, a person and three lines, one read, one naming the person.
 - **Contract:** a section "Reading how the homeserver stands" in `doc/transport.md`, with `describe` naming the verb;

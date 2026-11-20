@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX116",
   "title": "Each Verb Only Maps And A Service Does The Work",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "L",
   "priority": "High",
   "rank": 1,
@@ -24,6 +24,8 @@ Read in the code: `Send.run` parses its arguments, reads the files, checks the s
 
 ## Plan
 
+- **After the Matrix page's issues** (the overview, opening a room, keeping the conversation), whose new verbs are
+  built in this shape from the start.
 - **Verbs, in this order:** `check`, `rename`, `read`, `receipt`, `send`, `poll`; then `room read`, `room post`, `room wait`,
   whose vault question becomes a collaborator of its own.
 - **The shape, as for every part of this move:** each verb gets a request record and an answer record; its entry
@@ -43,12 +45,6 @@ Read in the code: `Send.run` parses its arguments, reads the files, checks the s
   service classes' code that the later parts extend.
 - The whole suite and the integration tests pass after every verb's step; `doc/transport.md` and `describe` are
   unchanged.
-
-## Open questions
-
-- **Order against the Matrix page's issues** (the overview, opening a room, keeping the conversation): build those
-  first, their new verbs already in this shape, and these four parts after; or these first, so they land on
-  services? Recommended: those first - they are High and wanted by a story under test, and this moves no behavior.
 
 ## To be checked
 

@@ -5,7 +5,7 @@
   "$schema": "issue-1.json",
   "id": "MX119",
   "title": "The Gate Only Maps And A Service Does The Work",
-  "state": "Analyzed",
+  "state": "Estimated",
   "size": "M",
   "priority": "High",
   "rank": 4,
