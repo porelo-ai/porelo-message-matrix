@@ -87,7 +87,8 @@ over a Matrix homeserver. Porelo's side of it - the peer table, a task's account
 
 ## Work in this repository
 
-- **Issue prefix: `MX`.**
+- **Issues are in the repository's GitHub Issues**, each named by its reference there
+  (`porelo-ai/porelo-message-matrix#<number>`).
 - **Installed machine-wide, this transport is polled by every account's `porelod`** and answers 78 where it
   is not configured, so a machine-wide install is only for an announced test and is removed after it.
 

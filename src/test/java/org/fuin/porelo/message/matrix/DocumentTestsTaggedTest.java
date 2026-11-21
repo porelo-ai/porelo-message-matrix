@@ -15,9 +15,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * A change to documents or issues runs only the tests tagged {@code documents}; a test that reads a
- * document without the tag is left out of that run, and the run stays green while the document it
- * checks is broken. No test here reads one today - the build's {@code check-citations} and {@code
+ * A change to documents runs only the tests tagged {@code documents}; a test that reads a document
+ * without the tag is left out of that run, and the run stays green while the document it checks is
+ * broken. No test here reads one today - the build's {@code check-citations} and {@code
  * check-doc-site} check them - so this guard is what makes the next one carry the tag.
  */
 @Tag("documents")
@@ -27,10 +27,10 @@ class DocumentTestsTaggedTest {
 
     /**
      * How a test reaches a document, each as a string literal of its own: a Markdown file, the
-     * site's navigation, or the documentation chapter or the issues as a directory.
+     * site's navigation, or the documentation chapter as a directory.
      */
     private static final Pattern READS_DOCUMENTS =
-            Pattern.compile("\"[^\"\\s]*\\.md\"|\"[^\"\\s]*mkdocs\\.yml\"|\"(doc|issues)/?\"");
+            Pattern.compile("\"[^\"\\s]*\\.md\"|\"[^\"\\s]*mkdocs\\.yml\"|\"doc/?\"");
 
     private static final String TAG = "@Tag(\"documents\")";
 
@@ -58,7 +58,7 @@ class DocumentTestsTaggedTest {
 
     @Test
     @DisplayName(
-            "A path to a Markdown file, the navigation, doc or issues is seen, and other strings are not")
+            "A path to a Markdown file, the navigation or doc is seen, and other strings are not")
     void seesTheWaysToADocument() {
         assertThat(
                         List.of(
@@ -66,7 +66,6 @@ class DocumentTestsTaggedTest {
                                 "Path.of(\"doc\", \"transport.md\")",
                                 "Path.of(\"mkdocs.yml\")",
                                 "Path.of(\"doc\")",
-                                "Path.of(\"issues\")",
                                 "root.resolve(\"doc/\")"))
                 .allMatch(code -> READS_DOCUMENTS.matcher(code).find());
         assertThat(

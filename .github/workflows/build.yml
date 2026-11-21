@@ -10,9 +10,9 @@ on:
         branches: [main]
         # A release is a tag v<version>, and nothing else.
         tags: ['v*']
-        paths-ignore: ['**/*.md', 'doc/**', 'issues/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
+        paths-ignore: ['**/*.md', 'doc/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
     pull_request:
-        paths-ignore: ['**/*.md', 'doc/**', 'issues/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
+        paths-ignore: ['**/*.md', 'doc/**', 'mkdocs.yml', 'porelo.yml', '.github/**']
 
 permissions:
     contents: read
