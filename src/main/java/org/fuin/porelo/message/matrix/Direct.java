@@ -99,6 +99,20 @@ final class Direct {
             @Nullable final String central,
             final JsonNode invites)
             throws Failure {
+        return answerInvitations(client, self, central, invites, new ArrayList<>());
+    }
+
+    /**
+     * As {@link #answerInvitations(MatrixClient, String, String, JsonNode)}, adding each chat
+     * joined to {@code joined}.
+     */
+    static List<String> answerInvitations(
+            final MatrixClient client,
+            final String self,
+            @Nullable final String central,
+            final JsonNode invites,
+            final List<String> joined)
+            throws Failure {
         final List<String> declined = new ArrayList<>();
         for (final Map.Entry<String, JsonNode> invite : invites.properties()) {
             final String room = invite.getKey();
@@ -157,6 +171,7 @@ final class Direct {
                     "/_matrix/client/v3/join/" + MatrixClient.segment(room),
                     MatrixClient.JSON.createObjectNode());
             remember(client, self, inviter, room);
+            joined.add(room);
         }
         return declined;
     }

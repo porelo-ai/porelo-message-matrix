@@ -175,6 +175,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `poll --direct` hands over the line a person said in a direct chat they opened before the task joined it, as every
+  client opens one: the chat's newest 100 lines before the join are read, by the poll that joins it or, when that poll
+  fails, by the next. Before, a chat was read only from after the join, and that first line never reached the task.
 - Tasks of one project started at once on a central homeserver no longer end `setup` with 75 while the project's
   relay is being polled: setup waits for the relay's poll only when it must forget the relay's position.
 - A connection the gate closes for idling no longer reads as a bad request, with an answer to nobody and an

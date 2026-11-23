@@ -102,6 +102,40 @@ class DirectIT {
         return found;
     }
 
+    /**
+     * Harm guarded: a person's first line in a chat they open - said before the task joins, as
+     * every client opens one - never reaches the task, or reaches it twice.
+     */
+    @Test
+    @DisplayName("A line said before the task joined a new chat is handed over once, as direct")
+    void aLineSaidBeforeTheJoinIsHandedOverOnce() throws IOException, InterruptedException {
+        final String chat = tuwunel.openDirect(alice, task);
+        tuwunel.sayContent(alice, chat, text("a word before you joined"));
+
+        assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(tuwunel.membership(alice, chat, task.userId())).isEqualTo("join");
+        assertThat(persons())
+                .as("handed over by the poll that joined the chat")
+                .singleElement()
+                .satisfies(
+                        p -> {
+                            assertThat(p.path("body").asText())
+                                    .isEqualTo("a word before you joined");
+                            assertThat(p.path("direct").asBoolean(false)).isTrue();
+                            assertThat(p.path("to"))
+                                    .extracting(JsonNode::asText)
+                                    .containsExactly(task.userId());
+                        });
+        try (Stream<Path> files = Files.list(inbound)) {
+            for (final Path file : files.toList()) {
+                Files.delete(file);
+            }
+        }
+
+        assertThat(pollDirect()).as(this::stderr).isEqualTo(Exit.OK);
+        assertThat(persons()).as("not handed over a second time").isEmpty();
+    }
+
     @Test
     @DisplayName(
             "A chat a person of the project opens is joined, and what they say there is handed over as direct, for the task alone")

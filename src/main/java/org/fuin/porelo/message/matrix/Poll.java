@@ -253,18 +253,53 @@ final class Poll {
         // The names each room's members show, asked once in this sync for the heads people type.
         final Map<String, Map<String, String>> shown = new HashMap<>();
         // A task's direct chats: answer the invitations first, so a chat a person just opened is
-        // joined now and
-        // read from the next poll on.
+        // joined and read now.
         final Map<String, Set<String>> directRooms = new java.util.HashMap<>();
+        final Path toRead = stateDir.resolve("chats-to-read");
         if (direct) {
-            skipped.addAll(
-                    Direct.answerInvitations(
-                            client, self, central, sync.path("rooms").path("invite")));
+            final List<String> chatsJoined = new ArrayList<>();
+            try {
+                skipped.addAll(
+                        Direct.answerInvitations(
+                                client,
+                                self,
+                                central,
+                                sync.path("rooms").path("invite"),
+                                chatsJoined));
+            } finally {
+                // Marked until read, so a poll failing after the join leaves the chat to the next.
+                for (final String chat : chatsJoined) {
+                    mark(toRead.resolve(sha256(self + "\n" + chat)), stateDir);
+                }
+            }
             directRooms.putAll(Direct.rooms(client, self));
         }
         // Paging back from a cut-short timeline can return events the timeline holds too: each is
         // handled once.
         final Set<String> seen = new HashSet<>();
+        for (final String chat : directRooms.values().stream().flatMap(Set::stream).toList()) {
+            final Path mark = toRead.resolve(sha256(self + "\n" + chat));
+            if (!Files.exists(mark)) {
+                continue;
+            }
+            // What the person said before the join lies before the position the next poll starts
+            // at.
+            for (final JsonNode event : before(client, chat, next, skipped)) {
+                if (seen.add(event.path("event_id").asText(""))
+                        && handDirect(
+                                client, self, central, chat, event, inbound, stateDir, skipped)) {
+                    handed++;
+                }
+            }
+            try {
+                Files.deleteIfExists(mark);
+            } catch (final IOException ex) {
+                throw new Failure(
+                        Exit.TEMPORARY,
+                        "cannot note the direct chat " + chat + " read: " + ex.getMessage(),
+                        ex);
+            }
+        }
         for (final Map.Entry<String, JsonNode> room :
                 sync.path("rooms").path("join").properties()) {
             // With --direct only the task's direct chats are read: the project's room is the
@@ -276,6 +311,20 @@ final class Poll {
             for (final JsonNode event :
                     timeline(client, room.getKey(), room.getValue().path("timeline"), since)) {
                 if (!seen.add(event.path("event_id").asText(""))) {
+                    continue;
+                }
+                if (direct) {
+                    if (handDirect(
+                            client,
+                            self,
+                            central,
+                            room.getKey(),
+                            event,
+                            inbound,
+                            stateDir,
+                            skipped)) {
+                        handed++;
+                    }
                     continue;
                 }
                 // A client that encrypts - nheko in a chat it opens - writes words nobody here can
@@ -294,28 +343,6 @@ final class Poll {
                 // Other event types are room business - joins, names - and never a message to
                 // deliver.
                 if (!"m.room.message".equals(event.path("type").asText())) {
-                    continue;
-                }
-                if (direct) {
-                    // What the task's own account said there is its own, not a person's to hand
-                    // back.
-                    if (!self.equals(event.path("sender").asText(""))) {
-                        final String why =
-                                Person.deliver(
-                                        client,
-                                        self,
-                                        room.getKey(),
-                                        event,
-                                        inbound,
-                                        stateDir,
-                                        central,
-                                        self);
-                        if (why == null) {
-                            handed++;
-                        } else {
-                            skipped.add(why);
-                        }
-                    }
                     continue;
                 }
                 // The poller writes in the room only to answer a person for Porelo; handed back,
@@ -362,6 +389,95 @@ final class Poll {
         return handed;
     }
 
+    private static final String MESSAGES = "{\"types\":[\"m.room.message\",\"m.room.encrypted\"]}";
+
+    /** Notes a chat joined and not yet read, in the poll's state, so it outlives this poll. */
+    private static void mark(final Path mark, final Path stateDir) throws Failure {
+        try {
+            Files.createDirectories(mark.getParent());
+            writeAtomically(mark, new byte[0], stateDir);
+        } catch (final IOException ex) {
+            throw new Failure(
+                    Exit.TEMPORARY, "cannot note a direct chat joined: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * What was said in a chat before a position, oldest first: one page back, since a chat a person
+     * just opened holds a few lines; more are named on {@code skipped}, not read to the start.
+     */
+    private static List<JsonNode> before(
+            final MatrixClient client,
+            final String chat,
+            final String position,
+            final List<String> skipped)
+            throws Failure {
+        final JsonNode page =
+                client.get(
+                        "/_matrix/client/v3/rooms/"
+                                + MatrixClient.segment(chat)
+                                + "/messages?dir=b&limit="
+                                + PAGE
+                                + "&filter="
+                                + MatrixClient.segment(MESSAGES)
+                                + "&from="
+                                + MatrixClient.segment(position));
+        final List<JsonNode> events = new ArrayList<>();
+        page.path("chunk").forEach(events::add);
+        if (events.size() >= PAGE && !page.path("end").asText("").isEmpty()) {
+            skipped.add(
+                    "the direct chat "
+                            + chat
+                            + " held more than "
+                            + PAGE
+                            + " lines before the task joined it; only the newest "
+                            + PAGE
+                            + " are handed over");
+        }
+        return events.reversed();
+    }
+
+    /**
+     * Hands over one event of a task's direct chat when it is a person's text; answers whether it
+     * was handed over, and names on {@code skipped} what a person said that was not.
+     */
+    private static boolean handDirect(
+            final MatrixClient client,
+            final String self,
+            @Nullable final String central,
+            final String chat,
+            final JsonNode event,
+            final Path inbound,
+            final Path stateDir,
+            final List<String> skipped)
+            throws Failure {
+        final String sender = event.path("sender").asText("");
+        // What the task's own account said there is its own, not a person's to hand back.
+        if (self.equals(sender)) {
+            return false;
+        }
+        // A client that encrypts - nheko in a chat it opens - writes words nobody here can read:
+        // said, not lost.
+        if ("m.room.encrypted".equals(event.path("type").asText())) {
+            skipped.add(
+                    "an encrypted message, which Porelo cannot read (write in a chat without encryption):"
+                            + " from "
+                            + event.path("sender").asText("?")
+                            + " in "
+                            + chat);
+            return false;
+        }
+        if (!"m.room.message".equals(event.path("type").asText())) {
+            return false;
+        }
+        final String why =
+                Person.deliver(client, self, chat, event, inbound, stateDir, central, self);
+        if (why != null) {
+            skipped.add(why);
+        }
+        return why == null;
+    }
+
     /**
      * The room's new events, oldest first. A sync may cut a busy timeline short; what it left out
      * is paged backwards down to where the last poll stopped, so nothing is skipped.
@@ -383,9 +499,7 @@ final class Poll {
                                 .append("/messages?dir=b&limit=")
                                 .append(PAGE)
                                 .append("&filter=")
-                                .append(
-                                        MatrixClient.segment(
-                                                "{\"types\":[\"m.room.message\",\"m.room.encrypted\"]}"))
+                                .append(MatrixClient.segment(MESSAGES))
                                 .append("&from=")
                                 .append(MatrixClient.segment(from));
                 if (since != null) {
