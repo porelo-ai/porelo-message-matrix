@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `keep-room` keeps a room for more than 500 logins in `--persons`: the cap of 500 and its refusal (64) are gone, so a
+  project with more persons has its room kept too, up to the system's limit on one command-line argument. Each
+  account is still invited on its own.
 - `enroll --project P --task T` refuses (78) a `T` that is not `porelo-P-<task>`, before any account is made: `members`
   would read such an account as a person or not at all, so the task would get no line meant for it.
 - `send --to <person>` answers only into a direct chat the task is still in: one it left or was taken out of is passed

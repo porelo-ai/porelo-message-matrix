@@ -22,9 +22,6 @@ import org.jspecify.annotations.Nullable;
  */
 final class KeepRoom {
 
-    /** As many persons as a room is kept to, each with its accounts beside it. */
-    private static final int MAX_PERSONS = 500;
-
     /** How often the room is read again while an account taken out is still in. */
     private static final int ROUNDS = 5;
 
@@ -120,11 +117,6 @@ final class KeepRoom {
             for (final String name : value.split(",", -1)) {
                 persons.add(Login.name(name));
             }
-        }
-        if (persons.size() > MAX_PERSONS) {
-            throw new Failure(
-                    Exit.USAGE,
-                    "--persons names at most " + MAX_PERSONS + " persons, not " + persons.size());
         }
         return List.copyOf(persons);
     }

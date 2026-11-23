@@ -117,18 +117,70 @@ class KeepRoomTest {
     }
 
     /**
-     * Harm guarded: a list far beyond a room's size reaches the homeserver one invite at a time.
+     * Harm guarded: a project with more persons than a fixed count can never have its room kept.
      */
     @Test
-    void aListTooLongIsAUsageError() throws IOException {
+    void aListOfThousandsReachesTheCredentialCheck() throws IOException {
         gate();
         final String list =
-                java.util.stream.IntStream.rangeClosed(1, 501)
+                java.util.stream.IntStream.rangeClosed(1, 3_000)
                         .mapToObj(i -> "host" + i)
                         .collect(java.util.stream.Collectors.joining(","));
-        assertThat(run(TOKEN_INPUT, "keep-room", "--project", "demo", "--persons", list))
-                .as(error())
-                .isEqualTo(Exit.USAGE);
+        assertThat(run("{\"secrets\":{}}", "keep-room", "--project", "demo", "--persons", list))
+                .as("a long list is no usage error: %s", error())
+                .isEqualTo(Exit.CONFIG);
+        assertThat(error())
+                .as("the list was accepted before credential validation")
+                .contains("administrator's token");
+    }
+
+    /**
+     * Harm guarded: a large room is kept by one call to the homeserver that grows with it, or some
+     * of its persons are left uninvited.
+     */
+    @Test
+    void aRoomOfMoreThanFiveHundredIsKeptOneInvitationAtATime() throws Exception {
+        try (FakeHomeserver homeserver = new FakeHomeserver()) {
+            final MatrixClient admin =
+                    new MatrixClient(new Config(URI.create(homeserver.url()), "token", null, true));
+            homeserver.answer(200, membership(Map.of("@porelo:example.org", "join")).toString());
+            final List<String> logins =
+                    java.util.stream.IntStream.rangeClosed(1, 501)
+                            .mapToObj(i -> "host" + i)
+                            .toList();
+            for (int i = 0; i < 2 * logins.size(); i++) {
+                homeserver.answer(200, "{}");
+            }
+
+            final var answer =
+                    KeepRoom.keepTo(admin, "!r", "#porelo-p:example.org", "example.org", logins);
+
+            assertThat(answer.path("invited"))
+                    .as("both accounts of every one of the 501 logins, each once")
+                    .extracting(com.fasterxml.jackson.databind.JsonNode::asText)
+                    .containsExactlyInAnyOrderElementsOf(
+                            logins.stream()
+                                    .flatMap(
+                                            l ->
+                                                    java.util.stream.Stream.of(
+                                                            "@" + l + ":example.org",
+                                                            "@porelo." + l + ":example.org"))
+                                    .toList());
+            final var invitations =
+                    homeserver.requests().stream()
+                            .filter(r -> r.rawPath().endsWith("/invite"))
+                            .toList();
+            assertThat(invitations)
+                    .as("one invitation per account, each naming one account")
+                    .hasSize(2 * logins.size())
+                    .allSatisfy(
+                            r ->
+                                    assertThat(MatrixClient.JSON.readTree(r.body()).size())
+                                            .isEqualTo(1));
+            assertThat(homeserver.requests().stream().filter(r -> r.rawPath().endsWith("/members")))
+                    .as("the members are read once")
+                    .hasSize(1);
+        }
     }
 
     /**
@@ -273,21 +325,5 @@ class KeepRoomTest {
                                 .putObject("content")
                                 .put("membership", membership));
         return answer;
-    }
-
-    /** Harm guarded: a valid membership list cannot reconcile. */
-    @Test
-    void exactlyFiveHundredPersonsReachTheCredentialCheck() throws Exception {
-        gate();
-        final String persons =
-                java.util.stream.IntStream.rangeClosed(1, 500)
-                        .mapToObj(i -> "host" + i)
-                        .collect(java.util.stream.Collectors.joining(","));
-        assertThat(run("{\"secrets\":{}}", "keep-room", "--project", "demo", "--persons", persons))
-                .as("valid maximum-size list reaches the missing-token check")
-                .isEqualTo(Exit.CONFIG);
-        assertThat(error())
-                .as("the list was accepted before credential validation")
-                .contains("administrator's token");
     }
 }

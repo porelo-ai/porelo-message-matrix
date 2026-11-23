@@ -138,8 +138,9 @@ again at its next follow.
   its maker, invite-only, closed to guests and unlisted, then keeps it to the list: it invites `@<login>` and
   `@porelo.<login>` of each login named, signed in or not, and takes every account of a login no longer named out of
   this room, `@porelo.<login>` first. Run again with the same list it changes nothing. `--persons ""` is a project with
-  no members: its room stays. At most 500 logins; the project `default` is refused (78). A kick is no ban, so a login
-  named again is invited again. It answers
+  no members: its room stays. No fixed number of logins: what bounds the list is the system's limit on one
+  command-line argument (128 KiB on Linux, about 3,900 logins of 32 characters); each account is invited on its own.
+  The project `default` is refused (78). A kick is no ban, so a login named again is invited again. It answers
   `{"room":"#porelo-P:server","conversation":"!…","created_room":true|false,"invited":[…],"removed":[…]}`.
 - **A person shows under the name the host passes**, given on the input beside the secrets, never on the command line,
   where a comma or `=` in a name could split into another login's entry:
