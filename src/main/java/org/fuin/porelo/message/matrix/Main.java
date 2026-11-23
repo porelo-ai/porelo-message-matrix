@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.fuin.porelo.wire.LimitFactors;
 
 /** The transport's entry point, called by Porelo with a verb and its arguments. */
 public final class Main {
@@ -79,9 +80,36 @@ public final class Main {
             final InputStream stdin,
             final PrintStream out,
             final PrintStream err) {
+        final String[] verbArgs;
+        Limits.use(LimitFactors.DEFAULT);
+        if (args.length > 0 && LimitFactors.OPTION.equals(args[0])) {
+            if (args.length < 2) {
+                err.println(NAME + ": " + LimitFactors.OPTION + ": the limits line is missing");
+                return Exit.USAGE;
+            }
+            try {
+                Limits.use(LimitFactors.parse(args[1]));
+            } catch (final IllegalArgumentException ex) {
+                err.println(NAME + ": " + LimitFactors.OPTION + ": " + ex.getMessage());
+                return Exit.USAGE;
+            }
+            verbArgs = Arrays.copyOfRange(args, 2, args.length);
+        } else {
+            verbArgs = args;
+        }
+        return runVerb(verbArgs, given, stdin, out, err);
+    }
+
+    private static int runVerb(
+            final String[] args,
+            final Map<String, String> given,
+            final InputStream stdin,
+            final PrintStream out,
+            final PrintStream err) {
         // Fail closed: an unknown verb stops with an exit code rather than being guessed at.
         if (args.length == 0) {
-            err.println("usage: " + NAME + " <verb> [arguments]");
+            err.println(
+                    "usage: " + NAME + " [" + LimitFactors.OPTION + " <line>] <verb> [arguments]");
             return Exit.USAGE;
         }
         final List<String> rest = Arrays.asList(args).subList(1, args.length);

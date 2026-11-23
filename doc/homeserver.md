@@ -120,8 +120,8 @@ A host shared by several people runs the homeserver as an account of its own. Th
 `/run/porelo-matrix/client.sock`, owned by the homeserver account and group `porelo-people`, mode 0660,
 in a directory of the same owner and group, mode 0750. The host keeps that group equal to the admitted,
 unlocked logins and leaves the homeserver account out. A system socket unit with `Accept=yes` starts
-`porelo-message-transport-matrix gate` as the homeserver account for each connection, with
-`StandardInput=socket`. The gate requires that inherited connection to be a connected Unix socket;
+`porelo-message-transport-matrix --limits <line> gate` as the homeserver account for each connection, with the
+limits line from the host's configuration and `StandardInput=socket`. The gate requires that inherited connection to be a connected Unix socket;
 starting it on ordinary stdin exits 78.
 
 Run `porelo-message-transport-matrix gate --prepare` as the homeserver account before the homeserver's

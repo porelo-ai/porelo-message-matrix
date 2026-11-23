@@ -354,7 +354,7 @@ final class Lifecycle {
                 Poll.key(nobody.config(), relay.userId()),
                 relay.userId(),
                 report,
-                POLL_WAIT,
+                pollWait(),
                 position -> position.takenOnlyInRoomsOutside(joined));
         final JsonNode kept = report.answer().path("kept");
         if (!kept.isEmpty()) {
@@ -1373,7 +1373,7 @@ final class Lifecycle {
             return report.answer();
         }
         forgetPosition(
-                stateDir, Poll.key(place.nobody().config(), relay), relay, report, POLL_WAIT);
+                stateDir, Poll.key(place.nobody().config(), relay), relay, report, pollWait());
         return report.answer();
     }
 
@@ -1463,7 +1463,7 @@ final class Lifecycle {
             report.kept("the poll position of " + relay, failure.getMessage());
             return report.answer();
         }
-        forgetPosition(stateDir, Poll.key(nobody.config(), relay), relay, report, POLL_WAIT);
+        forgetPosition(stateDir, Poll.key(nobody.config(), relay), relay, report, pollWait());
         return report.answer();
     }
 
@@ -1500,6 +1500,13 @@ final class Lifecycle {
 
     /** How long {@code clear} waits for the relay's poll to end: its long sync and a margin. */
     private static final Duration POLL_WAIT = Duration.ofSeconds(45);
+
+    private static final Duration LOCK_CHECK = Duration.ofMillis(250);
+
+    /** How long {@code clear} waits for the relay's poll to end. */
+    static Duration pollWait() {
+        return Poll.outlastingASync(Limits.services(POLL_WAIT));
+    }
 
     /**
      * Forgets the relay's poll position and its lock, holding the lock the poll takes: a poll still
@@ -1591,7 +1598,7 @@ final class Lifecycle {
                 return null;
             }
             try {
-                Thread.sleep(250);
+                Thread.sleep(Limits.polling(LOCK_CHECK));
             } catch (final InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 return null;

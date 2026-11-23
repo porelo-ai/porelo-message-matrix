@@ -62,13 +62,15 @@ final class MatrixClient {
         if ("unix".equals(config.homeserver().getScheme())) {
             this.wire =
                     new SocketWire(
-                            Path.of(config.homeserver().getPath()), CONNECT_TIMEOUT, socketOwner);
+                            Path.of(config.homeserver().getPath()),
+                            Limits.services(CONNECT_TIMEOUT),
+                            socketOwner);
             return;
         }
         // A redirect would carry the token to wherever the homeserver points, so none is followed.
         final HttpClient.Builder builder =
                 HttpClient.newBuilder()
-                        .connectTimeout(CONNECT_TIMEOUT)
+                        .connectTimeout(Limits.services(CONNECT_TIMEOUT))
                         .followRedirects(HttpClient.Redirect.NEVER);
         final SSLContext tls = Trust.context(config);
         if (tls != null) {
@@ -233,9 +235,17 @@ final class MatrixClient {
         }
     }
 
+    /**
+     * One request's limit: its default times {@code services}, never below a held sync, which a
+     * small factor would otherwise cut off on every poll.
+     */
+    static Duration requestTimeout() {
+        return Poll.outlastingASync(Limits.services(REQUEST_TIMEOUT));
+    }
+
     private HttpRequest.Builder request(final String path) {
         final HttpRequest.Builder builder =
-                HttpRequest.newBuilder(URI.create(endpoint() + path)).timeout(REQUEST_TIMEOUT);
+                HttpRequest.newBuilder(URI.create(endpoint() + path)).timeout(requestTimeout());
         // Registration and login are made by nobody yet; every other call as the account.
         if (!config.accessToken().isEmpty()) {
             builder.header("Authorization", "Bearer " + config.accessToken());
@@ -358,7 +368,7 @@ final class MatrixClient {
                 return "timed out connecting";
             }
             if (t instanceof HttpTimeoutException) {
-                return "no answer within " + REQUEST_TIMEOUT.toSeconds() + " s";
+                return "no answer within " + requestTimeout().toSeconds() + " s";
             }
             final String message = t.getMessage();
             if (message != null

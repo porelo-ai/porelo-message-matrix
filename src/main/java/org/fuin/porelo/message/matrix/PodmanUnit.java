@@ -178,7 +178,7 @@ final class PodmanUnit implements Unit {
         } catch (final IOException ex) {
             return Optional.empty();
         }
-        final long deadline = System.nanoTime() + DIAGNOSTIC_TIMEOUT.toNanos();
+        final long deadline = System.nanoTime() + Limits.machines(DIAGNOSTIC_TIMEOUT).toNanos();
         final long workDeadline = deadline - CLEANUP_RESERVE.toNanos();
         final Set<ProcessHandle> descendants = new LinkedHashSet<>();
         final FutureTask<T> output =
@@ -451,15 +451,16 @@ final class PodmanUnit implements Unit {
                         .redirectOutput(ProcessBuilder.Redirect.DISCARD);
         builder.environment().putAll(secrets);
         try {
+            final Duration runTimeout = Limits.machines(RUN_TIMEOUT);
             final Process process = builder.start();
-            if (!process.waitFor(RUN_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) {
+            if (!process.waitFor(runTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 process.destroyForcibly();
                 throw new Failure(
                         Exit.TEMPORARY,
                         "podman "
                                 + args.getFirst()
                                 + " did not end within "
-                                + RUN_TIMEOUT.toSeconds()
+                                + runTimeout.toSeconds()
                                 + " s");
             }
             return process.exitValue();

@@ -96,14 +96,15 @@ final class Expel {
                 MatrixClient.JSON.createObjectNode().put("login", login).put("known", known);
         final var expelled = answer.putArray("expelled");
         final List<String> done = new ArrayList<>();
+        final int rounds = Limits.tries(ROUNDS);
         for (int round = 0; !left.isEmpty(); round++) {
-            if (round == ROUNDS) {
+            if (round == rounds) {
                 throw new Failure(
                         Exit.TEMPORARY,
                         "accounts of "
                                 + login
                                 + " are still listed after "
-                                + ROUNDS
+                                + rounds
                                 + " rounds: "
                                 + String.join(", ", left));
             }

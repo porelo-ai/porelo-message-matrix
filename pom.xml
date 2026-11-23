@@ -34,6 +34,8 @@
         <jspecify.version>1.0.1</jspecify.version>
         <assertj.version>3.27.7</assertj.version>
         <jackson.version>2.22.3</jackson.version>
+        <!-- The limits line and its four time factors, read the same way by every Porelo program. -->
+        <porelo-wire.version>0.5.1-SNAPSHOT</porelo-wire.version>
         <main.class>org.fuin.porelo.message.matrix.Main</main.class>
         <transport.name>porelo-message-transport-matrix</transport.name>
         <!-- Named as porelo names its snapshots; CI sets the run and clears the local suffix. -->
@@ -62,6 +64,11 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.fuin.porelo</groupId>
+            <artifactId>porelo-wire</artifactId>
+            <version>${porelo-wire.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

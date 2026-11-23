@@ -54,6 +54,27 @@ The keys, on stdin or in the old way's environment:
   when the executable is built: a CA added to the machine's store changes nothing, `PORELO_MATRIX_CA_FILE`
   does. A CA file together with `off` is refused.
 
+### Time limits
+
+`--limits <line>`, before the verb, carries Porelo's four time factors in the limits line of Porelo's
+`doc/limits.md` (`services=1.0,machines=1.0,polling=1.0,retries=1.0`); every verb takes it, and without it all
+four are 1.0. A line that breaks its grammar is 64 with `--limits: <what is wrong>`, before anything is done.
+
+- **`services`**: each answer from the homeserver (10 s to connect, 60 s per request), the admin room's answer
+  (20 s), the vault's credential for `room` (10 s, 1 s to read it), the gate's request (2 minutes) and its login
+  token (120 s), a backup waiting for the other runs' locks (180 s) and `clear` for the relay's poll (45 s), and one
+  probe of a starting homeserver (2 s). A request's limit, a backup's wait for the locks and `clear`'s wait for the
+  poll never drop below 45 s, the longest held sync and a margin, so a small factor cannot cut off `poll --wait` or
+  `room wait`, nor give up on a poll still holding its sync.
+- **`machines`**: the local homeserver's start (180 s), its backup (60 s), a `podman run` (300 s) and gathering
+  why a start or a run failed (4 s, 3 s).
+- **`polling`**: how often the admin room (250 ms), a lock (250 ms, 100 ms), a backup (100 ms) and a starting
+  homeserver (200 ms) are looked at again.
+- **`retries`**: the rounds of `expel` and `keep-room` (5) and the writes of `m.direct` (5).
+
+The held sync itself (`poll --wait`, at most 30 s, and `room wait`'s 30 s) follows no factor, nor does the unit's
+`TimeoutStartSec`, which a systemd drop-in sets.
+
 ## The lifecycle
 
 Porelo runs these to make a project's conversation, and keeps what they print without reading it. Each

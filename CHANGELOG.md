@@ -52,10 +52,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Every verb takes `--limits <line>` before it, Porelo's four time factors: each time limit of the transport is its
+  default times its group's factor (`services`, `machines`, `polling`, `retries`), so a slow homeserver or machine is
+  met by one setting rather than a new build. Without it all four are 1.0; a wrong line is 64. A request's limit and
+  every wait for a poll never drop below 45 s, so a held sync is never cut off.
 - The transport's packages ship the license and notice texts, in full, of everything compiled into its executable
-  (Jackson, with the parser jackson-core embeds, jspecify, and the GraalVM runtime) as `THIRD-PARTY-NOTICES`: in the
-  .deb beside its `copyright`, which names it and now follows Debian's copyright format, in the .rpm under
-  `/usr/share/licenses/porelo-message-transport-matrix/`. The build makes it with porelo-buildtools' generator and
+  (Jackson, with the parser jackson-core embeds, jspecify, porelo-wire, and the GraalVM runtime) as
+  `THIRD-PARTY-NOTICES`: in the .deb beside its `copyright`, which names it and now follows Debian's copyright
+  format, in the .rpm under `/usr/share/licenses/porelo-message-transport-matrix/`. The build makes it with porelo-buildtools' generator and
   refuses a jar whose bill names no license.
 - `members --project P [--login L]` says who is in the project's room: every joined or invited member with the name
   the room shows for it and whether it is a task (with the task's name, and its login on a central homeserver), a

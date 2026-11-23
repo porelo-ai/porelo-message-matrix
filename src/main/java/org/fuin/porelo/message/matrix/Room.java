@@ -194,7 +194,7 @@ final class Room {
                     ExecutionException,
                     TimeoutException,
                     Failure {
-        final long deadline = System.nanoTime() + CREDENTIAL_TIMEOUT.toNanos();
+        final long deadline = System.nanoTime() + Limits.services(CREDENTIAL_TIMEOUT).toNanos();
         final Set<ProcessHandle> descendants = new HashSet<>();
         final FutureTask<byte[]> output =
                 new FutureTask<>(
@@ -246,7 +246,9 @@ final class Room {
                         TimeUnit.NANOSECONDS);
             }
             final long readDeadline =
-                    Math.min(deadline, System.nanoTime() + READER_TIMEOUT.toNanos());
+                    Math.min(
+                            deadline,
+                            System.nanoTime() + Limits.services(READER_TIMEOUT).toNanos());
             // The answer first: it ends at its empty line, while stderr may stay open in a
             // descendant.
             final byte[] bytes =

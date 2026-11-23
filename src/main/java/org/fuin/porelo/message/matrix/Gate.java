@@ -122,7 +122,7 @@ final class Gate {
      */
     void serve(final InputStream in, final OutputStream out, final @Nullable Closeable connection)
             throws IOException {
-        serve(in, out, connection, IDLE);
+        serve(in, out, connection, Limits.services(IDLE));
     }
 
     /** As with {@link #IDLE}, under a limit of the caller's. */

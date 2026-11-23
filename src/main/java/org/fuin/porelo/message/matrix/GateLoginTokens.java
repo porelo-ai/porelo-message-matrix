@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 
@@ -42,6 +43,9 @@ final class GateLoginTokens {
 
     /** A person signs in with one; more than this unused at once is a loop, not a person. */
     static final int OPEN_PER_LOGIN = 16;
+
+    /** How long the second connection of one sign-in has to take its token up. */
+    private static final Duration LIFE = Duration.ofSeconds(120);
 
     private String issueLocked(final String login) throws IOException {
         if (!GateRules.login(login)) {
@@ -78,7 +82,7 @@ final class GateLoginTokens {
             final String token = Accounts.secret();
             GateFiles.write(
                     directory.resolve(hash(token)),
-                    login + "\n" + now.plusSeconds(120).getEpochSecond() + "\n",
+                    login + "\n" + now.plus(Limits.services(LIFE)).getEpochSecond() + "\n",
                     false);
             return token;
         }

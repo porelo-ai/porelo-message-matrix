@@ -61,7 +61,8 @@ final class Direct {
             throws Failure {
         final String path =
                 "/_matrix/client/v3/user/" + MatrixClient.segment(self) + "/account_data/m.direct";
-        for (int attempt = 0; attempt < REMEMBER_ATTEMPTS; attempt++) {
+        final int attempts = Limits.tries(REMEMBER_ATTEMPTS);
+        for (int attempt = 0; attempt < attempts; attempt++) {
             final Map<String, Set<String>> rooms = rooms(client, self);
             rooms.computeIfAbsent(person, p -> new LinkedHashSet<>()).add(room);
             final ObjectNode data = MatrixClient.JSON.createObjectNode();
@@ -82,7 +83,7 @@ final class Direct {
                         + " with "
                         + person
                         + " was written over in m.direct "
-                        + REMEMBER_ATTEMPTS
+                        + attempts
                         + " times by another writer; the chat is joined but not read until it is there");
     }
 

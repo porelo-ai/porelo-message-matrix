@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -49,6 +50,17 @@ final class Poll {
      * request limit.
      */
     static final int MAX_WAIT_SECONDS = 30;
+
+    /** The longest a sync is held open, by a poll or by {@code room wait}, and a margin. */
+    private static final Duration OUTLASTING_A_SYNC = Duration.ofSeconds(MAX_WAIT_SECONDS + 15L);
+
+    /**
+     * {@code scaled}, never below a held sync and a margin: a smaller factor would otherwise end a
+     * request, or a wait for a poll, while a healthy sync is still held.
+     */
+    static Duration outlastingASync(final Duration scaled) {
+        return scaled.compareTo(OUTLASTING_A_SYNC) < 0 ? OUTLASTING_A_SYNC : scaled;
+    }
 
     private Poll() {}
 

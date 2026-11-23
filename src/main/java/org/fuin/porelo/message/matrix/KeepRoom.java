@@ -290,15 +290,16 @@ final class KeepRoom {
             throws Failure {
         final ArrayNode removed = MatrixClient.JSON.createArrayNode();
         List<String> still = left.apply(read);
+        final int rounds = Limits.tries(ROUNDS);
         for (int round = 0; !still.isEmpty(); round++) {
-            if (round == ROUNDS) {
+            if (round == rounds) {
                 throw new Failure(
                         Exit.TEMPORARY,
                         who
                                 + " are still in "
                                 + alias
                                 + " after "
-                                + ROUNDS
+                                + rounds
                                 + " rounds: "
                                 + String.join(", ", still));
             }

@@ -17,6 +17,8 @@ final class AdminRoom {
 
     private static final Duration ANSWER_TIMEOUT = Duration.ofSeconds(20);
 
+    private static final Duration CHECK_INTERVAL = Duration.ofMillis(250);
+
     /**
      * What a command's argument may be: a user or room id, or a password made here - one word of
      * visible characters. A command is a line of text; an argument with a space or a line break in
@@ -86,7 +88,8 @@ final class AdminRoom {
                                         .put("body", text))
                         .path("event_id")
                         .asText("");
-        final Instant deadline = Instant.now().plus(ANSWER_TIMEOUT);
+        final Duration answerTimeout = Limits.services(ANSWER_TIMEOUT);
+        final Instant deadline = Instant.now().plus(answerTimeout);
         while (Instant.now().isBefore(deadline)) {
             // The newest first, down to the command. The server's answer names the command it
             // answers; another command's answer, or a notice of its own, is passed over.
@@ -115,7 +118,7 @@ final class AdminRoom {
                 }
             }
             try {
-                Thread.sleep(250);
+                Thread.sleep(Limits.polling(CHECK_INTERVAL));
             } catch (final InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 throw new Failure(
@@ -131,7 +134,7 @@ final class AdminRoom {
                         + " "
                         + text.split(" ")[1]
                         + "' within "
-                        + ANSWER_TIMEOUT.toSeconds()
+                        + answerTimeout.toSeconds()
                         + " s");
     }
 

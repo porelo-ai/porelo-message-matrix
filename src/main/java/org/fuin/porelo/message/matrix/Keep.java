@@ -57,7 +57,14 @@ final class Keep {
     /** A backup waits for the polls to end their long sync, and for another backup. */
     private static final Duration LOCK_WAIT = Duration.ofSeconds(180);
 
+    private static final Duration CHECK_INTERVAL = Duration.ofMillis(100);
+
     private Keep() {}
+
+    /** How long a backup waits for the polls' and another backup's locks. */
+    static Duration lockWait() {
+        return Poll.outlastingASync(Limits.services(LOCK_WAIT));
+    }
 
     static void run(
             final String verb,
@@ -75,7 +82,7 @@ final class Keep {
         final Path dir = Path.of(args.getFirst());
         final ObjectNode answer =
                 "backup".equals(verb)
-                        ? backup(dir, env, unit, BACKUP_WAIT, LOCK_WAIT, err)
+                        ? backup(dir, env, unit, Limits.machines(BACKUP_WAIT), lockWait(), err)
                         : restore(dir, env, unit, err);
         try {
             out.println(MatrixClient.JSON.writeValueAsString(answer));
@@ -109,7 +116,7 @@ final class Keep {
             final Duration wait,
             final PrintStream err)
             throws Failure {
-        return backup(dir, env, unit, wait, LOCK_WAIT, err);
+        return backup(dir, env, unit, wait, lockWait(), err);
     }
 
     /** A backup with one bounded budget for acquiring its locks. */
@@ -463,7 +470,7 @@ final class Keep {
             final Unit unit,
             final PrintStream err)
             throws Failure {
-        return retake(nobody, url, env, unit, LocalHomeserver.START_TIMEOUT, err);
+        return retake(nobody, url, env, unit, Limits.machines(LocalHomeserver.START_TIMEOUT), err);
     }
 
     /** Retakes with a bounded restart wait, including when the unit never answers. */
@@ -585,7 +592,9 @@ final class Keep {
             }
             final long remaining = lockWait.toNanos() - (System.nanoTime() - started);
             if (remaining > 0) {
-                pause(Duration.ofNanos(Math.min(100_000_000L, remaining)));
+                pause(
+                        Duration.ofNanos(
+                                Math.min(Limits.polling(CHECK_INTERVAL).toNanos(), remaining)));
             }
         }
     }
@@ -722,7 +731,7 @@ final class Keep {
     }
 
     private static void pause() throws Failure {
-        pause(Duration.ofMillis(100));
+        pause(Limits.polling(CHECK_INTERVAL));
     }
 
     private static void pause(final Duration duration) throws Failure {

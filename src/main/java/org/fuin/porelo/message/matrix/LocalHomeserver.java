@@ -91,6 +91,11 @@ final class LocalHomeserver {
 
     private static final Duration DIAGNOSTIC_TIMEOUT = Duration.ofSeconds(4);
 
+    private static final Duration PROBE_INTERVAL = Duration.ofMillis(200);
+
+    /** One probe's connect and answer: a port that takes the connection and never answers. */
+    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(2);
+
     private static final int CAUSE_LIMIT = 300;
 
     private static final String WITHHELD =
@@ -253,7 +258,7 @@ final class LocalHomeserver {
     }
 
     static void awaitUp(final URI url, final PrintStream err) throws Failure {
-        awaitUp(url, START_TIMEOUT, err);
+        awaitUp(url, Limits.machines(START_TIMEOUT), err);
     }
 
     /** Waits after a unit start, protecting any additional secrets made during this invocation. */
@@ -264,7 +269,7 @@ final class LocalHomeserver {
             final PrintStream err,
             final String... secrets)
             throws Failure {
-        awaitUp(url, START_TIMEOUT, env, unit, err, secrets);
+        awaitUp(url, Limits.machines(START_TIMEOUT), env, unit, err, secrets);
     }
 
     /** Waits after starting the unit, with its environment available to protect diagnostics. */
@@ -285,7 +290,7 @@ final class LocalHomeserver {
                 System::nanoTime,
                 Progress.INTERVAL,
                 err,
-                () -> Thread.sleep(200),
+                () -> Thread.sleep(Limits.polling(PROBE_INTERVAL)),
                 secrets);
     }
 
@@ -299,7 +304,7 @@ final class LocalHomeserver {
                 System::nanoTime,
                 Progress.INTERVAL,
                 err,
-                () -> Thread.sleep(200),
+                () -> Thread.sleep(Limits.polling(PROBE_INTERVAL)),
                 progressSecrets(Map.of()))) {
             throw new Failure(Exit.TEMPORARY, timeout(url, within));
         }
@@ -378,7 +383,7 @@ final class LocalHomeserver {
             final List<String> secrets)
             throws Failure {
         final HttpClient http =
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+                HttpClient.newBuilder().connectTimeout(Limits.services(PROBE_TIMEOUT)).build();
         final Instant deadline = clock.instant().plus(within);
         try (Progress progress = new Progress(nanoTime, interval, err, secrets)) {
             progress.phase("waiting for the homeserver on " + url.getRawAuthority(), within);
@@ -390,7 +395,7 @@ final class LocalHomeserver {
                                     // A port that takes the connection and never answers holds
                                     // no request past this, so the limit above is kept.
                                     HttpRequest.newBuilder(url.resolve("/_matrix/client/versions"))
-                                            .timeout(Duration.ofSeconds(2))
+                                            .timeout(Limits.services(PROBE_TIMEOUT))
                                             .build(),
                                     HttpResponse.BodyHandlers.discarding());
                     if (response.statusCode() == 200) {
@@ -422,7 +427,7 @@ final class LocalHomeserver {
                 new FutureTask<>(() -> readStartupCause(env, unit, additionalSecrets));
         Thread.ofPlatform().daemon().name("homeserver-startup-cause").start(cause);
         try {
-            return cause.get(DIAGNOSTIC_TIMEOUT.toNanos(), TimeUnit.NANOSECONDS);
+            return cause.get(Limits.machines(DIAGNOSTIC_TIMEOUT).toNanos(), TimeUnit.NANOSECONDS);
         } catch (final InterruptedException ex) {
             Thread.currentThread().interrupt();
             return "the homeserver's unit is unknown";
