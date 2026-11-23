@@ -475,7 +475,8 @@ final class RoomRehearsal {
             return "asked every task, got no answer within "
                     + seconds(answerWithin)
                     + " from "
-                    + String.join(", ", silent.stream().map(Task::display).toList());
+                    + String.join(", ", silent.stream().map(Task::display).toList())
+                    + records(event, silent);
         }
         final String wrong = onceEach(answersTo(messages, event, nonce), tasks);
         return wrong != null ? "asked every task, " + wrong : undelivered(event, tasks);
@@ -549,7 +550,8 @@ final class RoomRehearsal {
             return "asked "
                     + task.display()
                     + " directly, got no answer within "
-                    + seconds(answerWithin);
+                    + seconds(answerWithin)
+                    + records(posted.event(), List.of(task));
         }
         final String lacking = undelivered(posted.event(), List.of(task));
         if (lacking != null) {
@@ -687,6 +689,28 @@ final class RoomRehearsal {
             }
             pause.run();
         }
+    }
+
+    /**
+     * What the silent tasks' records say of the line, read once: whether Porelo delivered it and
+     * the agent did not answer, or it never reached the task.
+     */
+    private String records(final String event, final List<Task> silent) {
+        final String id = messageId(event);
+        final List<String> delivered = new ArrayList<>();
+        final List<String> not = new ArrayList<>();
+        for (final Task task : silent) {
+            try {
+                (delivered(talkLog.of(task.name()), id) ? delivered : not).add(task.name());
+            } catch (final Failure ex) {
+                // The silence is the failure; a record that cannot be read only leaves it unsorted.
+                return "; talk log unreadable: " + ex.getMessage();
+            }
+        }
+        return "; talk log shows it delivered to "
+                + (delivered.isEmpty() ? "none" : String.join(", ", delivered))
+                + ", not to "
+                + (not.isEmpty() ? "none" : String.join(", ", not));
     }
 
     static boolean delivered(final String log, final String id) {
