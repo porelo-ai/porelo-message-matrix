@@ -132,6 +132,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- The transport is built by GraalVM CE 25.6.5.1 (Java 25.0.5.1), whose Base64 decoder is fixed against
+  CVE-2026-114938; the transport decodes a Matrix event's signature field with it. A Porelo task's image installs
+  that archive by its digest, and the busy-room rehearsal step takes the same JDK.
 - The host's gate lets only a page at the forward the request came in on, `http://` and its `Host`, or Element
   Desktop's `vector://vector` read its answers; a page on another local port or name, such as the forge's web
   through the same tunnel, is refused with 403 and can no longer register a name of the person's. An SSO sign-in whose

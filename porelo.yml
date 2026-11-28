@@ -16,8 +16,8 @@ image:
                 build-essential zlib1g-dev ca-certificates curl git unzip rpm systemd \
             && rm -rf /var/lib/apt/lists/*
         RUN curl -fsSL -o /tmp/graalvm.tar.gz \
-                https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.5.5.0.3/graalvm-community-jdk-25i5-25.0.5.0.3_linux-x64_bin.tar.gz \
-            && echo "c6438dee6c3ade2220d40b7ccdcad24b512d30e233e61bb4fc70519522de34ef  /tmp/graalvm.tar.gz" | sha256sum -c - \
+                https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.6.5.1/graalvm-community-jdk-25i6-25.0.5.1_linux-x64_bin.tar.gz \
+            && echo "d792848db26f1602f0a5cf2cd9279d9a652d32ab450d891ce616c9ca67e359d0  /tmp/graalvm.tar.gz" | sha256sum -c - \
             && mkdir -p /opt/graalvm && tar -xzf /tmp/graalvm.tar.gz -C /opt/graalvm --strip-components=1 \
             && rm /tmp/graalvm.tar.gz \
             && for tool in java javac jar native-image; do ln -s /opt/graalvm/bin/$tool /usr/local/bin/$tool; done
